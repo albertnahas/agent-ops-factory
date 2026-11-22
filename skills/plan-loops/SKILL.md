@@ -22,7 +22,7 @@ Then ask only what the repo can't tell you, and at most three questions: how muc
 
 ## 2. Propose
 
-For each loop from the catalog whose "needs it when" holds, say in one line why this project needs it, then give its trigger and cadence, runtime (cloud for anything a customer waits on), outcome check (what it reads that the run didn't write), **checked by**, its **Supervisor** if it needs one (a loop that already reads its output and should steer it; most loops have none; see "Supervisors and Orders" in `KIT/docs/FACTORY_PLAYBOOK.md`), and a cost range. Order by what hurts most if it's missing. Also name the catalog loops you're leaving out and why, and any loop the project already has that the catalog says it doesn't need.
+For each loop from the catalog whose "needs it when" holds, say in one line why this project needs it, then give its trigger and cadence, runtime (cloud for anything a customer waits on), outcome check (what it reads that the run didn't write), **checked by**, its **Supervisor** if it needs one (a loop that already reads its output and should steer it; most loops have none; see "Supervisors and Orders" in `FACTORY/docs/FACTORY_PLAYBOOK.md`), and a cost range. Order by what hurts most if it's missing. Also name the catalog loops you're leaving out and why, and any loop the project already has that the catalog says it doesn't need.
 
 Stop and wait for the user to pick.
 
