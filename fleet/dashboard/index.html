@@ -267,7 +267,7 @@ button.fx-kpi:focus-visible { outline: 2px solid var(--color-fg); outline-offset
         <p class="fx-muted">Loops check each other's output, supervisors set their Orders, and anything that needs a person climbs to the master before it reaches you. Tap a loop to trace it, or You to see every path in.</p>
         <div class="fx-fview" role="group" aria-label="Show">
           <button type="button" class="fx-ltog" data-layer="check"><i></i>Checks</button>
-          <button type="button" class="fx-ltog" data-layer="sup" id="legend-sup" hidden><i class="sup"></i>Supervises</button>
+          <button type="button" class="fx-ltog" data-layer="sup" data-sups hidden><i class="sup"></i>Supervises</button>
           <button type="button" class="fx-ltog" data-layer="esc"><i class="esc"></i>Escalates</button>
           <button type="button" class="fx-ltog" data-problems>Problems</button>
         </div>
@@ -280,7 +280,7 @@ button.fx-kpi:focus-visible { outline: 2px solid var(--color-fg); outline-offset
         <span><span class="fx-dot" data-tone="bad"></span>Failing or silent</span>
         <span><span class="fx-dot" data-tone="none"></span>Not run yet or paused</span>
         <span><i></i>Checks</span>
-        <span><i class="sup"></i>Supervises</span>
+        <span data-sups hidden><i class="sup"></i>Supervises</span>
         <span><i class="esc"></i>Escalates</span>
         <span id="legend-glass" hidden><i class="glass"></i>Break-glass</span>
         <span><i class="gap"></i>Nobody reads it</span>
@@ -767,7 +767,7 @@ dash.draw('factory', (box) => {
   cols.append(col.workers, col.checkers, col.ends);
   const detail = el('div', 'fx-fdetail'); detail.hidden = true; detail.setAttribute('aria-live', 'polite');
   box.append(cols, detail);
-  document.querySelectorAll('#legend-sup').forEach((e) => { e.hidden = !g.sups.length; });
+  document.querySelectorAll('[data-sups]').forEach((e) => { e.hidden = !g.sups.length; });
   document.querySelectorAll('#legend-glass').forEach((e) => { e.hidden = !g.glass.length; });
 
   const paths = [];
