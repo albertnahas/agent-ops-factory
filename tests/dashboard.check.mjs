@@ -38,6 +38,30 @@ if (await withChanges.count()) {
 }
 loops.firstCardAll = await page.locator('#loop-groups .fx-card:first-child .fx-all button').click({timeout: 1000})
   .then(() => page.evaluate(() => document.querySelectorAll('#loop-groups .fx-card:first-child .fx-row').length), () => null);
+/* the prompt builder: its fields in order, then a prompt from filling every field one way (text "v-<id>", a longtext
+   "a" and "b" on two lines, a repeat "x" and "y", each choice's first option, numbers left at their default) */
+const fill = () => page.evaluate(() => {
+  const set = (i, v) => { i.value = v; i.dispatchEvent(new Event('input')); };
+  for (const q of document.querySelectorAll('#loop-form .fx-q')) {
+    const radio = q.querySelector('input[type=radio]:not([value=""])'); if (radio) { radio.click(); continue; }
+    const i = q.querySelector('.fx-input'); if (!i || i.readOnly || i.type === 'number') continue;
+    set(i, i.placeholder === 'One per line' ? 'x\ny' : i.tagName === 'TEXTAREA' ? 'a\nb' : 'v-' + q.dataset.q);
+  }
+});
+const built = async () => { await page.click('#loop-form .fx-form-body > .fx-btn'); await frames();
+  return page.evaluate(() => ({prompt: document.querySelector('#loop-form .fx-prompt')?.textContent ?? null, copy: !!document.querySelector('#loop-form .fx-built .fx-btn'),
+    founder: document.querySelectorAll('#loop-form .fx-founder').length, missing: document.querySelectorAll('#loop-form [data-missing]').length})); };
+const fields = () => page.evaluate(() => [...document.querySelectorAll('#loop-form .fx-q')].map((q) => q.dataset.q));
+const form = {offered: await page.locator('#loop-form .fx-btn', {hasText: 'New loop'}).count()};
+if (form.offered) {
+  await page.click('#loop-form .fx-btn'); await frames();
+  form.fields = await fields(); form.empty = await built(); await fill(); form.new = await built();
+  form.overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+  const row = page.locator('#loop-groups .fx-row').first(); await row.click(); await frames();
+  await row.locator('xpath=..').locator('.fx-btn', {hasText: 'Change this loop'}).click(); await frames();
+  form.loop = await page.inputValue('#loop-form [data-q="loop"] .fx-input');
+  form.editFields = await fields(); await fill(); form.edit = await built();
+}
 await page.click('#tab-waiting'); await frames();
 const waiting = await page.evaluate(() => ({
   badge: +document.querySelector('[data-draw="badge-waiting"]').textContent || 0,
@@ -68,4 +92,4 @@ if (improver.rows) {
 }
 ms.overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
 await browser.close();
-console.log(JSON.stringify({ms, errors, attention, factory, loops, improver, waiting: {...waiting, invalid: /Invalid Date|NaN/.test(waiting.text), text: undefined}}));
+console.log(JSON.stringify({ms, errors, attention, factory, loops, improver, form, waiting: {...waiting, invalid: /Invalid Date|NaN/.test(waiting.text), text: undefined}}));

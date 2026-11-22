@@ -206,6 +206,25 @@ button.fx-kpi:focus-visible { outline: 2px solid var(--color-fg); outline-offset
 .fx-fdetail p { margin: 0; overflow-wrap: anywhere; }
 .fx-fdetail .fx-defs { pointer-events: auto; margin-top: 4px; }
 .fx-defs { align-items: center; }
+#loop-form:not(:empty) { margin-bottom: var(--cds-gap-md); }
+.fx-form-body { display: grid; gap: 14px; padding: 14px; }
+.fx-form-body p { margin: 0; }
+.fx-q { display: grid; gap: 6px; min-width: 0; }
+.fx-q > .fx-btn, .fx-form-body > .fx-btn { justify-self: start; }
+.fx-ask { font-weight: var(--cds-font-weight-medium); }
+.fx-founder { margin-left: 6px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; color: var(--color-warn); }
+.fx-input { font: inherit; font-size: 16px; color: var(--color-fg); background: var(--color-bg); border: 1px solid var(--color-border-line); border-radius: 6px; padding: 8px 10px; width: 100%; box-sizing: border-box; min-width: 0; }
+textarea.fx-input { resize: vertical; }
+.fx-input[readonly] { background: var(--color-panel); color: var(--color-fg-muted); }
+.fx-q[data-missing] .fx-input, .fx-q[data-missing] .fx-choices { border-color: var(--color-bad); }
+.fx-miss { color: var(--color-bad); font-size: var(--cds-font-size-caption); }
+.fx-choices { display: grid; gap: 6px; border: 1px solid transparent; border-radius: 6px; }
+.fx-choice { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 8px; align-items: start; cursor: pointer; }
+.fx-choice input { margin: 3px 0 0; }
+.fx-choice small { display: block; }
+.fx-built:not(:empty) { display: grid; gap: 8px; }
+.fx-prompt { margin: 0; padding: 10px; font-size: 13px; white-space: pre-wrap; overflow-wrap: anywhere; background: var(--color-panel); border: 1px solid var(--color-border-line); border-radius: 6px; }
+.fx-built .fx-btn { justify-self: start; }
 .fx-defs .none { font-size: 13px; color: var(--color-fg-muted); }
 .fx-defs .k { width: 100%; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; color: var(--color-fg-muted); }
 .fx-legend { display: flex; flex-wrap: wrap; gap: 6px 14px; padding: 10px 14px; border-top: 1px solid var(--color-border-line); font-size: 11px; color: var(--color-fg-muted); }
@@ -264,6 +283,7 @@ button.fx-kpi:focus-visible { outline: 2px solid var(--color-fg); outline-offset
       <span class="fx-muted" data-draw="loop-count">—</span>
       <select class="dash-select" id="loop-filter" data-draw="loop-filter" aria-label="Show loops" data-source="loops"></select>
     </div>
+    <div id="loop-form" data-draw="loop-form" data-source="questions loops"></div>
     <div class="fx-grid" id="loop-groups" data-draw="loop-list" data-source="loops changes"></div>
     <section class="fx-card" id="services">
       <header><h2>Services and one-off jobs</h2><span class="fx-muted" data-draw="svc-count">—</span></header>
@@ -362,6 +382,8 @@ const ICONS = {
   chev: '<path d="m6 9 6 6 6-6"/>',
   right: '<path d="m9 18 6-6-6-6"/>',
   ext: '<path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>',
+  plus: '<path d="M5 12h14"/><path d="M12 5v14"/>',
+  pencil: '<path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/><path d="m15 5 4 4"/>',
   copy: '<rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/>',
   cloud: '<path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/>',
   'app-window': '<rect x="2" y="4" width="20" height="16" rx="2"/><path d="M10 4v4"/><path d="M2 8h20"/><path d="M6 4v4"/>',
@@ -428,7 +450,8 @@ const copyBtn = (cmd, label) => {
    page can only link to http and https */
 const DEFS = [['charter', 'Charter'], ['orders', 'Orders'], ['prompt', (r) => /^https?:/.test(r.prompt) ? 'Routine' : 'Prompt'],
   ['runner', (r) => /\.plist$/.test(r.runner) ? 'Plist' : 'Run script'], ['report', 'Latest report'], ['log', 'Run log']];
-const registered = (r) => !NOT_LOOP.includes(r.project) && r.checked_by != null;
+/* a loop with a registry row: what reads, steers and defines it is known, and the new-loop skill can change it */
+const registered = (r) => !health() && !NOT_LOOP.includes(r.project) && r.checked_by != null;
 const defsRow = (r) => {
   const defs = DEFS.filter(([k]) => r[k]);
   const none = registered(r) && !r.charter;
@@ -494,11 +517,98 @@ const retirePrompt = (r) => 'Retire the scheduled loop "' + r.loop + '" (' + [r.
   + 'Ask me for the reason first, then show me what you will remove and wait for my yes. Stop and remove its schedule'
   + (metaOf('Registry') ? ', delete its row in ' + metaOf('Registry') + ' and follow any retirement rules that file names. ' : '. ')
   + 'Then run python3 ' + (metaOf('Builder') || 'fleet.py') + ' and confirm it is gone.';
+/* the prompt builder. The page runs nothing: it asks the kit's new-loop questions (the questions dataset, from the kit's
+   questions.json) and builds the prompt the skill takes, its first line and then one "id: value" line per answer, a
+   repeated answer once per line, empty ones left out. A longtext answer stays on its one line. */
+const asked = (form) => { const q = dash.data('questions'); return q.status === 'ok' ? q.data.filter((x) => x.form === form) : []; };
+const promptOf = (form) => { const q = dash.data('questions'); const m = q.status === 'ok' && (q.meta || []).find((x) => x.label === 'prompt ' + form); return m ? m.value : null; };
+const answer = (q) => String((FX.form.values[q.id] ?? q.default ?? '')).trim();
+const promptText = (form) => [promptOf(form), ...asked(form).filter((q) => q.value == null).flatMap((q) => {
+  const v = answer(q);
+  return !v ? [] : (q.repeat ? v.split('\n').map((x) => x.trim()).filter(Boolean) : [v.replace(/\s*\n\s*/g, ' ')]).map((x) => q.id + ': ' + x);
+})].join('\n');
+const ask = (form, r) => {
+  const l = dash.data('loops'), {project = ''} = dash.params();
+  const known = l.status === 'ok' && l.data.some((x) => x.project === project && !NOT_LOOP.includes(x.project));
+  FX.form = {form, row: r || null, values: r ? {loop: r.loop} : known ? {project} : {}, built: null, missing: []};
+  go('loops'); dash.draw('loop-form');
+  document.getElementById('loop-form').scrollIntoView({block: 'start'});
+};
+const field = (q, choices, onInput) => {
+  const box = el('div', 'fx-q'), id = 'q-' + FX.form.form + '-' + q.id;
+  box.dataset.q = q.id;
+  const head = el(q.kind === 'choice' ? 'span' : 'label', 'fx-ask', q.ask);
+  if (q.kind !== 'choice') head.htmlFor = id;
+  if (!q.required) head.append(el('span', 'fx-muted', ' optional'));
+  if (q.mission) head.append(el('span', 'fx-founder', 'founder'));
+  box.append(head);
+  if (q.help) box.append(el('p', 'fx-muted', q.help));
+  const guide = linkBtn(q.guide, 'How to choose'); if (guide) box.append(guide);
+  const v = FX.form.values[q.id] ?? (q.default ?? '');
+  if (q.kind === 'choice') {
+    const set = el('div', 'fx-choices'); set.setAttribute('role', 'radiogroup'); set.setAttribute('aria-label', q.ask);
+    [...(q.required ? [] : [{value: '', label: 'None'}]), ...choices].forEach((c) => {
+      const lab = el('label', 'fx-choice'), r = el('input'); r.type = 'radio'; r.name = id; r.value = c.value; r.checked = String(v) === c.value;
+      r.onchange = () => onInput(q.id, c.value);
+      const txt = el('span'); txt.append(el('b', '', c.label));
+      if (c.route === 'founder') txt.append(el('span', 'fx-founder', 'founder'));
+      if (c.help) txt.append(el('small', 'fx-muted', c.help));
+      lab.append(r, txt); set.append(lab);
+    });
+    box.append(set);
+  } else {
+    const multi = q.kind === 'longtext' || q.repeat, input = el(multi ? 'textarea' : 'input', 'fx-input');
+    input.id = id; input.value = v;
+    if (multi) input.rows = 3; else input.type = q.kind === 'number' || q.kind === 'integer' ? 'number' : 'text';
+    if (q.kind === 'integer') input.step = '1'; if (q.kind === 'number') input.step = 'any';
+    if (q.repeat) input.placeholder = 'One per line';
+    if (q.kind === 'path' || q.kind === 'cron') { input.spellcheck = false; input.autocapitalize = 'off'; }
+    if (FX.form.form === 'edit' && q.id === 'loop' && FX.form.row) input.readOnly = true;
+    input.oninput = () => onInput(q.id, input.value);
+    box.append(input);
+  }
+  if (FX.form.missing.includes(q.id)) { box.dataset.missing = ''; box.append(el('p', 'fx-miss', 'Answer this one first')); }
+  return box;
+};
+dash.draw('loop-form', (box) => {
+  box.replaceChildren();
+  if (!promptOf('new') || !asked('new').length) return;
+  const f = FX.form;
+  if (!f) {
+    const b = el('button', 'fx-btn'); b.type = 'button'; b.append(icon('plus', 14), document.createTextNode('New loop'));
+    b.onclick = () => ask('new'); box.append(b); return;
+  }
+  const card = el('section', 'fx-card fx-form'), head = el('header');
+  head.append(el('h2', '', f.form === 'edit' ? 'Change ' + nameOf(f.row) : 'New loop'));
+  const close = el('button', 'fx-link', 'Close'); close.type = 'button'; close.onclick = () => { FX.form = null; dash.draw('loop-form'); };
+  head.append(close); card.append(head);
+  const body = el('div', 'fx-form-body');
+  body.append(el('p', 'fx-muted', 'Answer here, copy the prompt, and paste it into Claude Code. It asks for anything missing and confirms before it changes a thing.'));
+  if (f.row) body.append(el('p', 'fx-muted', 'Now: ' + [f.row.runtime && 'runs on ' + f.row.runtime, f.row.schedule, f.row.supervisor && 'supervised by ' + f.row.supervisor].filter(Boolean).join(' · ')));
+  const out = el('div', 'fx-built');
+  const onInput = (id, v) => { f.values[id] = v; f.built = null; out.replaceChildren(); };
+  const all = asked(f.form);
+  all.filter((q) => q.value == null).forEach((q) => body.append(field(q, all.filter((c) => c.id === q.id && c.value != null), onInput)));
+  const build = el('button', 'fx-btn'); build.type = 'button'; build.textContent = 'Build prompt';
+  build.onclick = () => {
+    f.missing = all.filter((q) => q.value == null && q.required && !answer(q)).map((q) => q.id);
+    f.built = f.missing.length ? null : promptText(f.form);
+    dash.draw('loop-form');
+    const first = document.querySelector('#loop-form [data-missing], #loop-form .fx-built pre'); if (first) first.scrollIntoView({block: 'center'});
+  };
+  body.append(build);
+  if (f.built) { const pre = el('pre', 'fx-prompt', f.built); out.append(pre, copyBtn(f.built, 'Copy prompt')); }
+  body.append(out); card.append(body); box.append(card);
+});
 const loopActs = (r) => {
   const acts = el('div', 'fx-acts');
   if (r.runtime === 'mac' && !NOT_LOOP.includes(r.project) && !['paused', 'missing'].includes(r.status) && r.job) acts.append(copyBtn('launchctl kickstart gui/' + metaOf('uid') + '/' + r.job, 'Copy run-now command'));
   if (r.project === 'Service' && r.status === 'failing') acts.append(copyBtn('launchctl bootout gui/' + metaOf('uid') + '/' + r.job, 'Copy stop command'));
-  acts.append(copyBtn(retirePrompt(r), 'Copy retire prompt'));
+  if (registered(r) && promptOf('edit')) {
+    const b = el('button', 'fx-btn'); b.type = 'button'; b.append(icon('pencil', 14), document.createTextNode('Change this loop'));
+    b.onclick = (e) => { e.stopPropagation(); ask('edit', r); };
+    acts.append(b);
+  } else acts.append(copyBtn(retirePrompt(r), 'Copy retire prompt'));
   return acts.childElementCount ? acts : null;
 };
 /* the improver's changes, from improvements.jsonl: each is a PR to one loop with the metric it should move by a read

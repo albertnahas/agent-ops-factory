@@ -1,0 +1,23 @@
+{
+  "about": "A test copy of the kit's new-loop question spec, using every kind and every optional key, so the dashboard's prompt builder is tested without the kit.",
+  "prompt": {"new": "/demo:new-loop", "edit": "/demo:new-loop edit"},
+  "new": [
+    {"id": "repo", "kind": "path", "required": true, "ask": "Which repo?", "help": "The local checkout."},
+    {"id": "name", "kind": "text", "required": true, "ask": "What's it called?", "help": "letters, digits, . _ and -"},
+    {"id": "mission", "kind": "longtext", "required": true, "mission": true, "ask": "What should it achieve?", "help": "One or two sentences."},
+    {"id": "x-surface", "kind": "text", "required": false, "repeat": true, "mission": true, "ask": "What can't a revert undo?", "help": "One per line."},
+    {"id": "runtime", "kind": "choice", "required": true, "ask": "Where does it run?", "help": "The first that fits.", "guide": "docs/RUNTIMES.md",
+     "choices": [{"value": "cloud", "label": "Cloud routine", "help": "Runs while the laptop sleeps."}, {"value": "launchd", "label": "Mac", "help": "Needs this machine."}]},
+    {"id": "schedule", "kind": "cron", "required": true, "ask": "When does it run?", "help": "A cron line."},
+    {"id": "project", "kind": "text", "required": false, "ask": "Which project?", "help": "Groups it on the dashboard."},
+    {"id": "role", "kind": "choice", "required": false, "ask": "A fleet role?", "help": "Most have none.", "choices": [{"value": "manager", "label": "Manager", "help": "Takes its project's escalations."}]},
+    {"id": "budget", "kind": "number", "required": false, "default": 5, "ask": "Most it may spend a run?", "help": "USD."},
+    {"id": "turns", "kind": "integer", "required": false, "default": 60, "ask": "Most turns a run?", "help": "A cap."}
+  ],
+  "edit": [
+    {"id": "loop", "kind": "text", "required": true, "ask": "Which loop?", "help": "Its registry name."},
+    {"id": "change", "kind": "choice", "required": true, "ask": "What do you want to change?",
+     "choices": [{"value": "orders", "label": "Orders or Target", "route": "orders", "help": "An Orders PR."}, {"value": "mission", "label": "Mission or Good", "route": "founder", "help": "A founder PR."}]},
+    {"id": "details", "kind": "longtext", "required": false, "ask": "What exactly?", "help": "The new words or number."}
+  ]
+}

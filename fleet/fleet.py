@@ -23,6 +23,7 @@ def load_config():
             "tasks": path("tasks", Path.home() / ".claude/scheduled-tasks"),
             "jobs": cfg.get("jobs") and Path(cfg["jobs"]).expanduser(),
             "improvements": path("improvements", "improvements.jsonl"),
+            "kit": Path(cfg.get("kit", os.environ.get("AGENT_OPS_KIT", Path.home() / ".agent-ops/kit"))).expanduser(),
             "refresh": cfg.get("refresh", "Rebuilt by fleet.py"), "waiting": cfg.get("waiting", {})}
 
 C = load_config()
@@ -447,6 +448,36 @@ def improvements(scope_of):
              "scope": scope_of.get(str(r["loop"]), "General")} for r in by.values() if name(r.get("loop"))]
     return sorted(rows, key=lambda r: str(r["date"] or ""), reverse=True)
 
+QUESTION = {"id", "kind", "required", "ask", "help", "choices", "default", "repeat", "mission", "guide"}
+KINDS = {"text", "longtext", "path", "choice", "cron", "number", "integer"}
+CHOICE = {"value", "label", "help", "route"}
+
+def questions():
+    """The kit's new-loop questions (skills/new-loop/questions.json), so the page's prompt builder asks exactly what the
+    skill asks. Rows of scalars in spec order: a question, then a row per choice (same id, its value set). The prompt
+    lines go in meta. A spec with a key, kind or choice this build doesn't know gives no rows and a reason, so the form
+    never asks a different question than the skill."""
+    f = C["kit"] / "skills/new-loop/questions.json"
+    if not f.is_file(): return [], [], None
+    try: spec = json.loads(f.read_text())
+    except ValueError as e: return [], [], f"{f}: {e}"
+    rows, bad = [], []
+    for form in ("new", "edit"):
+        for n, q in enumerate(spec.get(form, [])):
+            bad += [f"{form}.{q.get('id')}: unknown key {k}" for k in set(q) - QUESTION]
+            if q.get("kind") not in KINDS: bad.append(f"{form}.{q.get('id')}: unknown kind {q.get('kind')}")
+            row = {"form": form, "n": n, "id": q.get("id"), "kind": q.get("kind"), "required": bool(q.get("required")),
+                   "repeat": bool(q.get("repeat")), "mission": bool(q.get("mission")), "ask": q.get("ask"), "help": q.get("help"),
+                   "default": q.get("default"), "guide": where(C["kit"] / q["guide"]) if q.get("guide") else None,
+                   "value": None, "label": None, "route": None}
+            rows.append(row)
+            for c in q.get("choices", []):
+                bad += [f"{form}.{q.get('id')}.{c.get('value')}: unknown key {k}" for k in set(c) - CHOICE]
+                rows.append({**row, "help": c.get("help"), "value": c.get("value"), "label": c.get("label"), "route": c.get("route")})
+    prompts = [{"label": f"prompt {k}", "value": spec.get("prompt", {}).get(k)} for k in ("new", "edit")]
+    if bad or not all(p["value"] for p in prompts): return [], [], f"{f}: " + "; ".join(bad or ["no prompt lines"])
+    return rows, prompts, None
+
 def discovered(jobs, routines, tasks, led, week):
     """With no registry, everything found stands in for its own row: loops for scheduled jobs, routines, tasks and
     recent ledger names, services for jobs launchd keeps running. One-offs and vendors' jobs keep their own paths."""
@@ -725,7 +756,10 @@ def build():
     write("loops", rows, meta)
     write("waiting", items, meta[:1])
     write("changes", changes, meta[:1])
-    html(rows, items, meta, "Loop health" if health else "Loop fleet", changes)
+    asked, prompts, why = questions()
+    if why: print(f"questions: {why}", file=sys.stderr)
+    write("questions", asked, meta[:1] + prompts)
+    html(rows, items, meta, "Loop health" if health else "Loop fleet", changes, (asked, meta[:1] + prompts))
     return rows
 
 # --- what waits on you
@@ -824,10 +858,11 @@ def write(name, rows, meta):
     C["out"].mkdir(parents=True, exist_ok=True)
     (C["out"] / f"{name}.json").write_text(json.dumps({"rows": rows, "meta": meta}, indent=1, ensure_ascii=False) + "\n")
 
-def html(rows, items, meta, title, changes=()):
+def html(rows, items, meta, title, changes=(), questions=((), ())):
     """The same page the claude.ai dashboard runs, with a local stand-in for its runtime and the data inlined."""
     data = json.dumps({"loops": {"rows": rows, "meta": meta}, "waiting": {"rows": items, "meta": meta[:1]},
                        "changes": {"rows": list(changes), "meta": meta[:1]},
+                       "questions": {"rows": list(questions[0]), "meta": list(questions[1])},
                        "look": json.loads((ROOT / "dashboard/look.json").read_text()),
                        "params": json.loads((ROOT / "dashboard/params.json").read_text())}, ensure_ascii=False).replace("<", "\\u003c")  # no </script> or <!-- can end the script
     page = (ROOT / "dashboard/index.html").read_text()
