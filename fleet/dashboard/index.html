@@ -303,7 +303,7 @@ button.fx-kpi:focus-visible { outline: 2px solid var(--color-fg); outline-offset
 <script>
 const FX = window.FX = window.FX || {filter: 'all', open: new Set()};
 const NOT_LOOP = ['Service', 'One-off'];
-const URGENT = ['failing', 'silent', 'unregistered', 'chronic', 'stale'];
+const URGENT = ['failing', 'silent', 'unregistered', 'chronic', 'stale', 'missing'];
 const GAPS = ['no check', 'no runs yet', 'no record'];
 /* the project picked at the top: every count, list and tab shows its rows only; '' is all of them */
 const scoped = (rows, {project} = dash.params()) => rows.filter((r) => !project || r.scope === project);
@@ -311,13 +311,13 @@ const scoped = (rows, {project} = dash.params()) => rows.filter((r) => !project 
 const YOU = '\0you', NOBODY = '\0nobody', person = (c) => c === 'you' ? YOU : c;
 const checkers = (r) => r.checked_by ? r.checked_by.split(', ').map(person) : [];
 const LABEL = {failing: 'Failing', silent: 'Silent', unregistered: 'Unregistered', chronic: 'Flaky', stale: 'Stale data',
-  'no check': 'Unchecked', 'no runs yet': 'Not run yet', 'no record': 'No run record', ran: 'Ran', healthy: 'Healthy', paused: 'Paused', service: 'Running', 'one-off': 'One-off'};
+  'no check': 'Unchecked', 'no runs yet': 'Not run yet', 'no record': 'No run record', ran: 'Ran', healthy: 'Healthy', paused: 'Paused', missing: 'Missing', service: 'Running', 'one-off': 'One-off'};
 const TONE = {failing: 'bad', silent: 'bad', unregistered: 'warn', chronic: 'warn', stale: 'warn', 'no check': 'none', 'no runs yet': 'none',
-  'no record': 'none', ran: 'ok', healthy: 'ok', paused: 'none', service: 'ok', 'one-off': 'none'};
+  'no record': 'none', ran: 'ok', healthy: 'ok', paused: 'none', missing: 'warn', service: 'ok', 'one-off': 'none'};
 
 dash.calc('counts', {
   title: 'Loop counts',
-  description: 'In the project picked at the top: loops running (registered, not paused), healthy, failing or silent, needing a look (failing, silent, unregistered, flaky or stale, plus failing services), with no outcome check, items waiting on you, and those due within two days.',
+  description: 'In the project picked at the top: loops running (registered, not paused), healthy, failing or silent, needing a look (failing, silent, unregistered, flaky, stale or missing, plus failing services), with no outcome check, items waiting on you, and those due within two days.',
   inputs: ['loops', 'waiting'],
   fn: (loops, waiting) => {
     loops = scoped(loops, dash.params()); waiting = scoped(waiting, dash.params());
@@ -328,7 +328,7 @@ dash.calc('counts', {
       {status: 'loops', n: real.filter((r) => !['paused', 'unregistered'].includes(r.status)).length},
       {status: 'healthy', n: by('healthy', 'ran')},
       {status: 'failing', n: by('failing', 'silent')},
-      {status: 'attention', n: by('failing', 'silent', 'unregistered', 'chronic', 'stale') + loops.filter((r) => r.project === 'Service' && r.status === 'failing').length},
+      {status: 'attention', n: by(...URGENT) + loops.filter((r) => r.project === 'Service' && r.status === 'failing').length},
       {status: 'unchecked', n: by(...GAPS)},
       {status: 'waiting', n: waiting.length},
       {status: 'soon', n: waiting.filter((w) => w.due && w.due <= soon).length},

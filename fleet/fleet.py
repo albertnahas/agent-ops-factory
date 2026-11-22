@@ -74,7 +74,7 @@ def cells(line, outer=True):
 
 def table(md, heading, *keys):
     """Rows of the first markdown table under `## heading`, as dicts keyed by header, and what's wrong with the rows
-    left out: more cells than headers (an unescaped |), a blank key cell, or a first key a row above has (the first counts)."""
+    left out: more cells than headers (an unescaped |), a blank key cell, or a first key a row above has in any case (the first counts)."""
     if f"## {heading}" not in md: return [], []
     sec = md.split(f"## {heading}", 1)[1].split("\n## ", 1)[0]
     rows = [l for l in sec.split("\n") if l.startswith("|")]
@@ -85,9 +85,9 @@ def table(md, heading, *keys):
         r = dict(zip(head, c + [""] * len(head)))
         wrong = any(c[len(head):]) and f"{len(c)} cells under {len(head)} headers (a | in a cell is \\|)" or \
                 next((f"no {k}" for k in keys if not r.get(k)), None) or \
-                keys and r[keys[0]] in seen and f"a row above has this {keys[0]}; the first one counts"
+                keys and r[keys[0]].casefold() in seen and f"a row above has this {keys[0]}; the first one counts"
         if wrong: bad.append(f"{heading} row {next(filter(None, c), '')[:60]}: {wrong}")
-        else: out.append(r); seen.add(keys and r[keys[0]])
+        else: out.append(r); seen.add(keys and r[keys[0]].casefold())
     return out, bad
 
 # --- schedules: launchd calendar dicts and crons share one form, {Minute, Hour, Day, Month, Weekday} -> sets
@@ -353,7 +353,7 @@ def job_links(j):
 
 def definitions(reg, kind, ref, item, roots):
     """A registry loop's charter, its Orders (the first `orders/<name>.md` its charter names that is beside it), its prompt (a
-    routine's claude.ai page, a desktop task's SKILL.md) and its latest report."""
+    routine's claude.ai page, a desktop task's SKILL.md), its latest report, and whether the charter says `status: paused`."""
     charter = locate(reg.get("Charter"), reg.get("Project", ""), roots)
     text = read(charter) if charter else ""
     orders = next((f for f in (charter.parent / "orders" / n for n in re.findall(r"orders/([\w.-]+\.md)", text)) if exists(f)), None)
@@ -361,7 +361,8 @@ def definitions(reg, kind, ref, item, roots):
     return {"charter": where(charter), "orders": where(orders),
             "prompt": f"https://claude.ai/code/routines/{item['id']}" if kind == "routine" and (item or {}).get("id")
                       else where(task) if kind == "task" and task.is_file() else None,
-            "report": newest_report(charter, text) if charter else None}
+            "report": newest_report(charter, text) if charter else None,
+            "charter_paused": bool(re.search(r"^status:[ \t]*paused\b", text, re.M))}
 
 # --- the ledger claude-run and ops-check append to
 
@@ -427,13 +428,18 @@ def discovered(jobs, routines, tasks, led, week):
     return loops, services
 
 def tables():
-    """The registry's Registry, Services and Break-glass rows, and what's wrong with the rows left out."""
+    """The registry's Registry, Services and Break-glass rows, and what's wrong with the rows left out. A loop's name is
+    letters, digits, _ . and -, and not you or nobody, so it is a file name, a ledger key and a graph node as written."""
     md = "\n".join(lines(C["registry"]))
     (registry, b1), (services, b2), (glass, b3) = (table(md, "Registry", "Loop"), table(md, "Services", "Service"),
                                                    table(md, "Break-glass"))
-    return registry, services, glass, b1 + b2 + b3
+    ok = lambda n: re.fullmatch(r"[A-Za-z0-9_.-]+", n) and n.lower() not in ("you", "nobody")
+    b1 += [f"Registry row {r['Loop'][:60]}: a loop name is letters, digits, _ . and -, and not you or nobody" for r in registry if not ok(r["Loop"])]
+    return [r for r in registry if ok(r["Loop"])], services, glass, b1 + b2 + b3
 
-def links(registry, services, glass, bad=()):
+FAN_IN = 5  # more loops than this naming you in Checked by is a fan-in warning
+
+def links(registry, services, glass, bad=(), health=False):
     """Each registry loop's Checked by, Supervisor and Escalates to, and each break-glass entry's reason. A name is a loop's
     or service's name or its job, with or without the routine:/task: prefix, or you; any other name is kept as written, a
     checker the registry doesn't have. Supervisor, optional, is the one loop that writes this loop's Orders (or you): a
@@ -441,8 +447,10 @@ def links(registry, services, glass, bad=()):
     where the loop sends what needs a person; blank means its project's manager, else the master, else you (always you for the master). Once a loop
     has Role master, only it and the Break-glass table may reach you; escalation_issue says what breaks that. A cycle is
     drawn once, from its first loop by name; the other loops on it, and those whose chain runs into it, name that loop.
-    Returns (loops, break-glass reasons by name, issues that belong to no one loop: the `bad` rows tables() left out
-    and Break-glass rows that name nothing)."""
+    Checked by is checked too (not in health mode, whose rows have none): no reader but itself, a reader that is no loop,
+    service or you, a chain of readers that never reaches you, and you named on a loop that has a supervisor loop.
+    Returns (loops, break-glass reasons by name, issues that belong to no one loop: the `bad` rows tables() left out,
+    Break-glass rows that name nothing, and more than FAN_IN loops read straight by you)."""
     named = [(r["Loop"], r["Job"]) for r in registry] + [(r["Service"], r["Job"]) for r in services]
     alias = {k: n for n, j in named for k in (j, j.partition(":")[2]) if k} | {n: n for n, _ in named}
     resolve = lambda c: "you" if c.lower() == "you" else alias.get(c, c)
@@ -457,7 +465,8 @@ def links(registry, services, glass, bad=()):
     def default(loop):
         up = [m for m in managers.get(projects[loop], [])[:1] + masters[:1] if m != loop and roles[loop] != "master"]
         return up[0] if up else "you"
-    out = {r["Loop"]: {"checked_by": ", ".join(dict.fromkeys(resolve(c.strip()) for c in cell(r, "Checked by").split(",") if c.strip())),
+    readers = {r["Loop"]: list(dict.fromkeys(resolve(c.strip()) for c in cell(r, "Checked by").split(",") if c.strip())) for r in registry}
+    out = {r["Loop"]: {"checked_by": ", ".join(readers[r["Loop"]]),
                        "supervisor": resolve(cell(r, "Supervisor")) if cell(r, "Supervisor") else None,
                        "role": roles[r["Loop"]], "break_glass": reasons.get(r["Loop"]),
                        "escalates_to": resolve(cell(r, "Escalates to")) if cell(r, "Escalates to") else default(r["Loop"]),
@@ -478,9 +487,24 @@ def links(registry, services, glass, bad=()):
             said.update(dict.fromkeys(path, fate.get(up) and f"{what} runs into the cycle through {fate[up][0]}"))
         return said
     sup, esc = cycles("supervisor", "supervision"), cycles("escalates_to", "escalation")
+    known = set(out) | {s["Service"] for s in services}
+    reach, reads = {l for l, rs in readers.items() if "you" in rs}, {}  # loops whose readers lead to you; reader -> loops it reads
+    for l, rs in readers.items():
+        for c in rs: reads.setdefault(c, []).append(l)
+    todo = list(reach)
+    while todo:
+        for l in reads.get(todo.pop(), []):
+            if l not in reach: reach.add(l); todo.append(l)
     for loop, l in out.items():
-        l["supervisor_issue"] = (f"supervisor {l['supervisor']} is not a loop in the registry" if l["supervisor"] not in {**out, "you": 0, None: 0}
-                                 else sup[loop])
+        rs = [c for c in readers[loop] if c != loop]
+        issues = [f"supervisor {l['supervisor']} is not a loop in the registry" if l["supervisor"] not in {**out, "you": 0, None: 0}
+                  else sup[loop]] + ([] if health else [
+                  loop in readers[loop] and "Checked by names itself",
+                  not rs and "nobody reads it",
+                  *(f"checker {c} is not a loop, a service or you" for c in rs if c not in known | {"you"}),
+                  rs and loop not in reach and "its checkers never reach you",
+                  l["supervisor"] in out and "you" in rs and f"Checked by names you, but {l['supervisor']} supervises it"])
+        l["supervisor_issue"] = "; ".join(i for i in issues if i) or None
         project, to = projects[loop], l["escalates_to"]
         issues = [l["role"] not in (None, "master", "manager") and f"role {l['role']} is neither master nor manager",
                   l["role"] == "master" and len(masters) > 1 and f"{len(masters)} loops have Role master; the door to you is one loop",
@@ -491,8 +515,8 @@ def links(registry, services, glass, bad=()):
                   and "escalates straight to you; only the master and break-glass loops may",
                   esc[loop]]
         l["escalation_issue"] = "; ".join(i for i in issues if i) or None
-    known = set(out) | {s["Service"] for s in services}
-    loose = list(bad) + [f"{who}: break-glass names no loop or service in the registry" for who in reasons if who not in known] + \
+    fan = [] if health else [l for l, rs in readers.items() if "you" in rs]
+    loose = list(bad) + [f"you: {len(fan)} loops name you in Checked by, more than {FAN_IN}; let a supervisor loop read most of them"] * (len(fan) > FAN_IN) + [f"{who}: break-glass names no loop or service in the registry" for who in reasons if who not in known] + \
             [f"{who}: its break-glass row needs a reason" for who, why in reasons.items() if who in known - set(out) and not why]
     return out, reasons, loose
 
@@ -518,7 +542,7 @@ def build():
     snap_age_h = (now - snap_at).total_seconds() / 3600 if snap_at else None
     health = not registry and not services  # no registry: show every job's own health, nothing a registry would add
     if health: (registry, services), glass = discovered(jobs, routines, tasks, led, (now - dt.timedelta(days=7)).isoformat()), []
-    link, reasons, loose = links(registry, services, glass, bad)
+    link, reasons, loose = links(registry, services, glass, bad, health)
     window_from = max(first or now.date().isoformat(), (now - dt.timedelta(days=WINDOW)).date().isoformat())
     rows, claimed = [], set()
     gh = C["waiting"].get("github") or {}
@@ -549,7 +573,7 @@ def build():
             if item: row["next_due"] = iso(item["next_run_at"])
             if item and item["last_finished_at"] and loop not in led:
                 row["last_run"] = iso(item["last_finished_at"])
-                row["result"] = "pass" if item["last_status"] == "succeeded" else "fail"
+                row["result"] = None if item["last_status"] == "running" else "pass" if item["last_status"] == "succeeded" else "fail"
                 row["detail"] = f"routine run {item['last_status']}"
         row.update(definitions(reg, kind, ref, item, roots), **job_links(j))
         if override: spec = cron_spec(override.group(1), both=True)
@@ -582,12 +606,16 @@ def build():
         if spec and row["last_run"]:
             prev1, prev2 = nth(fires(spec, now, -1), 0), nth(fires(spec, now, -1), 1)
             late = bool(prev1 and prev2) and now - dt.datetime.fromisoformat(row["last_run"]) > (prev1 - prev2) + dt.timedelta(hours=12)
-        elif j and j["interval"] and row["last_run"]:  # one period plus 12 hours, as for a calendar
-            late = now - dt.datetime.fromisoformat(row["last_run"]) > dt.timedelta(seconds=j["interval"], hours=12)
+        elif j and j["interval"] and row["last_run"]:  # three periods, at least an hour
+            late = now - dt.datetime.fromisoformat(row["last_run"]) > max(dt.timedelta(seconds=3 * j["interval"]), dt.timedelta(hours=1))
+        if item and live and item["next_run_at"] and snap_at and item["next_run_at"] < snap_at - dt.timedelta(hours=1):
+            late = True  # claude.ai still had this run due an hour before the snapshot
         if health and late and j and loop not in led and not check:  # an old log is no proof: scripts often log elsewhere
             row.update(last_run=None, detail="; ".join(filter(None, [row["detail"], f"its log last changed {j['log_at']:%d %b}, so when it last ran is unknown"])))
             late = False
-        row["status"] = ("stale" if kind != "local" and (snap_age_h is None or snap_age_h > STALE_SNAPSHOT_H)
+        row["status"] = ("paused" if row.pop("charter_paused")
+                         else "stale" if kind != "local" and (snap_age_h is None or snap_age_h > STALE_SNAPSHOT_H)
+                         else "missing" if kind != "local" and not item
                          else "paused" if not live
                          else "failing" if row["result"] == "fail"
                          else "silent" if late
@@ -597,7 +625,8 @@ def build():
                          else "no record" if health and j and not row["last_run"]  # an exit code with no time: not on schedule
                          else "ran" if health
                          else "no check")
-        if row["status"] == "paused": row["next_due"] = None  # it won't run
+        if row["status"] in ("paused", "missing"): row["next_due"] = None  # it won't run
+        if row["status"] == "missing": row["detail"] = f"no {kind} named {ref} in the claude.ai snapshot: deleted or renamed there?"
         rows.append(row)
 
     for svc in services:
@@ -613,7 +642,7 @@ def build():
         runtime = "cron" if label.startswith("cron:") else "mac"
         if j["oneoff"]:
             rows.append({"loop": label, "project": "One-off", "runtime": runtime, "job": label, "status": "one-off", **job_links(j),
-                         "next_due": iso(nth(fires(j["spec"], now, 1, days=400), 0)), "schedule": "runs once, then removes itself"})
+                         "next_due": iso(nth(fires(j["spec"], now, 1, days=400), 0)), "schedule": "yearly, unless it removes itself after it runs"})
             continue
         rows.append({"loop": label, "project": "Unregistered", "runtime": runtime, "job": label, "status": "unregistered", **job_links(j),
                      "next_due": iso(nth(fires(j["spec"], now, 1), 0)) if j["spec"] else None,
