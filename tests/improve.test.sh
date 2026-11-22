@@ -77,9 +77,10 @@ expect "--check rejects any other Improver value" "! FLEET_CONFIG=$D/bad.json py
 python3 fleet/improve_read.py --json > "$D/read.json"
 K=$D/kpi.jsonl
 kpi() { jq -c --arg l "$1" 'select(.loop == $l) | del(.date)' "$K"; }
-expect "met: the latest value at or past its bar, as of its date"        "[ \"\$(kpi up)\" = '{\"loop\":\"up\",\"as_of\":\"2026-11-21\",\"value\":0.9,\"bar\":0.8,\"kpi\":\"met\"}' ] && [ \"\$(kpi even)\" = '{\"loop\":\"even\",\"as_of\":\"2026-11-21\",\"value\":5,\"bar\":5,\"kpi\":\"met\"}' ]"
-expect "below: since the streak began, attempts since then, escalated at 2 of 2" "[ \"\$(kpi down)\" = '{\"loop\":\"down\",\"as_of\":\"2026-11-21\",\"value\":50,\"bar\":62,\"kpi\":\"below\",\"since\":\"2026-11-15\",\"attempts\":2,\"of\":2,\"escalated\":true}' ]"
-expect "no KPI: no value, or a value with no bar"       "[ \"\$(kpi bare)\" = '{\"loop\":\"bare\",\"kpi\":\"no KPI\"}' ] && [ \"\$(kpi nobar)\" = '{\"loop\":\"nobar\",\"as_of\":\"2026-11-21\",\"value\":3,\"kpi\":\"no KPI\"}' ]"
+expect "met: the latest value at or past its bar, as of its date"        "[ \"\$(kpi up)\" = '{\"loop\":\"up\",\"as_of\":\"2026-11-21\",\"value\":0.9,\"better\":\"higher\",\"bar\":0.8,\"kpi\":\"met\"}' ] && [ \"\$(kpi even)\" = '{\"loop\":\"even\",\"as_of\":\"2026-11-21\",\"value\":5,\"better\":\"higher\",\"bar\":5,\"kpi\":\"met\"}' ]"
+expect "below: since the streak began, attempts since then, escalated at 2 of 2" "[ \"\$(kpi down)\" = '{\"loop\":\"down\",\"as_of\":\"2026-11-21\",\"value\":50,\"better\":\"higher\",\"bar\":62,\"kpi\":\"below\",\"since\":\"2026-11-15\",\"attempts\":2,\"of\":2,\"escalated\":true}' ]"
+expect "measured: a value with no bar"                  "[ \"\$(kpi nobar)\" = '{\"loop\":\"nobar\",\"as_of\":\"2026-11-21\",\"value\":3,\"better\":\"higher\",\"kpi\":\"measured\"}' ]"
+expect "no KPI: no value"                               "[ \"\$(kpi bare)\" = '{\"loop\":\"bare\",\"kpi\":\"no KPI\"}' ]"
 expect "a loop without Improver on gets no KPI line"     "[ -z \"\$(kpi off)\" ] && [ \$(wc -l < $K) -eq 5 ] && jq -e 'select(.date == \"2026-11-22\")' $K >/dev/null"
 O() { jq -Rc --arg i "$1" 'fromjson? | select(.id == $i and .outcome) | [.outcome, .moved]' "$D/improvements.jsonl"; }
 expect "kept: the mean beat the baseline it computed from the runs before, and the pass rate held" "[ \"\$(O k1)\" = '[\"kept\",true]' ] && jq -Re 'fromjson? | select(.id == \"k1\" and .outcome) | .baseline == 0.7 and .pass_rate_before == 1 and (.result | startswith(\"mean 0.9 vs baseline 0.7\"))' $D/improvements.jsonl >/dev/null"

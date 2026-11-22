@@ -45,12 +45,13 @@ def hit_rate(merged):
     return sum(r["outcome"] == "kept" and r.get("moved") is True for r in read), len(read)
 
 def kpi(loop, rs, first, today):
-    """Today's KPI line: met or below from the latest valued check against its bar, as of that check's date; no KPI with
-    no value or no bar."""
+    """Today's KPI line from the latest valued check, as of its date: met or below against its bar, measured with no bar,
+    no KPI with no value."""
     valued = [r for r in rs if num(r.get("value"))]
     last = valued[-1] if valued else {}
-    line = {"date": today, "loop": loop, "as_of": valued and last["at"].date().isoformat() or None, "value": last.get("value")}
-    if not num(last.get("bar")): return {**line, "kpi": "no KPI"}
+    if not valued: return {"date": today, "loop": loop, "kpi": "no KPI"}
+    line = {"date": today, "loop": loop, "as_of": last["at"].date().isoformat(), "value": last["value"], "better": last.get("better")}
+    if not num(last.get("bar")): return {**line, "kpi": "measured"}
     line["bar"] = last["bar"]
     if not ahead(last["bar"], last["value"], last.get("better")): return {**line, "kpi": "met"}
     streak = []

@@ -60,6 +60,7 @@ EOF
   echo '{"date":"2026-11-15","loop":"broken","kpi":"met","value":80,"bar":62,"floor":"at least 62%"}'
   echo '{"date":"2026-11-22","loop":"broken","kpi":"below","value":50,"bar":62,"of":2,"attempts":1,"since":"2026-11-22","escalated":false,"floor":"at least 62%"}'
   echo '{"date":"2026-11-22","loop":"good","kpi":"no KPI"}'
+  echo '{"date":"2026-11-22","loop":"fresh","kpi":"measured","value":5,"better":"higher","as_of":"2026-11-21"}'
   printf 'not json\n{"loop":"flaky","kpi":"great"}\n'
 } > "$AGENT_OPS_DIR/kpi.jsonl"
 mkdir -p "$AGENT_OPS_DIR/eval" && echo '{"window":"2026-11-08 to 2026-11-22 at 09:30","floor":{"detection":0.66},"fleet":{"incidents":12,"detected":8,"detection":0.667,"median_hours":2.65,"false_share":0.542},"attention":{"per_day":3.13}}' > "$AGENT_OPS_DIR/eval/result.json"
@@ -77,7 +78,7 @@ expect "never run is not run yet"              "[ \"\$(status fresh)\" = 'no run
 expect "a ledger name with no row is unregistered" "[ \"\$(status stray)\" = unregistered ]"
 expect "checked by is a comma list"            "jq -e '.rows[] | select(.loop == \"broken\") | .checked_by == \"good, heartbeat\"' $L >/dev/null"
 expect "every cell is a scalar, as on claude.ai" "jq -se 'all(.[].rows[][]; type != \"array\" and type != \"object\")' $L $AGENT_OPS_DIR/fleet/waiting.json >/dev/null"
-expect "a loop's KPI is its latest kpi.jsonl line, as scalar cells" "jq -e '[.rows[] | select(.loop == \"broken\" or .loop == \"good\" or .loop == \"flaky\") | [.loop, .kpi, .kpi_value, .kpi_attempts, .kpi_of, .kpi_since]] | sort == [[\"broken\", \"below\", 50, 1, 2, \"2026-11-22\"], [\"flaky\", null, null, null, null, null], [\"good\", \"no KPI\", null, null, null, null]]' $L >/dev/null"
+expect "a loop's KPI is its latest kpi.jsonl line, as scalar cells" "jq -e '[.rows[] | select(.loop == \"broken\" or .loop == \"good\" or .loop == \"flaky\" or .loop == \"fresh\") | [.loop, .kpi, .kpi_value, .kpi_attempts, .kpi_of, .kpi_since, .kpi_better]] | sort == [[\"broken\", \"below\", 50, 1, 2, \"2026-11-22\", null], [\"flaky\", null, null, null, null, null, null], [\"fresh\", \"measured\", 5, null, null, null, \"higher\"], [\"good\", \"no KPI\", null, null, null, null, null]]' $L >/dev/null"
 expect "the replay eval's latest scores ride in the meta, beside the KPIs" "jq -e '[.meta[] | select(.label | startswith(\"Eval: \"))] == [{\"label\": \"Eval: Replay window\", \"value\": \"2026-11-08 to 2026-11-22 at 09:30\"}, {\"label\": \"Eval: Replay, dashboard\", \"value\": \"catches 67% of real incidents (8 of 12), floor 66% · 54% of its flags are false alarms · flags in 2.65 h (median)\"}, {\"label\": \"Eval: Messages to you\", \"value\": \"3.13 a day\"}]' $L >/dev/null"
 C=$AGENT_OPS_DIR/fleet/changes.json
 expect "the improver's history: one row a change, the last line for an id wins, newest first" "jq -e '[.rows[] | [.id, .outcome, .moved, .result]] == [[\"c2\", \"pending\", null, null], [\"c1\", \"kept\", true, \"pass rate 60% to 90%\"]]' $C >/dev/null"

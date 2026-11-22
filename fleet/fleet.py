@@ -480,15 +480,15 @@ def questions():
     if bad or not all(p["value"] for p in prompts): return [], [], f"{f}: " + "; ".join(bad or ["no prompt lines"])
     return rows, prompts, None
 KPI = {"kpi": "kpi", "value": "kpi_value", "bar": "kpi_bar", "of": "kpi_of", "attempts": "kpi_attempts", "since": "kpi_since",
-       "escalated": "kpi_escalated", "date": "kpi_date", "as_of": "kpi_as_of"}
+       "escalated": "kpi_escalated", "date": "kpi_date", "as_of": "kpi_as_of", "better": "kpi_better"}
 def kpis():
     """Each loop's latest KPI line from kpi.jsonl (the improver's weekly read of its Good against its Floor), as the
-    loop row's kpi_* cells: kpi is met, below or "no KPI"; below carries since, attempts of its allowance and escalated."""
+    loop row's kpi_* cells: kpi is met, below, measured (no bar) or "no KPI"; below carries since, attempts of its allowance and escalated."""
     last = {}
     for l in lines(C["kpi"]):
         try: r = json.loads(l)
         except (ValueError, RecursionError): continue
-        if isinstance(r, dict) and name(r.get("loop")) and r.get("kpi") in ("met", "below", "no KPI"): last[str(r["loop"])] = r
+        if isinstance(r, dict) and name(r.get("loop")) and r.get("kpi") in ("met", "below", "measured", "no KPI"): last[str(r["loop"])] = r
     scalar = lambda v: v if v is None or isinstance(v, (int, float, bool)) else str(v)
     return {loop: {col: scalar(r.get(k)) for k, col in KPI.items()} for loop, r in last.items()}
 def evals():

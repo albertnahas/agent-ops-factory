@@ -655,10 +655,12 @@ const loopChanges = (r) => {
   return box;
 };
 /* a loop's KPI, from the improver's weekly read: its Good against the Floor and, below it, the attempts left before it
-   comes to you; a loop whose Good isn't measured has no KPI yet */
+   comes to you; a Good with no bar is measured, against no Floor; a loop whose Good isn't measured has no KPI yet */
 const goodText = (r) => r.kpi === 'met' || r.kpi === 'below'
   ? [r.kpi_value + ' vs Floor ' + (r.floor || r.kpi_bar), r.kpi === 'met' ? 'met' : r.kpi_since ? 'below since ' + dayMonth(String(r.kpi_since)) : 'below',
     r.kpi === 'below' && 'attempt ' + r.kpi_attempts + ' of ' + (r.kpi_of ?? 2), r.kpi_escalated && 'sent to you', r.kpi_as_of && 'as of ' + dayMonth(String(r.kpi_as_of))].filter(Boolean).join(' · ')
+  : r.kpi === 'measured' ? [r.kpi_value, r.kpi_better && r.kpi_better + ' is better', r.kpi_as_of && 'as of ' + dayMonth(String(r.kpi_as_of)),
+    r.floor ? 'Floor ' + r.floor : 'no Floor set'].filter(Boolean).join(' · ')
   : 'not measured · ' + (r.floor ? 'Floor ' + r.floor : 'no Floor set');
 const loopMore = (r) => (more) => {
   if (r.detail) { const p = el('p'); p.append(el('b', '', 'Last result: '), document.createTextNode(r.detail)); more.append(p); }
@@ -1137,12 +1139,12 @@ dash.draw('improver-list', (ul) => {
 dash.draw('evals', (box) => {
   const l = dash.data('loops'); box.replaceChildren();
   if (l.status !== 'ok') return failed(box, 'evaluations', l.status);
-  const rows = scoped(l.data).filter((r) => !NOT_LOOP.includes(r.project)), measured = rows.filter((r) => r.kpi === 'met' || r.kpi === 'below');
-  const below = measured.filter((r) => r.kpi === 'below'), pct = (n, d) => Math.round(100 * n / d) + '%';
+  const rows = scoped(l.data).filter((r) => !NOT_LOOP.includes(r.project)), measured = rows.filter((r) => ['met', 'below', 'measured'].includes(r.kpi));
+  const barred = measured.filter((r) => r.kpi !== 'measured'), below = barred.filter((r) => r.kpi === 'below'), pct = (n, d) => Math.round(100 * n / d) + '%';
   const checks = rows.map((r) => String(r.checks || '').match(/^(\d+) of (\d+)$/)).filter(Boolean), passed = checks.reduce((a, m) => a + +m[1], 0), ran = checks.reduce((a, m) => a + +m[2], 0);
   const ch = changesOf(), [hits, read] = ch ? hitRate(scoped(ch)) : [0, 0];
   const lines = [
-    ['Loops at or above their Floor', measured.length ? pct(measured.length - below.length, measured.length) + ' of measured (' + (measured.length - below.length) + ' of ' + measured.length + ')' : 'not measured'],
+    ['Loops at or above their Floor', barred.length ? pct(barred.length - below.length, barred.length) + ' of measured (' + (barred.length - below.length) + ' of ' + barred.length + ')' : 'not measured'],
     ['Loops whose Good is measured', rows.length ? pct(measured.length, rows.length) + ' (' + measured.length + ' of ' + rows.length + ')' : 'not measured'],
     ['Loops with a Floor', rows.length ? rows.filter((r) => r.floor).length + ' of ' + rows.length : 'not measured'],
     ['Health: checks passed', ran ? pct(passed, ran) + ' (' + passed + ' of ' + ran + ')' : 'not measured'],

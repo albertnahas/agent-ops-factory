@@ -38,6 +38,11 @@ if (await withChanges.count()) {
     return [t.find((s) => s.startsWith('Good: ')), t.find((s) => s.startsWith('Read by '))]; });
   if (process.env.SHOTS) await withChanges.first().locator('xpath=..').screenshot({path: process.env.SHOTS + '/loop-changes.png'});
 }
+const measured = page.locator('#loop-groups .fx-row', {has: page.locator('bdi', {hasText: /^lonely$/})});
+if (await measured.count()) {
+  await measured.first().click(); await frames();
+  loops.measured = await page.evaluate(() => [...document.querySelectorAll('#loop-groups .fx-more:not([hidden]) p')].map((p) => p.textContent).find((t) => t.startsWith('Good: ')));
+}
 loops.firstCardAll = await page.locator('#loop-groups .fx-card:first-child .fx-all button').click({timeout: 1000})
   .then(() => page.evaluate(() => document.querySelectorAll('#loop-groups .fx-card:first-child .fx-row').length), () => null);
 /* the prompt builder: its fields in order, then a prompt from filling every field one way (text "v-<id>", a longtext
