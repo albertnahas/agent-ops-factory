@@ -6,8 +6,12 @@ set -uo pipefail
 cd "$(dirname "$0")/.."
 export AGENT_OPS_DIR=$(mktemp -d) H=$(mktemp -d)
 trap 'rm -rf "$AGENT_OPS_DIR" "$H" "$H.reg"' EXIT
-mkdir "$AGENT_OPS_DIR/bin" && printf '#!/bin/sh\n' | tee "$AGENT_OPS_DIR/bin/crontab" > "$AGENT_OPS_DIR/bin/launchctl"
-chmod +x "$AGENT_OPS_DIR/bin/"* && export PATH="$AGENT_OPS_DIR/bin:$PATH"  # this machine's own jobs stay out of the test
+# launchctl and crontab stand-ins, so this machine's own jobs stay out of the test: what $AGENT_OPS_DIR/launchctl.txt
+# (launchctl list's table) and crontab.txt say
+mkdir "$AGENT_OPS_DIR/bin" && export PATH="$AGENT_OPS_DIR/bin:$PATH"
+printf '#!/bin/sh\n[ "$1" = list ] && cat "$AGENT_OPS_DIR/launchctl.txt" 2>/dev/null; exit 0\n' > "$AGENT_OPS_DIR/bin/launchctl"
+printf '#!/bin/sh\ncat "$AGENT_OPS_DIR/crontab.txt" 2>/dev/null; exit 0\n' > "$AGENT_OPS_DIR/bin/crontab"
+chmod +x "$AGENT_OPS_DIR/bin/"*
 fail=0
 expect() { if eval "$2"; then echo "ok    $1"; else echo "FAIL  $1"; fail=1; fi; }
 L="$AGENT_OPS_DIR/fleet/loops.json"
@@ -66,7 +70,7 @@ expect "a supervisor is a loop or you"         "[ \"\$(sup broken)\" = 'good | n
 expect "a supervisor's job names its loop"     "[ \"\$(sup reader | cut -d' ' -f1)\" = watched ]"
 expect "no supervisor is fine"                 "[ \"\$(sup lonely)\" = 'null | null' ]"
 expect "a missing supervisor is flagged"       "[ \"\$(sup fresh)\" = 'ghost | supervisor ghost is not a loop in the registry' ]"
-expect "supervision cycles are flagged"        "sup flaky | grep -q 'comes back to it: flaky → flaky' && sup reader | grep -q 'reader → watched → reader' && sup watched | grep -q 'watched → reader → watched'"
+expect "a supervision cycle is drawn once, on its first loop" "sup flaky | grep -q 'comes back to it: flaky → flaky' && sup reader | grep -q 'reader → watched → reader' && sup watched | grep -q 'in the cycle through reader'"
 expect "a registered row with no job is paused" "[ \"\$(status jobless)\" = paused ]"
 expect "the registry-only check names the same issues" "! python3 fleet/fleet.py --check > $AGENT_OPS_DIR/issues && diff <(jq -r '[.rows[] | select(.supervisor_issue) | \"\\(.loop): \\(.supervisor_issue)\"] | join(\"; \")' $L) $AGENT_OPS_DIR/issues"
 expect "no checker is an empty cell"           "jq -e '.rows[] | select(.loop == \"lonely\") | .checked_by == \"\"' $L >/dev/null"
@@ -181,6 +185,109 @@ expect "a path with spaces links encoded"        "[ \"\$(w \"$R/my notes/a.md\")
 touch "$AGENT_OPS_DIR/run.sh"
 run() { HOME="$AGENT_OPS_DIR" python3 -c "import sys; sys.path.insert(0, 'fleet'); from fleet import runner; print(runner(sys.argv[1:]) or '')" "$@" | sed "s|^$TMP/||"; }
 expect "a job's script is its last argument in your home" "[ \"\$(run /bin/bash \"$AGENT_OPS_DIR/run.sh\" morning)\" = run.sh ] && [ -z \"\$(run /bin/bash -c 'echo hi')\" ]"
+
+# Bad input: one odd line, file or field never stops the build or puts a list in a cell; it's left out, or flagged.
+mk() { O=$AGENT_OPS_DIR/case-$1; mkdir -p "$O/fleet" "$O/la" "$O/checks"; echo "{\"launch_agents\": \"$O/la\", \"waiting\": {\"queue\": {\"path\": \"$O/QUEUE.md\", \"owner\": \"You\"}}}" > "$O/fleet.json"; }
+build() { AGENT_OPS_DIR=$O FLEET_CONFIG=$O/fleet.json python3 fleet/fleet.py "$@" > "$O/said" 2>&1; }
+get() { jq -r --arg l "$1" ".rows[] | select(.loop == \$l) | $2" "$O/fleet/loops.json"; }
+reg() { printf '## Registry\n\n| Loop | Project | Runtime | Job | Schedule | Charter | Outcome check | Checked by | Supervisor |\n|---|---|---|---|---|---|---|---|---|\n'; printf '%s\n' "$@"; }
+row() { echo "| $1 | ${3:-P} | cloud | routine:$1 | daily | | | you | ${2:-} |"; }
+routine() { printf '{"name":%s,"enabled":%s,"cron":"0 6 * * *","next_run_at":%s,"last_status":%s,"last_finished_at":%s}' "$1" "${2:-true}" "${3:-null}" "${4:-null}" "${5:-null}"; }
+cloud() { echo "{\"at\":\"$(date +%FT%T%z)\",\"routines\":[$1],\"tasks\":${2:-[]}}" > "$O/fleet/cloud.json"; }
+scalar() { jq -se 'all(.[].rows[][]; type != "array" and type != "object")' "$O/fleet/loops.json" "$O/fleet/waiting.json" >/dev/null; }
+
+mk ledger; reg "$(row a)" > "$O/REGISTRY.md"; cloud "$(routine '"a"')"
+{ printf '{"loop":"a","date":"%s","check":"fail","detail":"report missing\xe2\x80\xa8really <!--<script>"}\n' "$(day 2)"
+  printf '{"loop":"b\xc3\xa9","detail":"x\xc3\n{"loop":["l"],"date":"%s"}\n{"loop":"a","date":20261121}\n' "$(day 1)"
+  printf '{"loop":"a","date":"%s","subtype":"success","cost":"1.5","detail":{"x":1}}\n{"loop":12345,"date":"%s","subtype":"success","cost":[1]}\n' "$(day 1)" "$(day 1)"
+  printf '{"loop":"a","date":"%s","subtype":"success","cost":1e999}\n{"loop":"a","date":"9999-12-31T23:59:59Z","subtype":"success"}\n' "$(day 3)"
+  python3 -c 'print("{\"x\": " + "[" * 100000 + "]" * 100000 + "}")'
+  printf '{"loop":"a","date":"%s","check":"pass"}\n' "$(day 9)"
+} > "$O/runs.jsonl"
+expect "bad bytes, odd types and deep nesting in the ledger don't stop the build" "build && scalar"
+expect "a failing check with a U+2028 in its output is still failing" "[ \"\$(get a .status)\" = failing ]"
+expect "the latest date is the last run, wherever its line sits" "[ \"\$(get a .last_run)\" = \"\$(day 1 | cut -c1-16)\" ]"
+expect "a cost that isn't a finite number counts as 0" "[ \"\$(get a .cost)\" = 0 ]"
+expect "a numeric loop name is a string"       "[ \"\$(get 12345 .status)\" = unregistered ] && jq -e 'all(.rows[]; .loop | type == \"string\")' $O/fleet/loops.json >/dev/null"
+expect "no text in the data can end the page's script" "grep 'window.FLEET' $O/fleet/dashboard.html | grep -v '<!--' | grep -q 'u003c!--'"
+
+mk tz; reg "$(row a)" > "$O/REGISTRY.md"; cloud "$(routine '"a"')"
+printf '{"loop":"a","date":"%s","subtype":"success","cost":1%s}\n' "$(date +%FT%T%z)" "$(printf '0%.0s' $(seq 400))" > "$O/runs.jsonl"
+expect "a +0100 offset is read; a 400-digit cost counts as 0" "build && [ \"\$(get a .last_run)\" != null ] && [ \"\$(get a .cost)\" = 0 ]"
+
+mk cloud; reg "$(row a)" "$(row b)" "$(row c)" > "$O/REGISTRY.md"
+echo "{\"at\":\"$(date -u +%FT%TZ)\",\"routines\":[$(routine '"a"' true null '"CANCELLED"' '"2026-11-21T06:00:00.123456789Z"'),
+$(routine '"b"' false '"2026-11-23T06:00:00Z"'),$(routine '"c"' true null '"SUCCEEDED"' '"2026-11-21T06:00:00Z"'),{\"enabled\":true},
+{\"name\":5,\"enabled\":true,\"cron\":[\"0 6 * * *\"],\"last_finished_at\":\"2026-11-21T06:00:00Z\"},\"junk\"],\"tasks\":{\"x\":1}}" > "$O/fleet/cloud.json"
+expect "a snapshot in any shape builds, Z times too" "build && scalar && [ \"\$(get a .status)\" != stale ]"
+expect "a routine's status is read in any case" "[ \"\$(get c .result)\" = pass ]"
+expect "a paused loop has no next run"         "[ \"\$(get b '\"\(.status) \(.next_due)\"')\" = 'paused null' ]"
+expect "a numeric routine name is a string, a list cron no cell" "[ \"\$(get 5 '.schedule')\" = 'on event' ]"
+echo '{}' > "$O/fleet/cloud.json"
+expect "an empty snapshot is stale data"       "build && [ \"\$(get a .status)\" = stale ]"
+echo "{\"at\":\"$(date +%FT%T)\",\"routines\":[$(routine '"a"')]}" > "$O/fleet/cloud.json"
+expect "a snapshot time with no offset is local" "build && [ \"\$(get a .status)\" = 'no runs yet' ]"
+
+mk mac; python3 - "$O/la" <<'P'
+import plistlib, sys
+for n, pl in {"str": {"Label": "com.t.str", "StartCalendarInterval": {"Hour": "9", "Minute": 0}}, "list": [1, 2],
+              "fast": {"Label": 77, "ProgramArguments": ["/bin/echo", 5], "StartInterval": 30, "StandardOutPath": "/"},
+              "intv": {"Label": "com.t.intv", "StartInterval": 300}, "exit": {"Label": "com.t.exit", "StartCalendarInterval": {"Hour": 9}}}.items():
+    open(f"{sys.argv[1]}/{n}.plist", "wb").write(plistlib.dumps(pl))
+P
+printf 'PID\tStatus\tLabel\n-\t0\t77\n-\t0\tcom.t.intv\n-\t1\tcom.t.exit\n-\t0\tcom.t.str\n' > "$O/launchctl.txt"
+printf '*/0 * * * * /bin/x.sh\n0 25 * * * /bin/y.sh\n0 22-2 * * * /bin/z.sh\n5 L * * * /bin/w.sh\n0 6 * * * /bin/ok.sh\n0 6 * * * /bin/%s.sh >> /tmp/%s.log\n' "$(printf 'l%.0s' $(seq 300))" "$(printf 'l%.0s' $(seq 300))" > "$O/crontab.txt"
+{ reg; for j in fast:77 intv:com.t.intv exit:com.t.exit; do echo "| ${j%%:*} | P | mac | ${j#*:} | daily | | | you | |"; done; } > "$O/REGISTRY.md"
+echo "{\"loop\":\"intv\",\"date\":\"$(day 5)\",\"check\":\"pass\"}" > "$O/runs.jsonl"
+expect "odd plists and crontab lines, a 300-character script name too, don't stop the build" "build && scalar && [ -z \"\$(get com.t.str .loop)\" ]"
+expect "a 5-minute job quiet for 5 days is silent" "[ \"\$(get intv .status)\" = silent ]"
+expect "a 30-second interval says so"          "[ \"\$(get fast .next_due)\" = 'every 30 s' ]"
+expect "a launchd exit is the exit code"       "get exit .detail | grep -q '^last run exited 1;'"
+expect "a crontab line cron would reject has no next run" "[ \"\$(get cron:x.sh .next_due)\$(get cron:y.sh .next_due)\$(get cron:z.sh .next_due)\$(get cron:w.sh .next_due)\" = nullnullnullnull ] && [ \"\$(get cron:ok.sh .next_due)\" != null ]"
+
+mk qdir; mkdir "$O/QUEUE.md"
+expect "a queue path that is a folder is no queue" "build"
+mk queue; printf '# Queue\nFormat: due | kind | item\n2026-12-01 | decision | Pick A | B price | You | decide | priced | agent\n2026-12-02 | decision | A \\| B | you | decide | x | agent\n| 2026-12-03 | todo | outer | YOU | do | x | agent |\n | todo | no date | You | do | x | \n' > "$O/QUEUE.md"
+W=$O/fleet/waiting.json
+expect "a queue line with a stray | is flagged, not dropped; prose with a | is skipped" "build && jq -e '[.rows[] | select(.title | startswith(\"A queue line\"))] | length == 1' $W >/dev/null"
+expect "a queue needs no header; \\| is a pipe; outer pipes, blank end cells and owner case are fine" "jq -e '[.rows[].item] | index(\"A | B\") and index(\"outer\") and index(\"no date\") and length == 4' $W >/dev/null"
+
+mk reg; L300=$(printf 'l%.0s' $(seq 300)); echo "open('$O/ran', 'w')" > "$O/pwn.py"
+{ reg "$(row dup '' Social-Algorithms)" "| dup | P | cloud | routine:d2 | daily | | | other | x |" "| x | y | broken | table | P | cloud | routine:e | daily | | | you | |" \
+      "$(row 'esc \| aped' '' 'Social algorithms')" "$(row "$(printf 'u\xe2\x80\xa8v')")" "$(row g '' General) |" "$(row "$L300")" "$(row ../pwn)"
+  for l in t2:t1 t1:ta ta:tb tb:tc tc:tb; do row "${l%%:*}" "${l#*:}"; done; } > "$O/REGISTRY.md"
+expect "a long, odd or U+2028 name doesn't stop the build" "build && [ -n \"\$(get \"$L300\" .loop)\" ] && [ -n \"\$(get \"\$(printf 'u\xe2\x80\xa8v')\" .loop)\" ]"
+expect "a loop name with ../ runs no check outside checks/" "[ ! -e $O/ran ]"
+expect "two rows with one name are one loop, the first row's" "[ \$(get dup .loop | wc -l) -eq 1 ] && [ \"\$(get dup .checked_by)\" = you ]"
+expect "a row with a stray | is left out; \\| is a pipe in a name" "[ -z \"\$(get x .loop)\" ] && [ \"\$(get 'esc | aped' .project)\" = 'Social algorithms' ]"
+expect "an empty cell past the last header is fine" "[ -n \"\$(get g .loop)\" ]"
+expect "spellings of a project share the first; a project called General is General" "[ \"\$(get 'esc | aped' .scope)\" = Social-Algorithms ] && [ \"\$(get g .scope)\" = General ]"
+expect "a chain that runs into a supervision cycle is flagged" "get t2 .supervisor_issue | grep -q 'runs into the cycle through tb' && get tc .supervisor_issue | grep -q 'in the cycle through tb'"
+build --check
+expect "the registry's issues wait on you on the page" "jq -e '[.rows[] | select(.kind == \"Registry\") | .item] | any(test(\"row dup: a row above\")) and any(test(\"cells under 9 headers\"))' $O/fleet/waiting.json >/dev/null"
+expect "--check names a duplicate, a broken row and each cycle once" "grep -q 'row dup: a row above has this Loop' $O/said && grep -q 'cells under 9 headers' $O/said && [ \$(grep -o 'comes back to it' $O/said | wc -l) -eq 1 ]"
+mk chain; { reg "$(row c1)"; for i in $(seq 2 2000); do row "c$i" "c$((i - 1))"; done; } > "$O/REGISTRY.md"
+expect "--check walks a 2000-deep supervisor chain in a blink" "perl -e 'alarm 3; exec @ARGV' env AGENT_OPS_DIR=$O FLEET_CONFIG=$O/fleet.json python3 fleet/fleet.py --check"
+mk none
+expect "--check fails with no registry to check" "! build --check && grep -q 'no Registry rows' $O/said"
+
+G=$AGENT_OPS_DIR/memo; git init -q --bare "$G.git" && git clone -q "$G.git" "$G" 2>/dev/null && mkdir "$G/docs"
+printf '## Founder decisions\n\n- Price the shop By 2026-12-01\n\n**Decision:**\n\n## Next\n' > "$G/docs/BETS.md"
+git -C "$G" add -A && git -C "$G" -c user.name=t -c user.email=t@t commit -qm m && git -C "$G" push -q origin HEAD 2>/dev/null && git -C "$G" remote set-head origin -a >/dev/null
+expect "a blank Decision line leaves the memo's decisions open" "[ \"\$(python3 -c \"import sys; sys.path.insert(0, 'fleet'); from fleet import memo_items; print(len(memo_items('o', 'r', '$G', {})))\")\" = 1 ]"
+
+mk sync; build; python3 - "$O/fleet" <<'P'
+import datetime as dt, hashlib, json, os, sys
+d = sys.argv[1]; t = int(dt.datetime.now().timestamp())
+for f in ("loops.json", "waiting.json"): os.utime(f"{d}/{f}", (t + .5, t + .5))
+json.dump({"at": dt.datetime.fromtimestamp(t).isoformat(), "blobs": {"loops": 1, "waiting": 1},
+           "page": hashlib.sha256(open("fleet/dashboard/index.html", "rb").read()).hexdigest()}, open(f"{d}/receipt.json", "w"))
+json.dump({"at": dt.datetime.fromtimestamp(t).astimezone().isoformat(), "routines": [], "tasks": []}, open(f"{d}/cloud.json", "w"))
+P
+sync() { AGENT_OPS_DIR=$O FLEET_CONFIG=$O/fleet.json python3 fleet/sync_check.py > "$O/said" 2>&1; }
+expect "a receipt from the second the data was written passes" "sync"
+jq -c '.rows = [{"loop": "a", "schedule": ["0 6 * * *"]}]' "$O/fleet/loops.json" > "$O/l" && mv "$O/l" "$O/fleet/loops.json" && touch -t "$(date -v-1M +%Y%m%d%H%M 2>/dev/null || date -d '1 minute ago' +%Y%m%d%H%M)" "$O/fleet/loops.json"
+expect "the sync check fails on a cell that isn't a scalar" "! sync && grep -q \"isn't a scalar\" $O/said"
 
 # Schedules: the next two fires after 10:00 on Sunday 22 Nov 2026 (or the day given), as crontab reads them.
 fires() { python3 -c "import sys, datetime as dt; sys.path.insert(0, 'fleet'); from fleet import cron_spec, fires, nth
