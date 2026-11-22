@@ -272,9 +272,10 @@ mk chain; { reg "$(row c1)"; for i in $(seq 2 2000); do echo "| c$i | P | cloud 
 expect "--check walks a 2000-deep supervisor and checker chain in a blink" "perl -e 'alarm 3; exec @ARGV' env AGENT_OPS_DIR=$O FLEET_CONFIG=$O/fleet.json python3 fleet/fleet.py --check"
 # Design answers: who reads a loop, a charter's pause, interval grace, and what claude.ai and launchd say.
 mk readers; { reg "$(row boss)" "| w | P | cloud | routine:w | daily | | | boss, you | boss |" "| self | P | cloud | routine:self | daily | | | self | |" \
-  "| r1 | P | cloud | routine:r1 | daily | | | r2 | |" "| r2 | P | cloud | routine:r2 | daily | | | r1 | |" "| ext | P | cloud | routine:ext | daily | | | vendor | |"
-  for i in 1 2 3 4 5; do row "f$i"; done; } > "$O/REGISTRY.md"
-expect "Checked by: a self-check, a cycle and a stranger are flagged" "build && [ \"\$(get self .supervisor_issue)\" = 'Checked by names itself; nobody reads it' ] && [ \"\$(get r1 .supervisor_issue)\" = 'its checkers never reach you' ] && [ \"\$(get ext .supervisor_issue)\" = 'checker vendor is not a loop, a service or you; its checkers never reach you' ]"
+  "| r1 | P | cloud | routine:r1 | daily | | | r2 | |" "| r2 | P | cloud | routine:r2 | daily | | | r1 | |" "| ext | P | cloud | routine:ext | daily | | | vendor | |" \
+  "| via | P | cloud | routine:via | daily | | | Build | |"
+  for i in 1 2 3 4 5; do row "f$i"; done; printf '\n## Services\n\n| Service | Job | What it is |\n|---|---|---|\n| Build | com.b | builds |\n'; } > "$O/REGISTRY.md"
+expect "Checked by: a self-check, a cycle and a stranger are flagged; a service ends a chain" "build && [ \"\$(get self .supervisor_issue)\" = 'Checked by names itself; nobody reads it' ] && [ \"\$(get r1 .supervisor_issue)\" = 'its checkers never reach you' ] && [ \"\$(get ext .supervisor_issue)\" = 'checker vendor is not a loop, a service or you' ] && [ \"\$(get via .supervisor_issue)\" = null ]"
 expect "a loop with a supervisor loop doesn't also name you" "[ \"\$(get w .supervisor_issue)\" = 'Checked by names you, but boss supervises it' ] && [ \"\$(get f1 .supervisor_issue)\" = null ]"
 build --check
 expect "--check warns when more than 5 loops go straight to you" "grep -q 'you: 7 loops name you in Checked by, more than 5' $O/said"

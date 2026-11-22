@@ -448,7 +448,7 @@ def links(registry, services, glass, bad=(), health=False):
     has Role master, only it and the Break-glass table may reach you; escalation_issue says what breaks that. A cycle is
     drawn once, from its first loop by name; the other loops on it, and those whose chain runs into it, name that loop.
     Checked by is checked too (not in health mode, whose rows have none): no reader but itself, a reader that is no loop,
-    service or you, a chain of readers that never reaches you, and you named on a loop that has a supervisor loop.
+    service or you, readers that only lead round loops (a cycle, or one nobody reads), and you on a loop with a supervisor loop.
     Returns (loops, break-glass reasons by name, issues that belong to no one loop: the `bad` rows tables() left out,
     Break-glass rows that name nothing, and more than FAN_IN loops read straight by you)."""
     named = [(r["Loop"], r["Job"]) for r in registry] + [(r["Service"], r["Job"]) for r in services]
@@ -488,7 +488,8 @@ def links(registry, services, glass, bad=(), health=False):
         return said
     sup, esc = cycles("supervisor", "supervision"), cycles("escalates_to", "escalation")
     known = set(out) | {s["Service"] for s in services}
-    reach, reads = {l for l, rs in readers.items() if "you" in rs}, {}  # loops whose readers lead to you; reader -> loops it reads
+    # loops whose readers lead out of the loops (to you, a service or a stranger, flagged on its own); reader -> loops it reads
+    reach, reads = {l for l, rs in readers.items() if any(c not in out for c in rs)}, {}
     for l, rs in readers.items():
         for c in rs: reads.setdefault(c, []).append(l)
     todo = list(reach)
