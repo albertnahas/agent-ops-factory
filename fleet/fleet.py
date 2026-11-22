@@ -427,7 +427,7 @@ IMPROVEMENT = ("id", "date", "loop", "pr", "change", "trace", "hypothesis", "met
 
 def improvements(scope_of):
     """The improver's history from improvements.jsonl: a line per change when its PR opens, then lines with the same id
-    as it is read (append only; later fields win). Rows of scalars, newest first, scoped like their loop: a list (the
+    as it is read (append only; later fields win, and a null never erases one). Rows of scalars, newest first, scoped like their loop: a list (the
     trace's links) as one link a line, anything else not a number or true/false as text."""
     by = {}
     for l in lines(C["improvements"]):
