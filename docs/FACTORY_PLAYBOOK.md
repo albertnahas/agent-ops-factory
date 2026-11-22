@@ -71,6 +71,19 @@ Two budgets, and the second runs out first.
 
 Anything else goes in a report or on the dashboard's waiting list, where you read it when you choose. When the fleet goes over budget, merge alerts or raise thresholds. Don't add a loop that pings you.
 
+**One door.** Three links join loops, and only one of them interrupts you:
+- **Checks** (Checked by): who reads a loop's output, when they choose to.
+- **Supervises** (Supervisor): who writes its Orders.
+- **Escalates** (Escalates to): where it sends anything that needs a person.
+
+Give one loop Role `master`, usually the master run that works your queue. From then on it's the only loop that messages you. Every other loop escalates to it, or to its project's manager, which escalates to the master. The master batches what reaches it, answers what it can, and sends you what's left in one message. A blank Escalates to follows that route, so most rows stay empty.
+
+**Break-glass.** A few things can't wait for the next master run: money at risk, production down, a security problem. The loops and services that watch for those go in the registry's Break-glass table, each with its reason, and they may message you directly. The table is the audit. If a row's reason no longer holds, delete it.
+
+**Managers.** A project earns a manager when it runs more than about four loops, or when its escalations alone go over your budget. Give its daily ops loop Role `manager`. It takes the project's escalations first, answers the ones its charter covers and passes the rest up. A smaller project doesn't need one: its loops escalate to the master.
+
+`fleet.py --check` fails when a loop that's neither the master nor break-glass escalates to you, when an escalation goes in a circle, and when Escalates to names something that isn't a loop. The fleet sync's outcome check runs it, so the heartbeat alerts you. The Factory tab counts the paths to you against the target, one plus the break-glass rows, and tapping You lights every path in.
+
 ## Fix or retire
 
 The two health rules live in the catalog: a check failing 3 of its last 7 runs is broken and gets fixed within a week or paused within two, and a loop whose output hasn't changed a decision, a PR or a post in 30 days is retired. The dashboard marks the first as Flaky. Nothing marks the second for you, so look for it.

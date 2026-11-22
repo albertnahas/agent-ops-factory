@@ -83,6 +83,53 @@ expect "punctuation doesn't count"             "[ \"\$(of social-algorithms)\" =
 expect "a repo of a general project is General" "[ \"\$(of ops)\" = Ops/General ]"
 expect "a repo of no project is General"       "[ \"\$(of ops-queue)\" = /General ]"
 expect "the dashboard carries the data"        "grep -q 'report missing' $AGENT_OPS_DIR/fleet/dashboard.html && grep -q 'dash-one-writer' $AGENT_OPS_DIR/fleet/dashboard.html"
+expect "with no master, every loop escalates to you, unflagged" "jq -e '[.rows[] | select(.project != \"Unregistered\" and .project != \"Service\")] | all(.escalates_to == \"you\" and .escalates_default and .escalation_issue == null)' $L >/dev/null"
+
+# Escalation: one master is the door to you; managers take their project's escalations; break-glass may skip the line.
+cat > "$AGENT_OPS_DIR/REGISTRY.md" <<EOF
+## Registry
+
+| Loop | Project | Runtime | Job | Schedule | Charter | Outcome check | Checked by | Supervisor | Escalates to | Role |
+|---|---|---|---|---|---|---|---|---|---|---|
+| door | Shop | cloud | routine:door | daily | | | you | | | Master |
+| boss | Shop | cloud | routine:boss | daily | | | you | | | manager |
+| boss2 | Shop | cloud | routine:boss2 | daily | | | you | | | manager |
+| worker | Shop | cloud | routine:worker | daily | | | boss | | | |
+| lone | Blog | cloud | routine:lone | daily | | | you | | | |
+| rogue | Blog | cloud | routine:rogue | daily | | | you | | you | |
+| pager | Blog | cloud | routine:pager | daily | | | you | | You | |
+| ping | Blog | cloud | routine:ping | daily | | | you | | pong | |
+| pong | Blog | cloud | routine:pong-job | daily | | | you | | routine:ping | |
+| astray | Blog | cloud | routine:astray | daily | | | you | | nowhere | |
+| odd | Blog | cloud | routine:odd | daily | | | you | | | chief |
+
+## Services
+
+| Service | Job | What it is |
+|---|---|---|
+| stripe | com.me.stripe | watches payments |
+
+## Break-glass
+
+| Who | Why |
+|---|---|
+| pager | production down |
+| com.me.stripe | money at risk, refunds |
+| phantom | security |
+EOF
+python3 fleet/fleet.py >/dev/null
+esc() { jq -r --arg l "$1" '.rows[] | select(.loop == $l) | "\(.escalates_to) \(.escalates_default) | \(.escalation_issue)"' "$L"; }
+expect "a blank goes to the project's manager"  "[ \"\$(esc worker)\" = 'boss true | null' ]"
+expect "a blank with no manager goes to the master" "[ \"\$(esc lone)\" = 'door true | null' ] && [ \"\$(esc boss | cut -d' ' -f1)\" = door ]"
+expect "the master's blank is you, even beside a manager"    "[ \"\$(esc door)\" = 'you true | null' ]"
+expect "only the master and break-glass reach you" "esc rogue | grep -q 'straight to you' && [ \"\$(esc pager)\" = 'you false | null' ]"
+expect "a break-glass reason is on its row"      "jq -e '[.rows[] | select(.break_glass)] | map(\"\\(.loop)=\\(.break_glass)\") == [\"pager=production down\", \"stripe=money at risk, refunds\"]' $L >/dev/null"
+expect "escalation cycles are flagged, by job too" "esc ping | grep -q 'comes back to it: ping → pong → ping'"
+expect "a target that is no loop is flagged"     "esc astray | grep -q 'escalates to nowhere, which is not a loop'"
+expect "one manager per project"                "esc boss | grep -q 'Shop has 2 managers' && esc boss2 | grep -q 'Shop has 2 managers'"
+expect "a role is master or manager"            "esc odd | grep -q 'role chief'"
+expect "every cell is still a scalar"           "jq -e 'all(.rows[][]; type != \"array\" and type != \"object\")' $L >/dev/null"
+expect "the registry-only check names every escalation issue" "! python3 fleet/fleet.py --check > $AGENT_OPS_DIR/issues && diff <(jq -r '[.rows[] | select(.escalation_issue) | \"\\(.loop): \\(.escalation_issue)\"] + [\"phantom: break-glass names no loop or service in the registry\"] | join(\"; \")' $L) $AGENT_OPS_DIR/issues"
 
 # Schedules: the next two fires after 10:00 on Sunday 22 Nov 2026 (or the day given), as crontab reads them.
 fires() { python3 -c "import sys, datetime as dt; sys.path.insert(0, 'fleet'); from fleet import cron_spec, fires, nth
@@ -108,6 +155,7 @@ expect "health: a dated job is a one-off"      "[ \"\$(status com.example.launch
 expect "health: unloaded and vendor jobs stay out" "! jq -e '.rows[] | select(.loop | test(\"old-experiment|vendor\"))' $L >/dev/null"
 expect "health: cron with an output file ran"  "[ \"\$(status cron:backup.sh)\" = ran ]"
 expect "health: an output file under a variable the crontab doesn't set has no record" "jq -e '.rows[] | select(.loop == \"cron:photo-sync.sh\") | .status == \"no record\" and (.detail | test(\"PHOTO_LOGS\"))' \$L >/dev/null"
+expect "health: a claude -p line is named after its output file, relative to its cd" "[ \"\$(status cron:notes-digest)\" = ran ]"
 expect "health: cron with no output file has no record" "[ \"\$(status cron:feed-poller.py)\" = 'no record' ]"
 expect "health: cron names skip shells, @reboot is skipped" "[ \"\$(status cron:never-ran.sh)\" = 'no runs yet' ] && ! jq -e '.rows[] | select(.loop | test(\"on-boot|bash|cd\$\"))' $L >/dev/null"
 expect "health: routines show their last status" "[ \"\$(status repo-dependency-check)\" = ran ] && [ \"\$(status release-notes-draft)\" = failing ] && [ -z \"\$(status paused-idea)\" ]"
@@ -124,11 +172,13 @@ names = {'cd /a && ./run.sh >> l 2>&1': 'run.sh', 'PATH=/x timeout 60 python3 /o
          '/bin/sh -lc "cd /x; ./y.sh"': 'y.sh', 'nice -n 5 /x/z.sh > /tmp/out': 'z.sh', 'bash -lc "source ~/.profile; /a/h.sh"': 'h.sh',
          'test -x f && f': 'f', '[ -f x ] && y': 'y', '( cd /a && ./z.sh )': 'z.sh', 'timeout -s KILL 300 x': 'x', 'flock -n lock x': 'x',
          "sh -c 'echo hi; x'": 'x', 'rsync -a src dst': 'rsync', '. ~/.profile && /a/dot.sh': 'dot.sh',
-         'flock -n /tmp/lock /a/m.sh': 'm.sh', 'env python3 /o/e.py --out x.txt': 'e.py', '/a/u.sh "unclosed': 'u.sh'}
+         'flock -n /tmp/lock /a/m.sh': 'm.sh', 'env python3 /o/e.py --out x.txt': 'e.py', '/a/u.sh "unclosed': 'u.sh',
+         'npm run build': 'build', 'cd /a && uv run python s.py': 's.py', 'npx tsx /a/job.ts': 'job.ts'}
 outs = {'/a/q.sh >> "/t/sp ace/q.log" 2>&1': '/t/sp ace/q.log', 'bash -c "x > inner.log"': str(Path.home() / 'inner.log'),
         'x &> /t/r.log': '/t/r.log', 'x 2> /t/err.log': '/t/err.log', 'x 2>&1 >> /t/o.log': '/t/o.log', 'x 2>&1': 'None',
         'x 2>&1 | tee -a /t/tee.log': '/t/tee.log', 'x >& /t/both.log': '/t/both.log', 'x 3> /t/fd3.log': 'None',
-        'x >> $NOPE/a.log': str(Path.home() / '$NOPE/a.log')}
+        'x >> $NOPE/a.log': str(Path.home() / '$NOPE/a.log'), 'cd /a && ./x.sh >> log 2>&1': '/a/log',
+        'x >> /t/p_$(date +%F).log': '/t/p_$', 'x >> /t/`date`.log': '/t/$.log'}
 bad = {k: cron_name(k) for k, v in names.items() if cron_name(k) != v} | {k: cron_output(k) for k, v in outs.items() if str(cron_output(k)) != v}
 assert not bad, bad
 assert str(cron_output('x >> ${L}/a.log', {'L': '/t'})) == '/t/a.log'

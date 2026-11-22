@@ -57,6 +57,7 @@ EOF
 printf '{\n\t"LastExitStatus" = 0;\n};\n' > "$D/launchctl/com.vendor.updater"
 
 : > "$D/logs/backup.log"; ago "$D/logs/backup.log" 2
+: > "$D/logs/notes-digest.log"; ago "$D/logs/notes-digest.log" $digest
 : > "$D/logs/nightly.log"; ago "$D/logs/nightly.log" $(( h >= 3 ? h - 3 : h + 21 ))
 cat > "$D/crontab" <<EOF
 # m h dom mon dow command
@@ -64,6 +65,7 @@ MAILTO=""
 LOGS=$D/logs
 0 */4 * * * cd $D && ./backup.sh >> \$LOGS/backup.log 2>&1
 45 * * * * $D/photo-sync.sh >> \$PHOTO_LOGS/sync.log 2>&1
+0 7 * * * cd $D && claude -p "Summarise yesterday's notes" >> logs/notes-digest.log 2>&1
 @hourly /usr/bin/python3 $D/feed-poller.py
 0 3 * * * /bin/bash -c "cd $D && timeout 300 ./nightly-export.sh" &> "$D/logs/nightly.log"
 30 2 * * * /bin/bash -lc $D/never-ran.sh >> $D/logs/never-ran.log 2>&1

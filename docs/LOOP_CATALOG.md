@@ -8,6 +8,8 @@ A loop is a trigger, one job written down as a charter (`docs/AGENT_LOOP.md`), a
 
 **Supervisor** is optional: a loop that checks how another loop is doing and writes its Orders. When a product has several loops, daily ops is the usual supervisor of the ones it already reads (growth, social, fix on demand). Strategy, support, incident and the per-person loops usually have none. See "Supervisors and Orders" in the [playbook](FACTORY_PLAYBOOK.md).
 
+**Escalates to** is where a loop sends anything that needs a person. Leave it blank: the default is the project's manager, else the master, and only the master messages you. Incident and payment watchers usually go in the Break-glass table instead. See "Budgets" in the [playbook](FACTORY_PLAYBOOK.md).
+
 ## Per product
 
 | Loop | Needs it when | Trigger | Output | Outcome check | Checked by | Cost |
