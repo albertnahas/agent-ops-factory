@@ -6,6 +6,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 export AGENT_OPS_DIR=${1:-$(mktemp -d)}
+export AGENT_OPS_KIT="$PWD/tests/kit"  # the test copy of the kit's question spec, never the real kit
 D=$AGENT_OPS_DIR
 mkdir -p "$D/bin" "$D/agents" "$D/logs" "$D/fleet"
 printf 'PID\tStatus\tLabel\n' > "$D/launchctl.txt"  # `launchctl list`: each loaded job's PID, last exit code and label

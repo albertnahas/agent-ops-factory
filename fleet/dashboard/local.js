@@ -24,7 +24,7 @@
   const resized = new ResizeObserver((entries) => requestAnimationFrame(() => entries.forEach(({target: e}) => {
     if (widths.get(e) !== e.clientWidth) { widths.set(e, e.clientWidth); draws[e.dataset.draw](e); }
   })));
-  for (const id of ['loops', 'waiting', 'changes']) {
+  for (const id of ['loops', 'waiting', 'changes', 'questions']) {
     const d = window.FLEET[id];
     /* as on claude.ai, a cell is a string, number, boolean or null */
     d.rows.forEach((r) => Object.entries(r).forEach(([k, v]) => { if (v !== null && typeof v === 'object') throw new TypeError(`${id}.${k} is not a scalar: ${JSON.stringify(v)}`); }));

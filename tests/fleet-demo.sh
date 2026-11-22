@@ -6,6 +6,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 export AGENT_OPS_DIR=${1:-$(mktemp -d)}
+export AGENT_OPS_KIT="$PWD/tests/kit"  # the test copy of the kit's question spec, never the real kit
 mkdir -p "$AGENT_OPS_DIR/fleet"
 echo "{\"launch_agents\": \"$AGENT_OPS_DIR/none\", \"tasks\": \"$AGENT_OPS_DIR/none\", \"refresh\": \"Demo data\"}" > "$AGENT_OPS_DIR/fleet.json"
 # Most loops are cloud routines; two are desktop-app tasks, and one is a launchd job, which shows as paused (not loaded here).

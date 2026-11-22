@@ -5,6 +5,7 @@
 set -uo pipefail
 cd "$(dirname "$0")/.."
 export AGENT_OPS_DIR=$(mktemp -d) H=$(mktemp -d)
+export AGENT_OPS_KIT="$PWD/tests/kit"  # the test copy of the kit's question spec, never the real kit
 trap 'rm -rf "$AGENT_OPS_DIR" "$H" "$H.reg"' EXIT
 # launchctl and crontab stand-ins, so this machine's own jobs stay out of the test: what $AGENT_OPS_DIR/launchctl.txt
 # (launchctl list's table) and crontab.txt say
@@ -176,6 +177,19 @@ expect "a routine links to its claude.ai page"   "[ \"\$(def ops prompt)\" = htt
 expect "a task links to its prompt file"         "[ \"\$(def nightly prompt)\" = tasks/nightly/SKILL.md ]"
 expect "a charter cell with no path, or a missing file, links nothing" "[ -z \"\$(def nightly charter)\$(def bare charter)\$(def bare orders)\$(def bare report)\" ]"
 expect "every link cell is a scalar"             "jq -e 'all(.rows[][]; type != \"array\" and type != \"object\")' $L >/dev/null"
+# The prompt builder's questions: the kit's spec, flattened to rows of scalars in its order, choices after their question.
+Q="$AGENT_OPS_DIR/fleet/questions.json"
+qs() { python3 -c "import sys; sys.path.insert(0, 'fleet'); import fleet; r, p, why = fleet.questions(); print(why or '')"; }
+expect "questions follow the spec in order, a row per choice" "python3 -c 'import json,sys; s=json.load(open(\"tests/kit/skills/new-loop/questions.json\")); r=json.load(open(\"$Q\"))[\"rows\"]; sys.exit(0 if [(x[\"form\"],x[\"id\"],x[\"value\"]) for x in r]==[(f,q[\"id\"],v) for f in (\"new\",\"edit\") for q in s[f] for v in [None]+[c[\"value\"] for c in q.get(\"choices\",[])]] and [x[\"route\"] for x in r if x[\"id\"]==\"change\" and x[\"value\"]]==[\"orders\",\"founder\"] else 1)'"
+expect "its prompt lines are in meta, every cell a scalar" "jq -e '([.meta[] | select(.label | startswith(\"prompt \")) | .value] == [\"/demo:new-loop\", \"/demo:new-loop edit\"]) and all(.rows[][]; type != \"array\" and type != \"object\")' $Q >/dev/null"
+mkdir -p "$AGENT_OPS_DIR/kit2/skills/new-loop"; jq '.new[0].colour = "red" | .edit[0].kind = "date"' tests/kit/skills/new-loop/questions.json > "$AGENT_OPS_DIR/kit2/skills/new-loop/questions.json"
+expect "a spec this build doesn't know asks nothing, and says why" "AGENT_OPS_KIT=$AGENT_OPS_DIR/kit2 python3 fleet/fleet.py 2>&1 >/dev/null | grep -q 'unknown key colour.*unknown kind date' && jq -e '.rows == []' $Q >/dev/null"
+expect "no kit, no questions"                     "AGENT_OPS_KIT=$AGENT_OPS_DIR/none python3 fleet/fleet.py >/dev/null 2>&1 && jq -e '.rows == []' $Q >/dev/null"
+KIT=${AGENT_OPS_KIT_REAL:-$HOME/.agent-ops/kit}
+if [ -f "$KIT/skills/new-loop/questions.json" ]; then
+  expect "the installed kit's spec is one this build reads" "[ -z \"\$(AGENT_OPS_KIT=$KIT qs)\" ]"
+else echo "skip  the installed kit's spec is one this build reads (no kit at $KIT)"; fi
+python3 fleet/fleet.py >/dev/null
 touch "$AGENT_OPS_DIR/co/shop/docs/LOOP.md"
 loc() { python3 -c "import sys; from pathlib import Path; sys.path.insert(0, 'fleet'); from fleet import locate
 co = Path('$AGENT_OPS_DIR'); print(locate('\`$1\`', '$2', {'shop': [co / 'co/shop', co / 'co2/shop']}) or '')" | sed "s|^$TMP/||"; }
@@ -331,8 +345,8 @@ expect "a blank Decision line leaves the memo's decisions open" "[ \"\$(python3 
 mk sync; build; python3 - "$O/fleet" <<'P'
 import datetime as dt, hashlib, json, os, sys
 d = sys.argv[1]; t = int(dt.datetime.now().timestamp())
-for f in ("loops.json", "waiting.json", "changes.json"): os.utime(f"{d}/{f}", (t + .5, t + .5))
-json.dump({"at": dt.datetime.fromtimestamp(t).isoformat(), "blobs": {"loops": 1, "waiting": 1, "changes": 1},
+for f in ("loops.json", "waiting.json", "changes.json", "questions.json"): os.utime(f"{d}/{f}", (t + .5, t + .5))
+json.dump({"at": dt.datetime.fromtimestamp(t).isoformat(), "blobs": {"loops": 1, "waiting": 1, "changes": 1, "questions": 1},
            "page": hashlib.sha256(open("fleet/dashboard/index.html", "rb").read()).hexdigest()}, open(f"{d}/receipt.json", "w"))
 json.dump({"at": dt.datetime.fromtimestamp(t).astimezone().isoformat(), "routines": [], "tasks": []}, open(f"{d}/cloud.json", "w"))
 P

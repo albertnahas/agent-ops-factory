@@ -4,6 +4,7 @@
 # Usage: tests/replay.test.sh   Needs bash, jq and python3. Writes only to a temp folder.
 set -uo pipefail
 cd "$(dirname "$0")/.."
+export AGENT_OPS_KIT="$PWD/tests/kit"  # the test copy of the kit's question spec, never the real kit
 T=$(mktemp -d); trap 'rm -rf "$T"' EXIT
 fail=0
 expect() { if eval "$2"; then echo "ok    $1"; else echo "FAIL  $1"; fail=1; fi; }

@@ -8,6 +8,7 @@
 set -uo pipefail
 cd "$(dirname "$0")/.."
 export AGENT_OPS_DIR=$(mktemp -d)
+export AGENT_OPS_KIT="$PWD/tests/kit"  # the test copy of the kit's question spec, never the real kit
 trap 'rm -rf "$AGENT_OPS_DIR"' EXIT
 fail=0
 expect() { if eval "$2"; then echo "ok    $1"; else echo "FAIL  $1"; fail=1; fi; }
@@ -78,6 +79,28 @@ expect "every waiting item is listed, dated or not"  "q odd '.waiting.badge == 7
 expect "a loop's panel lists its changes"              "q odd '.loops.changes == 4'"
 expect "the Improver card lists the scope's changes and its hit rate" "q odd '.improver.rows == (if .improver.scope == \"Shop\" then 4 else 5 end) and (.improver.rate | startswith(\"1 of 2 moved their metric\")) and .improver.detail'"
 expect "a fleet with no changes shows no Improver card" "q clique '.improver.rows == 0 and .improver.hidden'"
+# the form asks the spec's questions in its order and builds the prompt the skill reads, checked against the spec file itself
+want() { python3 - "$1" "$2" <<'P'
+import json, sys
+s, form = json.load(open("tests/kit/skills/new-loop/questions.json")), json.load(open(sys.argv[1]))["form"]
+def lines(f, loop=None):
+    out = [s["prompt"][f]]
+    for q in s[f]:
+        v = (q["choices"][0]["value"] if q["kind"] == "choice" else loop if q["id"] == "loop" and loop else ["x", "y"] if q.get("repeat")
+             else "a b" if q["kind"] == "longtext" else q.get("default") if q["kind"] in ("number", "integer") else "v-" + q["id"])
+        out += [f"{q['id']}: {x}" for x in (v if isinstance(v, list) else [v] if v is not None else [])]
+    return "\n".join(out)
+ok = {"fields": form["fields"] == [q["id"] for q in s["new"]] and form["editFields"] == [q["id"] for q in s["edit"]],
+      "new": form["new"]["prompt"] == lines("new"), "edit": form["edit"]["prompt"] == lines("edit", form["loop"])}[sys.argv[2]]
+sys.exit(0 if ok else 1)
+P
+}
+expect "the form asks the spec's questions, in its order" "want $AGENT_OPS_DIR/clique.json fields"
+expect "an empty form asks for each required answer first" "q clique \".form.empty.prompt == null and .form.empty.missing == $(jq '[.new[] | select(.required)] | length' tests/kit/skills/new-loop/questions.json)\""
+expect "New loop builds the skill's prompt, with a Copy button" "want $AGENT_OPS_DIR/clique.json new && q clique '.form.new.copy'"
+expect "Change this loop builds the edit prompt for that loop, founder route marked" "want $AGENT_OPS_DIR/clique.json edit && q clique '.form.edit.founder == 1 and .form.loop != \"\"'"
+expect "the open form and its prompt fit the phone" "q clique '.form.overflow == 0'"
+expect "with no question spec there's no builder" "q odd '.form.offered == 0'"
 expect "nothing is wider than the phone"             "q odd '.ms.overflow == 0'"
 expect "a long project name keeps its loop count in view" "q odd '.loops.countsVisible'"
 expect "a project card shows 25 loops, then See all opens the rest in place" "q big '.loops.firstCard == 25 and .loops.firstCardAll == 30'"
