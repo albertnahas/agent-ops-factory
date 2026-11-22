@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
 # Checks the dashboard page itself in headless Chromium at phone width: the Factory tab stays fast on dense check graphs,
-# and rows the builder may let through (a name that isn't a string, a loop named you or nobody, a due that isn't a date,
-# a right-to-left project) still draw every tab.
+# long lists show their first rows and a See all, a big fleet's Factory tab asks for a project, and rows the
+# builder may let through (a name that isn't a string, a loop named you or nobody, a due that isn't a date, a right-to-left
+# or very long project) still draw every tab.
 # Usage: tests/dashboard.test.sh   Needs bash, python3, node and Playwright (PLAYWRIGHT=<path to its index.mjs> if node
-# can't find it); without Playwright it builds the fixtures, prints their paths and skips. Writes only to a temp folder.
+# can't find it). Without Playwright it fails, unless DASHBOARD_TEST=skip. Writes only to a temp folder.
 set -uo pipefail
 cd "$(dirname "$0")/.."
 export AGENT_OPS_DIR=$(mktemp -d)
@@ -30,18 +31,32 @@ loops, waiting = (json.loads((C["out"] / f"{n}.json").read_text()) for n in ("lo
 row = next(r for r in loops["rows"] if r["loop"] == "ops-a")
 loops["rows"] += [{**row, "loop": n, "project": p, "scope": p, "checked_by": c} for n, p, c in
                   ((5, "Shop", "you"), (None, "Shop", "you"), ("you", "Shop", "ops-a"), ("nobody", "Shop", "you"), ("lonely", "Shop", ""),
-                   ("لولאת-חנות-loop", "לולאת-חנות", "you"), ("zalgo-loop", "Zalgo-Z̷̢͓̈́a̸̧̛l̶g̷o̶", "you"))]
+                   ("لولאת-חנות-loop", "לולאת-חנות", "you"), ("zalgo-loop", "Zalgo-Z̷̢͓̈́a̸̧̛l̶g̷o̶", "you"), ("long-loop", "P" * 255, "you"))]
 item = {"title": "Pick a price", "tag": "Decision", "source": "Queue", "kind": "Queue", "item": "Pick a price", "action": "decide",
         "where": "queue (decision)", "link": None, "since": None, "project": "", "scope": "General"}
 waiting["rows"] = [{**item, "title": f"due {d}", "due": d} for d in ("tomorrow", "2026-13-45", "99999-01-01", "", None, "2026-11-01", "2099-01-01")]
 html(loops["rows"], waiting["rows"], loops["meta"], "Loop fleet")
 EOF
 cp "$AGENT_OPS_DIR/fleet/dashboard.html" "$AGENT_OPS_DIR/odd.html"
+# a fleet of 70: Shop has 30 loops, 22 of them failing, and Blog 40 healthy ones
+python3 - <<'EOF'
+import json, sys; sys.path.insert(0, "fleet"); from fleet import html, C
+loops = json.loads((C["out"] / "loops.json").read_text())
+row = next(r for r in loops["rows"] if r["loop"] == "ops-a")
+rows = [{**row, "loop": f"{p.lower()}{i:02d}", "project": p, "scope": p, "checked_by": "you", "status": "failing" if p == "Shop" and i < 22 else "healthy"}
+        for p, n in (("Shop", 30), ("Blog", 40)) for i in range(n)]
+html(rows, [], loops["meta"], "Loop fleet")
+EOF
+cp "$AGENT_OPS_DIR/fleet/dashboard.html" "$AGENT_OPS_DIR/big.html"
 
 # check <name> [scope]: the page's JSON line, killed after 30 s so a frozen tab fails rather than hangs
 check() { perl -e 'alarm 30; exec @ARGV' node tests/dashboard.check.mjs "$AGENT_OPS_DIR/$1.html" "${2:-}" > "$AGENT_OPS_DIR/$1.json"; }
-check clique Shop; [ $? -eq 2 ] && { echo "skip  no Playwright: fixtures were $AGENT_OPS_DIR/{clique,ladder,odd}.html"; trap - EXIT; exit 0; }
-check ladder Shop; check odd Shop
+check clique Shop
+if [ $? -eq 2 ]; then
+  [ "${DASHBOARD_TEST:-}" = skip ] && { echo "skip  no Playwright, as DASHBOARD_TEST=skip asks"; exit 0; }
+  echo "FAIL  no Playwright: install it, set PLAYWRIGHT to its index.mjs, or skip with DASHBOARD_TEST=skip"; exit 1
+fi
+check ladder Shop; check odd Shop; check big
 q() { jq -e "$2" "$AGENT_OPS_DIR/$1.json" >/dev/null 2>&1; }
 for f in clique ladder; do
   expect "$f: the Factory tab draws, scopes and shows its lines in under 3 s" "q $f '.ms.factory + .ms.checks + .ms.scope < 3000 and .factory.lines > 0'"
@@ -54,5 +69,10 @@ expect "the scoped count counts the loops it draws"  "q odd '.factory as \$f | \
 expect "a right-to-left name keeps its count after it" "q odd '.loops.countsAfterNames'"
 expect "every waiting item is listed, dated or not"  "q odd '.waiting.badge == 7 and .waiting.rows == 7 and (.waiting.invalid | not)'"
 expect "nothing is wider than the phone"             "q odd '.ms.overflow == 0'"
+expect "a long project name keeps its loop count in view" "q odd '.loops.countsVisible'"
+expect "a project card shows 25 loops, then See all opens the rest in place" "q big '.loops.firstCard == 25 and .loops.firstCardAll == 30'"
+expect "Needs a look shows 20, then See all"         "q big '.attention == 20'"
+expect "a big fleet's Factory tab on All projects offers its projects, most problems first, and draws the one picked" \
+  "q big '.factory.loops == 0 and .factory.note and .factory.picks == [\"Shop · 22 with a problem\", \"Blog · 40 loops\"] and .factory.picked == 30 and .errors == []'"
 
 [ "$fail" -eq 0 ] && echo "all passed" || { echo "some failed"; exit 1; }
