@@ -182,29 +182,61 @@ def ledger(now):
 
 def tables():
     md = C["registry"].read_text() if C["registry"].exists() else ""
-    return table(md, "Registry"), table(md, "Services")
+    return table(md, "Registry"), table(md, "Services"), table(md, "Break-glass")
 
-def links(registry, services):
-    """Each registry loop's Checked by and Supervisor. A name is a loop's or service's name or its job, with or without the
-    routine:/task: prefix, or you; any other name is kept as written, a checker the registry doesn't have. Supervisor,
-    optional, is the one loop that writes this loop's Orders (or you): a parent that is no loop, or a chain that comes
-    back to the row, is its supervisor_issue."""
+def links(registry, services, glass):
+    """Each registry loop's Checked by, Supervisor and Escalates to, and each break-glass entry's reason. A name is a loop's
+    or service's name or its job, with or without the routine:/task: prefix, or you; any other name is kept as written, a
+    checker the registry doesn't have. Supervisor, optional, is the one loop that writes this loop's Orders (or you): a
+    parent that is no loop, or a chain that comes back to the row, is its supervisor_issue. Escalates to, optional, is
+    where the loop sends what needs a person; blank means its project's manager, else the master, else you (always you for the master). Once a loop
+    has Role master, only it and the Break-glass table may reach you; escalation_issue says what breaks that.
+    Returns (loops, break-glass reasons by name, issues of Break-glass rows that name nothing)."""
     named = [(r["Loop"], r["Job"]) for r in registry] + [(r["Service"], r["Job"]) for r in services]
     alias = {k: n for n, j in named for k in (j, j.partition(":")[2]) if k} | {n: n for n, _ in named}
     resolve = lambda c: "you" if c.lower() == "you" else alias.get(c, c)
-    out = {r["Loop"]: {"checked_by": ", ".join(dict.fromkeys(resolve(c.strip()) for c in r.get("Checked by", "").split(",") if c.strip())),
-                       "supervisor": resolve(r.get("Supervisor", "").strip()) if r.get("Supervisor", "").strip() else None} for r in registry}
+    cell = lambda r, k: r.get(k, "").strip()
+    reasons = {resolve(cell(g, "Who")): cell(g, "Why") for g in glass if cell(g, "Who")}
+    roles = {r["Loop"]: cell(r, "Role").lower() or None for r in registry}
+    projects = {r["Loop"]: r.get("Project", "") for r in registry}
+    masters = [l for l, k in roles.items() if k == "master"]
+    managers = {}
+    for loop, k in roles.items():
+        if k == "manager": managers.setdefault(projects[loop], []).append(loop)
+    def default(loop):
+        up = [m for m in managers.get(projects[loop], [])[:1] + masters[:1] if m != loop and roles[loop] != "master"]
+        return up[0] if up else "you"
+    out = {r["Loop"]: {"checked_by": ", ".join(dict.fromkeys(resolve(c.strip()) for c in cell(r, "Checked by").split(",") if c.strip())),
+                       "supervisor": resolve(cell(r, "Supervisor")) if cell(r, "Supervisor") else None,
+                       "role": roles[r["Loop"]], "break_glass": reasons.get(r["Loop"]),
+                       "escalates_to": resolve(cell(r, "Escalates to")) if cell(r, "Escalates to") else default(r["Loop"]),
+                       "escalates_default": not cell(r, "Escalates to")} for r in registry}
+    def chain(loop, key):
+        path, up = [loop], out[loop][key]
+        while up in out and up not in path: path.append(up); up = out[up][key]
+        return " → ".join(path + [up]) if up == loop else None
     for loop, l in out.items():
-        chain, up = [loop], l["supervisor"]
-        while up in out and up not in chain: chain.append(up); up = out[up]["supervisor"]
         l["supervisor_issue"] = (f"supervisor {l['supervisor']} is not a loop in the registry" if l["supervisor"] not in {**out, "you": 0, None: 0}
-                                 else "supervision comes back to it: " + " → ".join(chain + [up]) if up == loop else None)
-    return out
+                                 else chain(loop, "supervisor") and "supervision comes back to it: " + chain(loop, "supervisor"))
+        project, to = projects[loop], l["escalates_to"]
+        issues = [l["role"] not in (None, "master", "manager") and f"role {l['role']} is neither master nor manager",
+                  l["role"] == "master" and len(masters) > 1 and f"{len(masters)} loops have Role master; the door to you is one loop",
+                  l["role"] == "manager" and len(managers[project]) > 1 and f"{project or 'no project'} has {len(managers[project])} managers",
+                  l["break_glass"] == "" and "its break-glass row needs a reason",
+                  to not in {**out, "you": 0} and f"escalates to {to}, which is not a loop in the registry",
+                  to == "you" and masters and loop not in masters and l["break_glass"] is None
+                  and "escalates straight to you; only the master and break-glass loops may",
+                  chain(loop, "escalates_to") and "escalation comes back to it: " + chain(loop, "escalates_to")]
+        l["escalation_issue"] = "; ".join(i for i in issues if i) or None
+    known = set(out) | {s["Service"] for s in services}
+    loose = [f"{who}: break-glass names no loop or service in the registry" for who in reasons if who not in known] + \
+            [f"{who}: its break-glass row needs a reason" for who, why in reasons.items() if who in known - set(out) and not why]
+    return out, reasons, loose
 
 def build():
     now = dt.datetime.now().replace(microsecond=0)
-    registry, services = tables()
-    link = links(registry, services)
+    registry, services, glass = tables()
+    link, reasons, _ = links(registry, services, glass)
     jobs = {**launchd_jobs(), **cron_jobs()}
     led, first = ledger(now)
     snap_file = C["out"] / "cloud.json"
@@ -281,7 +313,7 @@ def build():
         claimed.add(svc["Job"])
         j = jobs.get(svc["Job"], {})
         rows.append({"loop": svc["Service"], "project": "Service", "runtime": "mac", "job": svc["Job"],
-                     "schedule": svc.get("What it is", ""),
+                     "schedule": svc.get("What it is", ""), "break_glass": reasons.get(svc["Service"]),
                      "status": "paused" if not j.get("loaded") else "service" if j.get("exit") in (0, None) else "failing",
                      "detail": f"last run exited {j['exit']}" if j.get("exit") not in (0, None) else ""})
 
@@ -312,7 +344,8 @@ def build():
     of = scoping(registry)
     for r in rows: r["scope"] = of(r["project"])[1]
     keys = ["loop", "project", "scope", "runtime", "job", "schedule", "status", "last_run", "result", "detail",
-            "next_due", "pass_rate", "checks", "cost", "history", "checked_by", "supervisor", "supervisor_issue"]
+            "next_due", "pass_rate", "checks", "cost", "history", "checked_by", "supervisor", "supervisor_issue",
+            "role", "escalates_to", "escalates_default", "break_glass", "escalation_issue"]
     rows = [{k: r.get(k) for k in keys} for r in rows]
 
     meta = [{"label": "Built", "value": now.isoformat(timespec="minutes")},
@@ -429,7 +462,8 @@ def html(rows, items, meta):
 
 if __name__ == "__main__":
     if sys.argv[1:] == ["--check"]:  # registry only, for an outcome check: every "loop: issue" on one line, exit 1 if any
-        issues = [f"{loop}: {l['supervisor_issue']}" for loop, l in links(*tables()).items() if l["supervisor_issue"]]
+        loops, _, loose = links(*tables())
+        issues = [f"{loop}: {i}" for loop, l in loops.items() for i in (l["supervisor_issue"], l["escalation_issue"]) if i] + loose
         if issues: print("; ".join(issues))
         sys.exit(bool(issues))
     rows = build()

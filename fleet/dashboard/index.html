@@ -2,7 +2,7 @@
 <style>
 /* Control panel, narrow-first: tabs (Overview, Loops, Waiting), one status line, four numbers, short lists that open for detail. */
 .fx [hidden] { display: none !important; }
-.fx { display: grid; gap: var(--cds-gap-md); font-family: var(--font-anthropic-sans); color: var(--color-fg); font-size: var(--cds-font-size-body); }
+.fx { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--cds-gap-md); font-family: var(--font-anthropic-sans); color: var(--color-fg); font-size: var(--cds-font-size-body); }
 .fx-top { display: flex; align-items: center; justify-content: space-between; gap: var(--cds-gap-sm); }
 .fx-top .dash-select { min-width: 0; max-width: 50%; }
 .fx-top h1 { margin: 0; font-family: var(--font-anthropic-serif); font-weight: 600; letter-spacing: -.01em; font-size: var(--cds-font-size-title); }
@@ -12,6 +12,7 @@
 .fx-tab { flex: 1; font: inherit; font-size: var(--cds-font-size-caption); font-weight: var(--cds-font-weight-medium); color: var(--color-fg-muted); background: none; border: 0; border-radius: 7px; padding: 7px 8px; cursor: pointer; display: inline-flex; justify-content: center; align-items: center; gap: 6px; transition: opacity 120ms; }
 .fx-tab[aria-selected="true"] { background: var(--color-bg); color: var(--color-fg); font-weight: 600; box-shadow: 0 1px 3px rgb(0 0 0 / .12), 0 0 0 1px var(--color-border-line); }
 .fx-tab:focus-visible { outline: 2px solid var(--color-fg); outline-offset: 1px; }
+@media (max-width: 359px) { .fx-tab { padding: 7px 3px; gap: 4px; } }
 .fx-badge { min-width: 18px; padding: 0 6px; border-radius: 999px; font-size: 11px; font-weight: 600; line-height: 18px; text-align: center; background: var(--color-fg); color: var(--color-bg); font-variant-numeric: tabular-nums; }
 .fx-badge:empty { display: none; }
 .fx-pane { display: grid; gap: var(--cds-gap-md); min-width: 0; }
@@ -120,7 +121,7 @@ button.fx-kpi:focus-visible { outline: 2px solid var(--color-fg); outline-offset
 
 /* factory: loops, then the loops that check them, then you; lines are Checked by, drawn from the chips' places */
 #factory-card { --sec: var(--fx-c0, var(--color-fg-muted)); overflow: clip; }
-.fx-fbody { padding: 12px; display: grid; gap: 10px; }
+.fx-fbody { padding: 12px; display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; }
 .fx-flayers, .fx-fcols { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr) 54px; column-gap: 18px; }
 @media (min-width: 640px) { .fx-flayers, .fx-fcols { grid-template-columns: minmax(0, 260px) minmax(0, 220px) 104px; column-gap: clamp(48px, 9vw, 150px); justify-content: center; }
   .fx-fcols .fx-fnode { padding: 5px 8px; gap: 6px; } .fx-fcols .fx-fend { padding: 10px 4px; font-size: var(--cds-font-size-caption); } }
@@ -130,8 +131,9 @@ button.fx-kpi:focus-visible { outline: 2px solid var(--color-fg); outline-offset
 .fx-fcols { position: relative; z-index: 1; }
 .fx-fcol { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
 .fx-fcol.ends { justify-content: center; gap: 28px; }
-.fx-fproj { font-size: 11px; font-weight: 600; color: var(--color-fg-muted); margin: 8px 0 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.fx-fproj:first-child { margin-top: 0; }
+.fx-fcol.workers { gap: 8px; }
+.fx-fclus { display: flex; flex-direction: column; gap: 5px; padding: 5px; border: 1px solid var(--color-border-line); border-radius: 9px; background: color-mix(in srgb, var(--color-fg) 3%, transparent); }
+.fx-fproj { font-size: 11px; font-weight: 600; color: var(--color-fg-muted); margin: 0 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .fx-fnode { all: unset; box-sizing: border-box; display: flex; align-items: center; gap: 5px; min-width: 0; padding: 5px 6px; border-radius: 7px; cursor: pointer;
   font-size: var(--cds-font-size-caption); line-height: 1.25; background: var(--color-bg); border: 1px solid var(--color-border-line); box-shadow: 0 1px 2px rgb(0 0 0 / .06);
   transition: opacity 160ms, border-color 160ms, box-shadow 160ms; }
@@ -153,28 +155,54 @@ button.fx-kpi:focus-visible { outline: 2px solid var(--color-fg); outline-offset
 .fx-fribbon { flex: 1; min-height: 40px; display: flex; align-items: flex-start; justify-content: center; padding-top: 6px; font-size: 11px; color: var(--color-fg-muted); }
 .fx-fedges { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; }
 .fx-fedges .band { fill: color-mix(in srgb, var(--color-fg) 4%, transparent); }
-.fx-fedges path { fill: none; stroke-width: 1.25; stroke: var(--color-fg-muted); opacity: .4; transition: opacity 160ms; }
-.fx-fedges path.via { stroke: var(--fx-c0, var(--color-fg)); opacity: .55; }
-.fx-fedges path.bad { stroke: var(--color-bad); opacity: .7; }
-.fx-fedges path.warn { stroke: var(--color-warn); opacity: .6; }
+/* the three links: checks thin grey, supervises dashed, escalates thick amber (red for break-glass) */
+.fx-fedges path { fill: none; stroke-width: 1.25; stroke: var(--color-fg-muted); opacity: .45; transition: opacity 160ms; }
 .fx-fedges path.gap { stroke: var(--color-bad); stroke-dasharray: 4 3; opacity: .75; }
-.fx-fedges path.sup { stroke: var(--fx-c3, var(--color-warn)); stroke-width: 1.75; stroke-dasharray: 1 4; stroke-linecap: round; opacity: .85; }
-.fx-fnode.sup-bad { outline: 1.5px dotted var(--color-warn); outline-offset: 2px; }
-.fx-fdetail p.warn { color: var(--color-warn); }
-.fx-legend i.sup { border-top: 2px dotted var(--fx-c3, var(--color-warn)); }
 .fx-fedges path.off { stroke-dasharray: 2 3; opacity: .3; }
-.fx-fedges path.flow { display: none; stroke: var(--fx-c0, var(--color-fg)); stroke-width: 2; stroke-linecap: round; stroke-dasharray: 0 14; opacity: .8; }
+.fx-fedges path.sup { stroke: var(--fx-c4, var(--color-fg)); stroke-width: 1.5; stroke-dasharray: 5 4; opacity: .8; }
+.fx-fedges path.esc { stroke: var(--color-warn); stroke-width: 2.5; stroke-linecap: round; opacity: .65; }
+.fx-fedges path.esc.glass { stroke: var(--color-bad); opacity: .8; }
+.fx-fedges text.esc { fill: var(--color-warn); font-size: 10px; font-weight: 700; transition: opacity 160ms; }
+.fx-fedges path.flow { display: none; stroke: var(--color-bg); stroke-width: 1.5; stroke-linecap: round; stroke-dasharray: 0 14; opacity: .9; }
+.fx-factory.hide-check .fx-fedges [data-e], .fx-factory.hide-sup .fx-fedges [data-s], .fx-factory.hide-esc .fx-fedges [data-x] { display: none; }
+.fx-fnode.issue { outline: 1.5px dotted var(--color-warn); outline-offset: 2px; }
+.fx-fcol .fx-fnode.mgr { border-left: 3px solid var(--color-warn); }
+.fx-fcol .fx-fnode.glass { border-left: 3px solid var(--color-bad); }
+.fx-fnode.door { background: color-mix(in srgb, var(--color-warn) 14%, var(--color-bg)); border: 1.5px solid color-mix(in srgb, var(--color-warn) 60%, transparent); align-items: center; }
+.fx-fnode.door > span:not(.fx-dot) { overflow-wrap: normal; }
+.fx-fnode.door .fx-rt { display: none; }
+.fx-fdetail p.warn { color: var(--color-warn); }
 .fx-factory.trace .fx-fnode:not(.on), .fx-factory.trace .fx-fproj { opacity: .28; }
-.fx-factory.trace .fx-fedges path:not(.on) { opacity: .06; }
-.fx-factory.trace .fx-fedges path.on:not(.flow) { opacity: 1; stroke-width: 2; }
+.fx-factory.trace .fx-fedges :is(path, text):not(.on) { opacity: .06; }
+.fx-factory.trace .fx-fedges path.on:not(.flow) { opacity: 1; }
+.fx-factory.trace .fx-fedges path.on:is(.chk, .sup, .off) { stroke-width: 2; }
+.fx-fdoor { --tone: var(--color-warn); display: flex; align-items: center; gap: 12px; margin: 0; padding: 10px 12px; border-radius: 8px; border-left: 4px solid var(--tone); background: color-mix(in srgb, var(--tone) 9%, var(--color-bg)); }
+.fx-fdoor[data-tone="ok"] { --tone: var(--color-ok); }
+.fx-fdoor > b { font-family: var(--font-anthropic-serif); font-size: 1.75rem; line-height: 1; font-weight: 600; color: var(--tone); font-variant-numeric: tabular-nums; }
+.fx-fdoor > span { display: grid; gap: 1px; font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); }
+.fx-fdoor strong { color: var(--color-fg); font-size: var(--cds-font-size-body); font-weight: 600; }
+.fx-fview { display: flex; gap: 4px; overflow-x: auto; scrollbar-width: none; }
+.fx-ltog { all: unset; box-sizing: border-box; flex: 1 1 auto; justify-content: center; white-space: nowrap; display: inline-flex; align-items: center; gap: 5px; padding: 5px 8px; border-radius: 999px; border: 1px solid var(--color-border-line); cursor: pointer; font-size: var(--cds-font-size-caption); font-weight: var(--cds-font-weight-medium); color: var(--color-fg-muted); }
+.fx-ltog i { display: inline-block; width: 14px; border-top: 1.5px solid var(--color-fg-muted); }
+.fx-ltog i.sup { border-top: 2px dashed var(--fx-c4, var(--color-fg)); }
+.fx-ltog i.esc { border-top: 3px solid var(--color-warn); }
+.fx-ltog[aria-pressed="true"] { color: var(--color-fg); background: color-mix(in srgb, var(--color-fg) 8%, var(--color-bg)); border-color: color-mix(in srgb, var(--color-fg) 35%, transparent); }
+.fx-ltog[data-problems][aria-pressed="true"] { color: var(--color-bad); border-color: color-mix(in srgb, var(--color-bad) 50%, transparent); background: color-mix(in srgb, var(--color-bad) 8%, var(--color-bg)); }
+.fx-ltog:hover { color: var(--color-fg); }
+@media (max-width: 419px) { .fx-ltog i { display: none; } }
+@media (max-width: 359px) { .fx-ltog { padding: 5px 4px; font-size: 11px; } }
+.fx-ltog:focus-visible { outline: 2px solid var(--color-fg); outline-offset: 1px; }
 .fx-fnode.sel { box-shadow: 0 0 0 2px var(--color-fg); }
 .fx-fdetail { position: sticky; bottom: 0; z-index: 2; pointer-events: none; margin-top: 12px; padding: 10px 12px; border: 1px solid var(--color-border-line); border-radius: 8px; background: var(--color-bg); box-shadow: 0 -2px 12px rgb(0 0 0 / .12); display: grid; gap: 4px; font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); min-height: 3.2em; }
 .fx-fdetail b { color: var(--color-fg); font-weight: 600; font-size: var(--cds-font-size-body); }
 .fx-fdetail p { margin: 0; overflow-wrap: anywhere; }
 .fx-legend { display: flex; flex-wrap: wrap; gap: 6px 14px; padding: 10px 14px; border-top: 1px solid var(--color-border-line); font-size: 11px; color: var(--color-fg-muted); }
 .fx-legend span { display: inline-flex; align-items: center; gap: 5px; }
-.fx-legend i { display: inline-block; width: 16px; border-top: 2px solid var(--fx-c0, var(--color-fg)); }
+.fx-legend i { display: inline-block; width: 16px; border-top: 1.5px solid var(--color-fg-muted); }
 .fx-legend i.gap { border-top: 2px dashed var(--color-bad); }
+.fx-legend i.sup { border-top: 2px dashed var(--fx-c4, var(--color-fg)); }
+.fx-legend i.esc { border-top: 3px solid var(--color-warn); }
+.fx-legend i.glass { border-top: 3px solid var(--color-bad); }
 @media (prefers-reduced-motion: no-preference) {
   .fx-fedges path.flow { display: inline; animation: fx-flow 2.4s linear infinite; }
   .fx-factory.trace .fx-fedges path.flow:not(.on) { display: none; }
@@ -235,8 +263,15 @@ button.fx-kpi:focus-visible { outline: 2px solid var(--color-fg); outline-offset
     <section class="fx-card" id="factory-card">
       <header><h2>Who checks what</h2><span class="fx-muted" data-draw="factory-count" data-source="loops">—</span></header>
       <div class="fx-fbody">
-        <p class="fx-muted">Every loop's output goes to whoever reads it next, until it reaches you. Tap a loop to trace its chain.</p>
-        <div class="fx-flayers" aria-hidden="true"><span>Loops</span><span>Checked by</span><span>Ends at</span></div>
+        <p class="fx-fdoor" data-draw="factory-door" data-source="loops">—</p>
+        <p class="fx-muted">Loops check each other's output, supervisors set their Orders, and anything that needs a person climbs to the master before it reaches you. Tap a loop to trace it, or You to see every path in.</p>
+        <div class="fx-fview" role="group" aria-label="Show">
+          <button type="button" class="fx-ltog" data-layer="check"><i></i>Checks</button>
+          <button type="button" class="fx-ltog" data-layer="sup" data-sups hidden><i class="sup"></i>Supervises</button>
+          <button type="button" class="fx-ltog" data-layer="esc"><i class="esc"></i>Escalates</button>
+          <button type="button" class="fx-ltog" data-problems>Problems</button>
+        </div>
+        <div class="fx-flayers" aria-hidden="true"><span>Loops</span><span>Checked by</span><span>To you</span></div>
         <div class="fx-factory" id="factory-graph" data-draw="factory" data-source="loops"></div>
       </div>
       <div class="fx-legend">
@@ -244,9 +279,11 @@ button.fx-kpi:focus-visible { outline: 2px solid var(--color-fg); outline-offset
         <span><span class="fx-dot" data-tone="warn"></span>Needs a look</span>
         <span><span class="fx-dot" data-tone="bad"></span>Failing or silent</span>
         <span><span class="fx-dot" data-tone="none"></span>Not run yet or paused</span>
-        <span><i></i>Checked by</span>
+        <span><i></i>Checks</span>
+        <span data-sups hidden><i class="sup"></i>Supervises</span>
+        <span><i class="esc"></i>Escalates</span>
+        <span id="legend-glass" hidden><i class="glass"></i>Break-glass</span>
         <span><i class="gap"></i>Nobody reads it</span>
-        <span id="legend-sup" hidden><i class="sup"></i>Writes its Orders</span>
       </div>
     </section>
   </section>
@@ -582,27 +619,39 @@ dash.draw('svc-count', (e) => {
   e.textContent = s.length + (bad ? ', ' + bad + ' failing' : '');
 });
 
-/* factory tab: each loop points at every name in its Checked by, or at Nobody when it has none. Loops that read
-   another's output are checkers; a name that is no loop is a checker the registry doesn't have. The page's scope picks
-   the loops, and every loop their output reaches comes too, so each chain stays whole. */
-const factoryGraph = (rows) => {
+/* factory tab: three links. Checks: each loop points at every name in its Checked by, or at Nobody when it has none; loops
+   that read another's output are checkers, and a name that is no loop is a checker the registry doesn't have. Supervises:
+   a supervisor writes a loop's Orders. Escalates: where a loop sends what needs a person, ending at you through the
+   master (the last column), or straight to you from the break-glass list. The page's scope picks the loops, and every
+   loop their links reach comes too, so each chain stays whole. */
+const problem = (r) => ['failing', 'silent', 'chronic', 'no check'].includes(r.status) || !r.checked_by || !!(r.supervisor_issue || r.escalation_issue);
+const factoryGraph = (rows, problems) => {
   const all = new Map(rows.filter((r) => !NOT_LOOP.includes(r.project)).map((r) => [r.loop, r]));
-  const mine = scoped([...all.values()]), loops = [...mine], keep = new Set(loops.map((r) => r.loop));
-  for (let k = 0; k < loops.length; k++) [...checkers(loops[k]), loops[k].supervisor].forEach((c) => { if (all.has(c) && !keep.has(c)) { keep.add(c); loops.push(all.get(c)); } });
-  const nodes = new Map(loops.map((r) => [r.loop, {id: r.loop, kind: 'loop', row: r}]));
+  const mine = scoped([...all.values()]).filter((r) => !problems || problem(r)), loops = [...mine], keep = new Set(loops.map((r) => r.loop));
+  for (let k = 0; k < loops.length; k++) [...checkers(loops[k]), loops[k].supervisor, loops[k].escalates_to].forEach((c) => { if (all.has(c) && !keep.has(c)) { keep.add(c); loops.push(all.get(c)); } });
+  const nodes = new Map(loops.map((r) => [r.loop, {id: r.loop, kind: 'loop', row: r, glass: r.break_glass}]));
+  const node = (id) => {
+    if (!nodes.has(id)) nodes.set(id, {id, kind: ['you', 'nobody'].includes(id) ? id : 'ext', service: rows.some((x) => x.loop === id && x.project === 'Service')});
+    return nodes.get(id);
+  };
   const edges = [];
   loops.forEach((r) => {
     const to = checkers(r).filter((c) => c !== r.loop);
-    (to.length ? to : ['nobody']).forEach((c) => {
-      if (!nodes.has(c)) nodes.set(c, {id: c, kind: ['you', 'nobody'].includes(c) ? c : 'ext', service: rows.some((x) => x.loop === c && x.project === 'Service')});
-      edges.push({from: r.loop, to: c, i: edges.length});
-    });
+    (to.length ? to : ['nobody']).forEach((c) => { node(c); edges.push({from: r.loop, to: c, i: edges.length}); });
   });
+  /* escalation: one edge per loop to its Escalates to, plus one straight to you for each break-glass entry */
+  const escs = [], esc = (from, to, set, glass) => { node(to); escs.push({from, to, set, glass, i: escs.length}); };
+  loops.filter((r) => r.escalates_to).forEach((r) => {
+    esc(r.loop, r.escalates_to, !r.escalates_default, !!r.break_glass && r.escalates_to === 'you');
+    if (r.break_glass && r.escalates_to !== 'you') esc(r.loop, 'you', true, true);
+  });
+  scoped(rows.filter((r) => r.project === 'Service' && r.break_glass && !problems)).forEach((r) => { node(r.loop).glass = r.break_glass; esc(r.loop, 'you', true, true); });
   const outs = (id) => edges.filter((e) => e.from === id), ins = (id) => edges.filter((e) => e.to === id);
-  nodes.forEach((n) => { n.col = ['you', 'nobody'].includes(n.kind) ? 'ends' : n.kind === 'ext' || ins(n.id).length ? 'checkers' : 'workers'; });
+  const master = (n) => n.kind === 'loop' && n.row.role === 'master';
+  nodes.forEach((n) => { n.col = ['you', 'nobody'].includes(n.kind) || master(n) ? 'ends' : n.kind === 'ext' || ins(n.id).length ? 'checkers' : 'workers'; });
+  const ends = [...nodes.values()].filter((n) => n.col === 'ends').sort((a, b) => ['loop', 'you', 'nobody'].indexOf(a.kind) - ['loop', 'you', 'nobody'].indexOf(b.kind));
   const depth = (id, seen) => seen.has(id) ? 0 : Math.max(0, ...outs(id).map((e) => 1 + depth(e.to, new Set([...seen, id]))));
-  const order = [...nodes.values()].filter((n) => n.col === 'checkers').sort((a, b) => depth(b.id, new Set()) - depth(a.id, new Set()) || a.id.localeCompare(b.id))
-    .concat(['you', 'nobody'].filter((k) => nodes.has(k)).map((k) => nodes.get(k)));
+  const order = [...nodes.values()].filter((n) => n.col === 'checkers').sort((a, b) => depth(b.id, new Set()) - depth(a.id, new Set()) || a.id.localeCompare(b.id)).concat(ends);
   const rank = (n) => Math.min(...outs(n.id).map((e) => order.indexOf(nodes.get(e.to))));
   const groups = [...groupBy([...nodes.values()].filter((n) => n.col === 'workers').sort((a, b) => rank(a) - rank(b) || nameOf(a.row).localeCompare(nameOf(b.row))),
     (n) => n.row.project || 'General')];
@@ -611,16 +660,16 @@ const factoryGraph = (rows) => {
   /* then each checker sits level with the loops it reads, so lines cross less */
   const at = new Map(groups.flatMap(([, ns]) => ns).map((n, k) => [n.id, k]));
   const level = (n) => { const ks = ins(n.id).filter((e) => at.has(e.from)); return ks.length ? mean(ks, (e) => at.get(e.from)) : Infinity; };
-  const ends = order.filter((n) => n.col === 'ends');
   order.splice(0, order.length, ...order.filter((n) => n.col === 'checkers').sort((a, b) => level(a) - level(b)), ...ends);
-  /* the chain both ways from one node: what it reads, and who reads it, up to you */
-  const chain = (id) => {
-    const on = new Set([id]), via = new Set();
-    [[outs, 'to'], [ins, 'from']].forEach(([next, end]) => {
-      const todo = [id], seen = new Set(todo);
-      while (todo.length) next(todo.pop()).forEach((e) => { via.add(e.i); on.add(e[end]); if (!seen.has(e[end])) { seen.add(e[end]); todo.push(e[end]); } });
-    });
+  /* everything one node's links touch, both ways; for you, only what escalates to you */
+  const walk = (list, id, down) => {
+    const on = new Set([id]), via = new Set(), todo = [id];
+    while (todo.length) { const n = todo.pop(); list.filter((e) => (down ? e.from : e.to) === n).forEach((e) => { const m = down ? e.to : e.from; via.add(e.i); if (!on.has(m)) { on.add(m); todo.push(m); } }); }
     return {on, via};
+  };
+  const chain = (id) => {
+    const c = id === 'you' ? [] : [walk(edges, id, true), walk(edges, id, false)], x = id === 'you' ? [walk(escs, id, false)] : [walk(escs, id, true), walk(escs, id, false)];
+    return {on: new Set([...c, ...x].flatMap((p) => [...p.on])), via: new Set(c.flatMap((p) => [...p.via])), esc: new Set(x.flatMap((p) => [...p.via]))};
   };
   const route = (id) => {
     const prev = new Map([[id, null]]), todo = [id];
@@ -629,61 +678,114 @@ const factoryGraph = (rows) => {
     const path = []; for (let n = 'you'; n != null; n = prev.get(n)) path.unshift(n);
     return path;
   };
+  /* a loop's escalation route, as its rows say: id → its Escalates to → … until you, a name that is no loop, or a repeat */
+  const ladder = (id) => { const p = [id]; for (let n = all.get(id)?.escalates_to; n && !p.includes(n); n = all.get(n)?.escalates_to) p.push(n); return p; };
+  /* the doors to you: every node with an escalation straight to you. The target is the master plus the break-glass list */
+  const doors = [...new Set(escs.filter((e) => e.to === 'you').map((e) => e.from))], glass = [...nodes.values()].filter((n) => n.glass);
   /* supervision: a loop's supervisor writes its Orders; you, implied, isn't drawn */
   const sups = loops.filter((r) => r.supervisor && r.supervisor !== r.loop && nodes.get(r.supervisor)?.kind === 'loop').map((r, i) => ({from: r.supervisor, to: r.loop, i}));
-  return {nodes, edges, outs, ins, order, groups, chain, route, mine, sups};
+  return {nodes, edges, escs, outs, ins, order, groups, chain, route, ladder, doors, glass, mine, sups, hasMaster: loops.some((r) => r.role === 'master')};
 };
 const fname = (n) => n.kind === 'loop' ? nameOf(n.row) : n.kind === 'you' ? 'You' : n.kind === 'nobody' ? 'Nobody' : n.id;
 const fcurve = (x1, y1, x2, y2) => { const m = (x1 + x2) / 2; return `M${x1},${y1}C${m},${y1} ${m},${y2} ${x2},${y2}`; };
+/* what the graph shows, remembered per viewer in this browser: the kinds of line, and problems only. The default is
+   escalations alone, the one question the tab answers first: what can reach you */
+const LAYERS = ['check', 'sup', 'esc'], VIEW = 'fx-factory-view';
+if (!FX.hide) {
+  let v = null; try { v = JSON.parse(localStorage.getItem(VIEW)); } catch (e) { /* storage blocked: the default stands */ }
+  FX.hide = new Set(v ? v.hide : ['check', 'sup']); FX.problems = !!(v && v.problems);
+}
+const saveView = () => { try { localStorage.setItem(VIEW, JSON.stringify({hide: [...FX.hide], problems: FX.problems})); } catch (e) { /* not remembered */ } };
+document.querySelectorAll('.fx-ltog[data-layer]').forEach((b) => {
+  b.setAttribute('aria-pressed', String(!FX.hide.has(b.dataset.layer)));
+  b.onclick = () => {
+    const k = b.dataset.layer, off = !FX.hide.has(k);
+    if (off) FX.hide.add(k); else FX.hide.delete(k);
+    b.setAttribute('aria-pressed', String(!off)); saveView();
+    document.querySelectorAll('#factory-graph').forEach((g) => g.classList.toggle('hide-' + k, off));
+  };
+});
+document.querySelectorAll('.fx-ltog[data-problems]').forEach((b) => {
+  b.setAttribute('aria-pressed', String(FX.problems));
+  b.onclick = () => { FX.problems = !FX.problems; b.setAttribute('aria-pressed', String(FX.problems)); saveView(); dash.draw('factory'); };
+});
 
 dash.draw('factory-count', (e) => {
   const l = dash.data('loops'); if (l.status !== 'ok') { e.textContent = '—'; return; }
   const g = factoryGraph(l.data), n = g.mine.length, gaps = g.ins('nobody').length;
   const lost = g.mine.filter((r) => g.outs(r.loop).some((x) => x.to !== 'nobody') && !g.route(r.loop)).length;
-  e.textContent = n + (n === 1 ? ' loop' : ' loops') + (!n ? '' : !gaps && !lost ? ' · every one reaches you' : (gaps ? ' · ' + gaps + ' nobody reads' : '') + (lost ? ' · ' + lost + ' never reach you' : ''));
+  e.textContent = n + (n === 1 ? ' loop' : ' loops') + (!n ? '' : !gaps && !lost ? ' · every one is read' : (gaps ? ' · ' + gaps + ' nobody reads' : '') + (lost ? ' · ' + lost + ' never reach you' : ''));
+});
+/* the headline: how many paths can interrupt you, against one master plus the break-glass list */
+dash.draw('factory-door', (e) => {
+  const l = dash.data('loops'); e.replaceChildren();
+  if (l.status !== 'ok') { e.textContent = '—'; return; }
+  const g = factoryGraph(l.data), n = g.doors.length, target = 1 + g.glass.length;
+  if (!g.nodes.size) return;
+  e.dataset.tone = n <= target && g.hasMaster ? 'ok' : 'warn';
+  const v = el('b', '', String(n)), text = el('span');
+  text.append(el('strong', '', (n === 1 ? 'path' : 'paths') + ' to you'),
+    el('span', '', 'Target ' + target + ': the master' + (g.glass.length ? ' and ' + g.glass.length + ' break-glass' : '') + '.'
+      + (g.hasMaster ? (n > target ? ' ' + (n - target) + ' more ' + (n - target === 1 ? 'goes' : 'go') + ' around the master.' : ' Everything else goes through them.') : ' No loop has Role master yet, so every loop can reach you.')));
+  e.append(v, text);
 });
 dash.draw('factory', (box) => {
   const l = dash.data('loops');
   box.replaceChildren(); box.classList.remove('trace');
+  LAYERS.forEach((k) => box.classList.toggle('hide-' + k, FX.hide.has(k)));
   if (l.status !== 'ok') return failed(box, 'loop list', l.status);
-  const g = factoryGraph(l.data);
-  if (!g.nodes.size) { box.append(el('div', 'fx-empty', 'No loops yet.')); return; }
-  const cols = el('div', 'fx-fcols'), chips = new Map();
+  const g = factoryGraph(l.data, FX.problems);
+  if (!g.nodes.size) { box.append(el('div', 'fx-empty', FX.problems ? 'No loop is failing, silent, unchecked or unread.' : 'No loops yet.')); return; }
+  const cols = el('div', 'fx-fcols'), chips = new Map(), frames = new Map();
   const col = {workers: el('div', 'fx-fcol workers'), checkers: el('div', 'fx-fcol checkers'), ends: el('div', 'fx-fcol ends')};
   const chip = (n) => {
     const b = el('button', 'fx-fnode' + (n.kind === 'loop' ? '' : n.kind === 'ext' ? ' ext' : ' fx-fend ' + n.kind)); b.type = 'button';
     const read = g.ins(n.id).length, gap = n.kind === 'loop' && g.outs(n.id).every((e) => e.to === 'nobody');
+    const role = n.kind === 'loop' && n.row.role, issue = n.kind === 'loop' && [n.row.supervisor_issue, n.row.escalation_issue].filter(Boolean).join('; ');
     if (gap) b.classList.add('gap');
-    if (n.kind === 'loop' && n.row.supervisor_issue) b.classList.add('sup-bad');
+    if (issue) b.classList.add('issue');
+    if (role === 'master') b.classList.add('door', 'fx-fend');
+    if (role === 'manager') b.classList.add('mgr');
+    if (n.glass) b.classList.add('glass');
     const rt = n.kind === 'loop' && runtimeMark(n.row);
     if (n.kind === 'loop') { b.dataset.tone = TONE[n.row.status]; b.append(dot(TONE[n.row.status], LABEL[n.row.status])); }
     b.append(el('span', '', fname(n)));
     if (rt) b.append(rt);
     if (read) b.append(el('b', '', String(read)));
     b.setAttribute('aria-label', fname(n) + (n.kind === 'loop' ? ', ' + LABEL[n.row.status] + (rt ? ', ' + runtimeOf(n.row)[1] : '') : n.kind === 'ext' ? (n.service ? ', a service' : ', not in the registry') : '')
-      + (read ? ', reads ' + read : '') + (gap ? ', nobody reads it' : '') + (n.kind === 'loop' && n.row.supervisor_issue ? ', ' + n.row.supervisor_issue : ''));
+      + (role ? ', ' + role : '') + (n.glass ? ', break-glass: ' + n.glass : '') + (read ? ', reads ' + read : '') + (gap ? ', nobody reads it' : '') + (issue ? ', ' + issue : ''));
     chips.set(n.id, b);
     return b;
   };
-  g.groups.forEach(([project, ns]) => { col.workers.append(el('p', 'fx-fproj', project), ...ns.map(chip)); });
+  g.groups.forEach(([project, ns]) => { const f = el('div', 'fx-fclus'); f.append(el('p', 'fx-fproj', project), ...ns.map(chip)); frames.set(project, f); col.workers.append(f); });
   g.order.forEach((n) => col[n.col].append(chip(n)));
   const through = g.edges.filter((e) => g.nodes.get(e.from).col === 'workers' && g.nodes.get(e.to).col === 'ends');
   const ribbon = el('div', 'fx-fribbon');
   const toYou = through.filter((e) => e.to === 'you').length;
-  if (toYou) ribbon.textContent = toYou + ' straight to you';
+  if (toYou) ribbon.textContent = toYou + ' you read yourself';
   col.checkers.append(ribbon);
   cols.append(col.workers, col.checkers, col.ends);
   const detail = el('div', 'fx-fdetail'); detail.hidden = true; detail.setAttribute('aria-live', 'polite');
   box.append(cols, detail);
+  document.querySelectorAll('[data-sups]').forEach((e) => { e.hidden = !g.sups.length; });
+  document.querySelectorAll('#legend-glass').forEach((e) => { e.hidden = !g.glass.length; });
 
   const paths = [];
   if (box.clientWidth) {
     const base = box.getBoundingClientRect();
     const at = (e) => { const r = e.getBoundingClientRect(); return {l: r.left - base.left, r: r.right - base.left, t: r.top - base.top, b: r.bottom - base.top, m: (r.top + r.bottom) / 2 - base.top}; };
     const pos = new Map([...chips].map(([id, c]) => [id, at(c)])), rb = at(ribbon), gap = at(col.checkers).l - at(col.workers).r;
+    /* a project's loops that escalate to the same place by default share one line from their frame; overrides and
+       break-glass get their own, so what differs from the rule stands out */
+    const lines = [];
+    groupBy(g.escs, (e) => { const n = g.nodes.get(e.from); return !e.set && n.col === 'workers' ? (n.row.project || 'General') + '\n' + e.to : 'x' + e.i; })
+      .forEach((es, k) => lines.push({key: 'x' + lines.length, es, from: es.length > 1 ? at(frames.get(k.split('\n')[0])) : pos.get(es[0].from),
+        fromCol: g.nodes.get(es[0].from).col, to: es[0].to, glass: es[0].glass}));
     /* lanes through the ribbon keep the loops' order; ports on a chip's left edge are spread in the order lines arrive */
-    const lanes = new Map(through.sort((a, b) => pos.get(a.from).m - pos.get(b.from).m).map((e, k) => [e.i, rb.t + 26 + (k + .5) * (rb.b - rb.t - 30) / through.length]));
-    const arrive = (e) => lanes.get(e.i) ?? pos.get(e.from).m;
+    const lanesOf = [...through.map((e) => ({key: 'c' + e.i, y: pos.get(e.from).m})),
+      ...lines.filter((x) => x.fromCol === 'workers' && g.nodes.get(x.to).col === 'ends').map((x) => ({key: x.key, y: x.from.m}))].sort((a, b) => a.y - b.y);
+    const lanes = new Map(lanesOf.map((x, k) => [x.key, rb.t + 26 + (k + .5) * (rb.b - rb.t - 30) / lanesOf.length]));
+    const arrive = (e) => lanes.get('c' + e.i) ?? pos.get(e.from).m;
     const port = new Map();
     g.nodes.forEach((n) => { const es = g.ins(n.id).filter((e) => g.nodes.get(e.from).col !== n.col).sort((a, b) => arrive(a) - arrive(b)), p = pos.get(n.id);
       es.forEach((e, k) => port.set(e.i, p.t + (k + 1) * (p.b - p.t) / (es.length + 1))); });
@@ -691,58 +793,68 @@ dash.draw('factory', (box) => {
     svg.setAttribute('class', 'fx-fedges'); svg.setAttribute('aria-hidden', 'true');
     const band = document.createElementNS(svg.namespaceURI, 'rect');
     [['class', 'band'], ['x', rb.l], ['y', rb.t + 20], ['width', Math.max(0, rb.r - rb.l)], ['height', Math.max(0, rb.b - rb.t - 20)], ['rx', 6]].forEach(([k, v]) => band.setAttribute(k, v));
-    if (through.length) svg.append(band);
+    if (lanesOf.length) svg.append(band);
+    const add = (d, cls, data) => { const p = document.createElementNS(svg.namespaceURI, 'path'); p.setAttribute('d', d); p.setAttribute('class', cls); Object.assign(p.dataset, data); svg.append(p); paths.push(p); return p; };
+    /* one shape for every link: down a column's spine, round its right side, through a lane, forward or back */
+    const shape = (s, t, sc, tc, lane, y, bulge) => sc === tc && sc === 'ends' ? `M${(s.l + s.r) / 2},${s.b}L${(t.l + t.r) / 2},${t.t}`
+      : sc === tc ? (() => { const k = Math.min(gap * .8, bulge + Math.abs(t.m - s.m) * .2); return `M${s.r},${s.m}C${s.r + k},${s.m} ${t.r + k},${t.m} ${t.r},${t.m}`; })()
+      : lane != null ? fcurve(s.r, s.m, rb.l, lane) + `L${rb.r},${lane}` + fcurve(rb.r, lane, t.l, y).replace(/^M[^C]+/, '')
+      : t.l > s.l ? fcurve(s.r, s.m, t.l, y) : fcurve(s.l, s.m, t.r, y);
     g.edges.forEach((e) => {
-      const s = pos.get(e.from), t = pos.get(e.to), from = g.nodes.get(e.from), to = g.nodes.get(e.to), y = port.get(e.i);
-      const d = from.col === to.col
-        ? (() => { const k = Math.min(gap * .8, 14 + Math.abs(t.m - s.m) * .2); return `M${s.r},${s.m}C${s.r + k},${s.m} ${t.r + k},${t.m} ${t.r},${t.m}`; })()
-        : lanes.has(e.i) ? fcurve(s.r, s.m, rb.l, lanes.get(e.i)) + `L${rb.r},${lanes.get(e.i)}` + fcurve(rb.r, lanes.get(e.i), t.l, y).replace(/^M[^C]+/, '')
-        : fcurve(s.r, s.m, t.l, y);
-      const tone = TONE[from.row ? from.row.status : 'healthy'];
-      const cls = e.to === 'nobody' ? 'gap' : tone === 'bad' ? 'bad' : tone === 'warn' ? 'warn' : tone === 'none' ? 'off' : to.kind === 'you' ? '' : 'via';
-      [cls, ...(['', 'via'].includes(cls) ? ['flow'] : [])].forEach((c) => {
-        const p = document.createElementNS(svg.namespaceURI, 'path');
-        p.setAttribute('d', d); p.setAttribute('class', c); p.dataset.e = e.i; svg.append(p); paths.push(p);
-      });
+      const from = g.nodes.get(e.from), to = g.nodes.get(e.to), tone = TONE[from.row ? from.row.status : 'healthy'];
+      add(shape(pos.get(e.from), pos.get(e.to), from.col, to.col, lanes.get('c' + e.i), port.get(e.i) ?? pos.get(e.to).m, 14),
+        e.to === 'nobody' ? 'gap' : tone === 'none' ? 'off' : 'chk', {e: e.i});
     });
     g.sups.forEach((e) => {
       const s = pos.get(e.from), t = pos.get(e.to), o = 5, k = 10;
       const d = Math.abs(s.l - t.l) < 2 ? `M${s.l},${s.m + o}C${s.l - k},${s.m + o} ${t.l - k},${t.m + o} ${t.l},${t.m + o}`
         : s.l > t.l ? fcurve(s.l, s.m + o, t.r, t.m + o) : fcurve(s.r, s.m + o, t.l, t.m + o);
-      const p = document.createElementNS(svg.namespaceURI, 'path');
-      p.setAttribute('d', d); p.setAttribute('class', 'sup'); p.dataset.s = e.i; svg.append(p); paths.push(p);
+      add(d, 'sup', {s: e.i});
+    });
+    lines.forEach((x) => {
+      const t = pos.get(x.to), d = shape(x.from, t, x.fromCol, g.nodes.get(x.to).col, lanes.get(x.key), t.m, 20), ids = {x: x.es.map((e) => e.i).join(' ')};
+      const p = add(d, 'esc' + (x.glass ? ' glass' : ''), ids);
+      if (x.es.length > 1) p.style.strokeWidth = Math.min(2.5 + x.es.length * .4, 6);
+      add(d, 'flow', ids);
+      if (x.es.length > 1) {
+        const n = document.createElementNS(svg.namespaceURI, 'text');
+        n.setAttribute('x', x.from.r + 4); n.setAttribute('y', x.from.m - 5); n.setAttribute('class', 'esc'); n.dataset.x = ids.x; n.textContent = x.es.length;
+        svg.append(n); paths.push(n);
+      }
     });
     box.prepend(svg);
   }
-  document.querySelectorAll('#legend-sup').forEach((e) => { e.hidden = !g.sups.length; });
 
   const say = (id) => {
     detail.replaceChildren(); detail.hidden = !id;
     if (!id) return;
     const n = g.nodes.get(id), reads = g.ins(id).map((e) => fname(g.nodes.get(e.from))), by = g.outs(id).map((e) => e.to === 'you' ? 'you' : fname(g.nodes.get(e.to)));
+    const label = (k) => k === 'you' ? 'you' : g.nodes.has(k) ? fname(g.nodes.get(k)) : k;
     detail.append(el('b', '', n.kind === 'loop' ? n.row.loop : fname(n)));
-    if (n.kind === 'loop') detail.append(el('p', '', [...new Set([LABEL[n.row.status], n.row.project || 'General'])].concat(n.row.last_run ? ['last run ' + rel(n.row.last_run)] : []).join(' · ')));
-    if (n.kind === 'you') { const all = g.chain(id).on.size - 1; detail.append(el('p', '', 'You read ' + reads.length + ' directly and ' + (all - reads.length) + ' more through the loops that check them.')); return; }
+    if (n.kind === 'loop') detail.append(el('p', '', [...new Set([LABEL[n.row.status], n.row.project || 'General'])].concat(n.row.role ? ['the ' + n.row.role] : [], n.row.last_run ? ['last run ' + rel(n.row.last_run)] : []).join(' · ')));
+    if (n.kind === 'you') { detail.append(el('p', '', g.doors.length + (g.doors.length === 1 ? ' path reaches' : ' paths reach') + ' you: ' + g.doors.map((k) => label(k) + (g.nodes.get(k).glass ? ' (break-glass: ' + g.nodes.get(k).glass + ')' : '')).join(', ') + '. You read ' + reads.length + ' loops\' output yourself.')); return; }
     if (n.kind === 'nobody') { detail.append(el('p', '', reads.length + (reads.length === 1 ? ' loop runs' : ' loops run') + ' with no one reading their output: ' + reads.join(', ') + '. Give each a Checked by in the registry.')); return; }
     if (n.kind === 'ext') detail.append(el('p', '', n.service ? 'A service, not a loop: the registry doesn\'t say who reads its output.' : 'Not in the registry, so who reads its output is unknown.'));
+    if (n.glass) detail.append(el('p', '', 'Break-glass: ' + n.glass + '. May message you directly.'));
     if (reads.length) detail.append(el('p', '', 'Reads ' + reads.join(', ') + '.'));
     if (n.kind !== 'loop') return;
     const path = g.route(id);
     detail.append(el('p', '', g.outs(id).every((e) => e.to === 'nobody') ? 'Nobody reads its output.'
       : path ? 'Read by ' + by.join(', ') + (path.length > 3 ? '. Reaches you through ' + path.slice(1, -1).map((k) => fname(g.nodes.get(k))).join(' → ') : '') + '.'
       : 'Read by ' + by.join(', ') + ', but the chain never reaches you.'));
+    if (n.row.escalates_to) detail.append(el('p', '', 'Escalates to ' + g.ladder(id).slice(1).map(label).join(' → ') + (n.row.escalates_default ? ' (the default)' : '') + '.'));
     const sup = n.row.supervisor, kids = g.sups.filter((e) => e.from === id).map((e) => fname(g.nodes.get(e.to)));
-    if (sup) detail.append(el('p', '', 'Orders from ' + (sup === 'you' ? 'you' : g.nodes.has(sup) ? fname(g.nodes.get(sup)) : sup) + '.'));
+    if (sup) detail.append(el('p', '', 'Orders from ' + label(sup) + '.'));
     if (kids.length) detail.append(el('p', '', 'Writes Orders for ' + kids.join(', ') + '.'));
-    if (n.row.supervisor_issue) detail.append(el('p', 'warn', n.row.supervisor_issue[0].toUpperCase() + n.row.supervisor_issue.slice(1) + '.'));
+    [n.row.supervisor_issue, n.row.escalation_issue].filter(Boolean).forEach((i) => detail.append(el('p', 'warn', i[0].toUpperCase() + i.slice(1) + '.')));
   };
   /* pointing only lights a chain; tapping also fills the card, so the page's height never moves under the pointer */
   const trace = (id, tell) => {
-    const c = id ? g.chain(id) : {on: new Set(), via: new Set()};
-    const sup = new Set(g.sups.filter((e) => e.from === id || e.to === id).map((e) => { c.on.add(e.from); c.on.add(e.to); return e.i; }));
+    const c = id ? g.chain(id) : {on: new Set(), via: new Set(), esc: new Set()};
+    const sup = new Set(id === 'you' ? [] : g.sups.filter((e) => e.from === id || e.to === id).map((e) => { c.on.add(e.from); c.on.add(e.to); return e.i; }));
     box.classList.toggle('trace', !!id);
     chips.forEach((b, k) => { b.classList.toggle('on', c.on.has(k)); b.classList.toggle('sel', k === FX.fsel); b.setAttribute('aria-pressed', String(k === FX.fsel)); });
-    paths.forEach((p) => p.classList.toggle('on', 's' in p.dataset ? sup.has(+p.dataset.s) : c.via.has(+p.dataset.e)));
+    paths.forEach((p) => p.classList.toggle('on', 's' in p.dataset ? sup.has(+p.dataset.s) : 'x' in p.dataset ? p.dataset.x.split(' ').some((i) => c.esc.has(+i)) : c.via.has(+p.dataset.e)));
     if (tell) say(id);
   };
   chips.forEach((b, id) => {
