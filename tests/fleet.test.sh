@@ -355,6 +355,9 @@ json.dump({"at": dt.datetime.fromtimestamp(t).astimezone().isoformat(), "routine
 P
 sync() { AGENT_OPS_DIR=$O FLEET_CONFIG=$O/fleet.json python3 fleet/sync_check.py > "$O/said" 2>&1; }
 expect "a receipt from the second the data was written passes" "sync"
+jq '.kit_pull = "fatal: Not possible to fast-forward"' "$O/fleet/receipt.json" > "$O/r" && cp "$O/fleet/receipt.json" "$O/r0" && mv "$O/r" "$O/fleet/receipt.json"
+expect "a failed kit pull in the receipt fails the check" "! sync && grep -q \"kit didn't update: fatal\" $O/said"
+mv "$O/r0" "$O/fleet/receipt.json"
 jq -c '.rows = [{"loop": "a", "schedule": ["0 6 * * *"]}]' "$O/fleet/loops.json" > "$O/l" && mv "$O/l" "$O/fleet/loops.json" && touch -t "$(date -v-1M +%Y%m%d%H%M 2>/dev/null || date -d '1 minute ago' +%Y%m%d%H%M)" "$O/fleet/loops.json"
 expect "the sync check fails on a cell that isn't a scalar" "! sync && grep -q \"isn't a scalar\" $O/said"
 
