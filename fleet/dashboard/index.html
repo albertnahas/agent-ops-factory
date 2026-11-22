@@ -298,7 +298,7 @@ button.fx-kpi:focus-visible { outline: 2px solid var(--color-fg); outline-offset
         <span><i class="gap"></i>Nobody reads it</span>
       </div>
     </section>
-    <section class="fx-card" id="improver" data-sec="c1">
+    <section class="fx-card" id="improver" data-sec="c1" hidden>
       <header><h2>Improver</h2><span class="fx-muted" data-draw="improver-rate" data-source="changes">—</span></header>
       <ul class="fx-list" data-draw="improver-list" data-source="changes"></ul>
     </section>
@@ -499,11 +499,12 @@ const loopActs = (r) => {
   return acts.childElementCount ? acts : null;
 };
 /* the improver's changes, from improvements.jsonl: each is a PR to one loop with the metric it should move by a read
-   date. Kept and moved is a hit; kept and flat, or reverted, is a miss; pending is not read yet. */
+   date. Of the merged changes that were read, kept and moved is a hit; kept and flat, or reverted, is a miss. Pending
+   is not read yet, and closed never merged, so neither counts. */
 const changesOf = (loop) => { const c = dash.data('changes'); return c.status === 'ok' ? c.data.filter((x) => loop == null || x.loop === loop) : null; };
-const OUTCOME = (c) => c.outcome === 'reverted' ? ['bad', 'Reverted'] : c.outcome === 'pending' ? ['none', 'Pending']
+const OUTCOME = (c) => c.outcome === 'reverted' ? ['bad', 'Reverted'] : c.outcome === 'pending' ? ['none', 'Pending'] : c.outcome === 'closed' ? ['none', 'Closed']
   : c.moved === true ? ['ok', 'Moved'] : c.moved === false ? ['warn', 'Kept, flat'] : ['none', c.outcome];
-const hitRate = (rows) => { const read = rows.filter((c) => c.outcome !== 'pending'); return [read.filter((c) => c.outcome !== 'reverted' && c.moved === true).length, read.length]; };
+const hitRate = (rows) => { const read = rows.filter((c) => ['kept', 'reverted'].includes(c.outcome)); return [read.filter((c) => c.outcome === 'kept' && c.moved === true).length, read.length]; };
 const changeDetail = (c) => (more) => {
   [['Why', c.hypothesis], ['Metric', c.metric], ['Baseline', c.baseline],
     ['Replay', c.replay_before != null || c.replay_after != null ? (c.replay_before ?? '—') + ' before, ' + (c.replay_after ?? '—') + ' after' : null],
@@ -981,15 +982,13 @@ dash.draw('factory', (box) => {
 /* the improver's history: every change, newest first, and its hit rate, the share of read changes that moved their metric */
 dash.draw('improver-rate', (e) => {
   const rows = changesOf(); if (!rows) { e.textContent = '—'; return; }
-  const [hits, read] = hitRate(scoped(rows)), open = scoped(rows).length - read;
+  const mine = scoped(rows), [hits, read] = hitRate(mine), open = mine.filter((c) => c.outcome === 'pending').length;
   e.textContent = read ? hits + ' of ' + read + ' moved their metric' + (open ? ' · ' + open + ' pending' : '') : open ? open + ' pending, none read yet' : '';
 });
 dash.draw('improver-list', (ul) => {
-  const c = dash.data('changes');
-  ul.replaceChildren();
-  if (c.status !== 'ok') return failed(ul, 'change history', c.status);
-  const rows = scoped(c.data);
-  if (!rows.length) { const li = el('li', 'fx-empty'); li.append(icon('check', 16), el('span', '', 'No changes yet. Each PR the improver opens shows here with its metric and read date.')); ul.append(li); return; }
+  /* a fleet with no improver, or none of its changes in the picked project, shows no card */
+  const c = dash.data('changes'), rows = c.status === 'ok' ? scoped(c.data) : [];
+  ul.replaceChildren(); document.getElementById('improver').hidden = !rows.length;
   capped(ul, rows, 12, 'improver', (x) => {
     const [tone, label] = OUTCOME(x), right = el('span', 'r');
     right.append(el('span', '', x.outcome === 'pending' && x.read_date ? 'read ' + rel(x.read_date) : label));

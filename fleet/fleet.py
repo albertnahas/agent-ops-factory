@@ -433,7 +433,8 @@ def improvements(scope_of):
     for l in lines(C["improvements"]):
         try: r = json.loads(l)
         except (ValueError, RecursionError): continue
-        if isinstance(r, dict) and name(r.get("id")): by[str(r["id"])] = {**by.get(str(r["id"]), {}), **r}
+        if isinstance(r, dict) and name(r.get("id")):
+            by[str(r["id"])] = {**by.get(str(r["id"]), {}), **{k: v for k, v in r.items() if v is not None}}
     cell = lambda v: (v if v is None or isinstance(v, (int, float, bool)) else "\n".join(map(str, v)) if isinstance(v, list)
                       else json.dumps(v) if isinstance(v, dict) else str(v))
     rows = [{**{k: cell(r.get(k)) for k in IMPROVEMENT}, "outcome": str(r.get("outcome") or "pending").lower(),

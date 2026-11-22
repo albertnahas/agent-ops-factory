@@ -60,7 +60,7 @@ if (factory.picks.length) {
   await page.click('#factory-graph .fx-btn'); await frames();
   factory.picked = await page.evaluate(() => document.querySelectorAll('#factory-graph .fx-fnode[data-tone]').length);
 }
-const improver = {scope, rows: await page.locator('#improver .fx-row').count(), rate: await page.textContent('[data-draw="improver-rate"]')};
+const improver = {scope, hidden: await page.locator('#improver').isHidden(), rows: await page.locator('#improver .fx-row').count(), rate: await page.textContent('[data-draw="improver-rate"]')};
 if (improver.rows) {
   await page.locator('#improver .fx-row').first().click(); await frames();
   improver.detail = await page.evaluate(() => /Why: .*Replay: /s.test(document.querySelector('#improver .fx-more:not([hidden])')?.textContent || ''));
