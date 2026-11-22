@@ -137,6 +137,7 @@ expect "a blank with no manager goes to the master" "[ \"\$(esc lone)\" = 'door 
 expect "the master's blank is you, even beside a manager"    "[ \"\$(esc door)\" = 'you true | null' ]"
 expect "only the master and break-glass reach you" "esc rogue | grep -q 'straight to you' && [ \"\$(esc pager)\" = 'you false | null' ]"
 expect "a break-glass reason is on its row"      "jq -e '[.rows[] | select(.break_glass)] | map(\"\\(.loop)=\\(.break_glass)\") == [\"pager=production down\", \"stripe=money at risk, refunds\"]' $L >/dev/null"
+expect "a service nothing runs is missing, not paused" "jq -e '.rows[] | select(.loop == \"stripe\") | .status == \"missing\" and (.detail | test(\"com.me.stripe\"))' $L >/dev/null"
 expect "escalation cycles are flagged, by job too" "esc ping | grep -q 'comes back to it: ping → pong → ping'"
 expect "a target that is no loop is flagged"     "esc astray | grep -q 'escalates to nowhere, which is not a loop'"
 expect "one manager per project"                "esc boss | grep -q 'Shop has 2 managers' && esc boss2 | grep -q 'Shop has 2 managers'"
@@ -148,6 +149,8 @@ expect "the registry-only check names every escalation issue" "! python3 fleet/f
 # folders), the Orders and dated report its charter names, a routine's page, a task's prompt, a job's script.
 mkdir -p "$AGENT_OPS_DIR/docs/orders" "$AGENT_OPS_DIR/docs/reports" "$AGENT_OPS_DIR/tasks/nightly" "$AGENT_OPS_DIR/co/shop/docs" "$AGENT_OPS_DIR/co2/shop/docs"
 printf '# Ops\n\nNot [orders/x.md] yet: first read [orders/ops.md](./orders/ops.md).\n\n## Steps\n\n`notes/YYYY-MM-DD.md`\n\n## Daily report\n\nWrite `docs/reports/YYYY-MM-DD.md`.\n' > "$AGENT_OPS_DIR/docs/OPS.md"
+printf '## Good\n\n<!-- mission -->\n- **Outcome:** more orders\n- **Floor:** at least 30 orders a week\n<!-- /mission -->\n' >> "$AGENT_OPS_DIR/docs/OPS.md"
+printf '# Orders\n\nTarget: at least 40 orders a week\n' > "$AGENT_OPS_DIR/docs/orders/ops.md"
 touch "$AGENT_OPS_DIR/docs/orders/ops.md" "$AGENT_OPS_DIR/docs/reports/2026-11-20.md" "$AGENT_OPS_DIR/docs/reports/2026-11-21.md" "$AGENT_OPS_DIR/docs/reports/index.md" "$AGENT_OPS_DIR/tasks/nightly/SKILL.md"
 cat > "$AGENT_OPS_DIR/REGISTRY.md" <<EOF
 ## Registry
@@ -166,6 +169,7 @@ def() { jq -r --arg l "$1" --arg k "$2" '.rows[] | select(.loop == $l) | .[$k] /
 expect "a charter is found from the registry's folder"  "[ \"\$(def ops charter)\" = docs/OPS.md ]"
 expect "its Orders are the first orders file it names"  "[ \"\$(def ops orders)\" = docs/orders/ops.md ]"
 expect "its report is the newest dated file its report section names" "[ \"\$(def ops report)\" = docs/reports/2026-11-21.md ]"
+expect "Good is the charter's Floor and its Orders' Target" "[ \"\$(def ops floor)\" = 'at least 30 orders a week' ] && [ \"\$(def ops target)\" = 'at least 40 orders a week' ] && [ -z \"\$(def nightly floor)\" ]"
 expect "a routine links to its claude.ai page"   "[ \"\$(def ops prompt)\" = https://claude.ai/code/routines/trig_01abc ]"
 expect "a task links to its prompt file"         "[ \"\$(def nightly prompt)\" = tasks/nightly/SKILL.md ]"
 expect "a charter cell with no path, or a missing file, links nothing" "[ -z \"\$(def nightly charter)\$(def bare charter)\$(def bare orders)\$(def bare report)\" ]"

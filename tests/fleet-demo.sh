@@ -27,6 +27,9 @@ for c in OPS:ops SOCIAL:social; do
   printf '# Orders\n' > "$AGENT_OPS_DIR/charters/orders/${c#*:}.md"
   for d in 2 1 0; do printf '# Report\n' > "$AGENT_OPS_DIR/charters/reports/${c#*:}/$(day "$d" 6 | cut -c1-10).md"; done
 done
+# The ops charter has a Good block and its Orders raise the bar, so one loop shows its Floor and Target and the rest "Good: not set".
+printf '\n## Good\n\n<!-- mission -->\n- **Outcome:** shoppers get their orders\n- **Floor:** at least 30 orders a week\n<!-- /mission -->\n' >> "$AGENT_OPS_DIR/charters/SHOP_OPS.md"
+printf '\nTarget: at least 40 orders a week\n' >> "$AGENT_OPS_DIR/charters/orders/ops.md"
 
 loops=(
   # loop|project|checked by|outcomes, oldest first (p pass, f fail, - none)|days since last run
