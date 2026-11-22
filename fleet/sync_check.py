@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Outcome check for SYNC.md: the receipt names the four uploads, is no older than the data files fleet.py wrote (so the
-dashboard shows what the builder holds), carries the page it published, and the cloud snapshot was taken in the same run."""
+dashboard shows what the builder holds), carries the page it published, records no failed kit pull, and the cloud snapshot was taken in the same run."""
 import hashlib, json, sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -18,6 +18,7 @@ if at < int(max((D / f"{f}.json").stat().st_mtime for f in DATA)): bad.append("d
 if any(isinstance(v, (list, dict)) for f in DATA for r in json.loads((D / f"{f}.json").read_text())["rows"] for v in r.values()):
     bad.append("a data file has a cell that isn't a scalar, which claude.ai can't draw")
 if rec.get("page") != page: bad.append("the dashboard runs an older page than the kit's")
+if rec.get("kit_pull"): bad.append(f"the kit didn't update: {rec['kit_pull']}")
 if not (t := when(snap.get("at"))) or abs(at - t.timestamp()) > 3600:
     bad.append(f"cloud snapshot from {(snap.get('at') or 'never')[:16]}, not this run")
 if any(set(r) != {"id", "name", "enabled", "cron", "next_run_at", "last_status", "last_finished_at"} for r in snap.get("routines", [])):
