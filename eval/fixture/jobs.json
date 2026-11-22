@@ -1,0 +1,1 @@
+{"com.shop.digest": {"cron": "0 8 * * *"}, "com.shop.poster": {"cron": "0 12 * * *"}}

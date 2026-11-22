@@ -1,0 +1,13 @@
+{"loop": "digest", "date": "2026-01-05T08:00:30", "check": "pass", "detail": "report ok"}
+{"loop": "poster", "date": "2026-01-05T12:00:30", "check": "pass", "detail": "posted, read back"}
+{"loop": "digest", "date": "2026-01-06T08:00:30", "check": "pass", "detail": "report ok"}
+{"loop": "poster", "date": "2026-01-06T12:00:30", "check": "fail", "detail": "post line not in the expected format"}
+{"loop": "digest", "date": "2026-01-07T08:00:30", "check": "pass", "detail": "report ok"}
+{"loop": "poster", "date": "2026-01-07T12:00:30", "check": "pass", "detail": "posted, read back"}
+{"loop": "digest", "date": "2026-01-08T08:00:30", "check": "fail", "detail": "report missing for today"}
+{"loop": "poster", "date": "2026-01-08T12:00:30", "check": "pass", "detail": "posted, read back"}
+{"loop": "digest", "date": "2026-01-09T08:00:30", "check": "pass", "detail": "report ok"}
+{"loop": "poster", "date": "2026-01-09T12:00:30", "check": "pass", "detail": "posted, read back"}
+{"loop": "digest", "date": "2026-01-10T08:00:30", "check": "pass", "detail": "report ok"}
+{"loop": "digest", "date": "2026-01-11T08:00:30", "check": "pass", "detail": "report ok"}
+{"loop": "digest", "date": "2026-01-12T08:00:30", "check": "pass", "detail": "report ok"}

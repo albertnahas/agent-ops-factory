@@ -64,3 +64,7 @@ The build is a service, not a loop: schedule `python3 fleet/fleet.py` every 30 m
 ## Actions
 
 The page can't change your machine, so each action copies something for you to run: launchd's run-now and stop commands, and a retire prompt you paste into Claude Code. The prompt asks for your reason, shows what it will remove and waits for your yes before it unloads the job and deletes its registry row.
+
+## Does it show the truth?
+
+`eval/replay.py` replays the builder at one time a day over a past ledger and scores what it flagged against labelled incidents: how many real failures it caught with the right cause, how fast, and how many flags were false alarms. Two seams make that possible: `FLEET_NOW` sets the time the build runs as (runs after it are ignored), and `jobs` in `fleet.json` names a fixture of jobs (`{"label": {"cron": "0 9 * * *"}}`) read in place of launchd and the crontab. `--min-detection` fails the run when detection falls, so run it before any change to the builder, the heartbeat or a check. Keep your real ledger slice and labels private; `eval/fixture/` is a made-up one, and `tests/replay.test.sh` runs it.
