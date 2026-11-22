@@ -132,7 +132,7 @@ Small changes ship through the loops and the merge policy. Anything that changes
 
 The test measures demand directly, with signups, replies or pre-orders, because at small volumes you can't read conversion in two weeks. A fake door can be the test. It's never the bet.
 
-**Your part.** Approve, reject or defer each bet in the memo's "Founder decisions" section by its deadline. The dashboard lists open decision sections from your repos' `docs/` (`waiting.github.memo_roots` in `fleet.json`). Silence means undecided: the bet is carried to the next memo, never assumed approved. A bet that reopens a settled decision says which one and what's different this time.
+**Your part.** Approve, reject or defer each bet in the memo's "Founder decisions" section by its deadline. The dashboard lists open decision sections from your repos' `docs/` and `bets/` (`waiting.github.memo_roots` in `fleet.json`). Silence means undecided: the bet is carried to the next memo, never assumed approved. A bet that reopens a settled decision says which one and what's different this time.
 
 **After you decide.** An approved bet's test is filed the same day, as an Order on the loop that owns the test ([Supervisors and Orders](#supervisors-and-orders)), or a queue line when no loop owns it, and only the test gets built. On the read date, the next memo reports the number against the kill rule. A killed bet goes into [DECISIONS.md](https://github.com/albertnahas/agent-ops-kit/blob/main/docs/DECISIONS.md) so it isn't proposed again in the same form. A bet that clears comes back with its next, bigger test. Only once the evidence is strong enough does it get built, as normal graded PRs, with money, identity and data surfaces still X.
 

@@ -786,12 +786,12 @@ def checkouts(owner, roots):
     return seen
 
 def memo_items(owner, repo, path, cfg):
-    """Open decisions in a checkout's docs/ on its default branch: bullets under a `decisions` heading (closed once
+    """Open decisions in a checkout's docs/ and bets/ on its default branch: bullets under a `decisions` heading (closed once
     every `**Decision:**` line is filled), and table rows whose last cell is the `awaiting` status."""
     heading, awaiting = cfg.get("decisions", "Founder decisions"), cfg.get("awaiting", "Awaiting founder")
     subprocess.run(["git", "-C", str(path), "fetch", "-q", "origin"], capture_output=True)
     ref = git(path, "symbolic-ref", "--short", "refs/remotes/origin/HEAD") or "origin/main"
-    hits = subprocess.run(["git", "-C", str(path), "grep", "-l", "-i", "-e", heading, "-e", awaiting, ref, "--", "docs"],
+    hits = subprocess.run(["git", "-C", str(path), "grep", "-l", "-i", "-e", heading, "-e", awaiting, ref, "--", "docs", "bets"],
                           capture_output=True, text=True).stdout.split()
     items = []
     for hit in hits:
