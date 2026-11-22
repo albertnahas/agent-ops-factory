@@ -22,8 +22,9 @@ def load_config():
             "launch_agents": path("launch_agents", Path.home() / "Library/LaunchAgents"),
             "tasks": path("tasks", Path.home() / ".claude/scheduled-tasks"),
             "jobs": cfg.get("jobs") and Path(cfg["jobs"]).expanduser(),
-            "improvements": path("improvements", "improvements.jsonl"),
             "kit": Path(cfg.get("kit", os.environ.get("AGENT_OPS_KIT", Path.home() / ".agent-ops/kit"))).expanduser(),
+            "improvements": path("improvements", "improvements.jsonl"), "kpi": path("kpi", "kpi.jsonl"),
+            "eval": path("eval", "eval/result.json"),
             "refresh": cfg.get("refresh", "Rebuilt by fleet.py"), "waiting": cfg.get("waiting", {})}
 
 C = load_config()
@@ -477,6 +478,34 @@ def questions():
     prompts = [{"label": f"prompt {k}", "value": spec.get("prompt", {}).get(k)} for k in ("new", "edit")]
     if bad or not all(p["value"] for p in prompts): return [], [], f"{f}: " + "; ".join(bad or ["no prompt lines"])
     return rows, prompts, None
+KPI = {"kpi": "kpi", "value": "kpi_value", "bar": "kpi_bar", "of": "kpi_of", "attempts": "kpi_attempts", "since": "kpi_since",
+       "escalated": "kpi_escalated", "date": "kpi_date"}
+def kpis():
+    """Each loop's latest KPI line from kpi.jsonl (the improver's weekly read of its Good against its Floor), as the
+    loop row's kpi_* cells: kpi is met, below or "no KPI"; below carries since, attempts of its allowance and escalated."""
+    last = {}
+    for l in lines(C["kpi"]):
+        try: r = json.loads(l)
+        except (ValueError, RecursionError): continue
+        if isinstance(r, dict) and name(r.get("loop")) and r.get("kpi") in ("met", "below", "no KPI"): last[str(r["loop"])] = r
+    scalar = lambda v: v if v is None or isinstance(v, (int, float, bool)) else str(v)
+    return {loop: {col: scalar(r.get(k)) for k, col in KPI.items()} for loop, r in last.items()}
+def evals():
+    """The replay eval's latest scores (eval/result.json, written by eval/replay.py --json) as `Eval:` meta lines, so
+    the dashboard shows them beside the KPIs; with no result yet, one line says it isn't measured."""
+    try: r = json.loads(C["eval"].read_text())
+    except (OSError, ValueError): return [{"label": "Eval: Replay", "value": "not measured"}]
+    pct = lambda v: f"{round(100 * v)}%" if isinstance(v, (int, float)) else "not measured"
+    floor = (r.get("floor") or {}).get("detection")
+    out = [{"label": "Eval: Replay window", "value": str(r.get("window"))}]
+    for k, who in (("fleet", "Replay, dashboard"), ("heartbeat", "Replay, heartbeat")):
+        s = r.get(k)
+        if not isinstance(s, dict): continue
+        out.append({"label": f"Eval: {who}", "value": f"catches {pct(s.get('detection'))} of real incidents ({s.get('detected')} of {s.get('incidents')})"
+                    + (f", floor {pct(floor)}" if k == "fleet" and floor is not None else "") + f" · {pct(s.get('false_share'))} of its flags are false alarms"
+                    + (f" · flags in {s['median_hours']} h (median)" if s.get("median_hours") is not None else "")})
+    if isinstance(r.get("attention"), dict): out.append({"label": "Eval: Messages to you", "value": f"{r['attention'].get('per_day')} a day"})
+    return out
 
 def discovered(jobs, routines, tasks, led, week):
     """With no registry, everything found stands in for its own row: loops for scheduled jobs, routines, tasks and
@@ -734,12 +763,12 @@ def build():
         if loop not in names and l["last"] >= week:
             rows.append({"loop": loop, "project": "Unregistered", "runtime": "?", "job": "", "status": "unregistered",
                          "last_run": l["last"][:16], "schedule": "logs to the ledger with no registry row"})
-    of = scoping(registry)
-    for r in rows: r["scope"] = of(r["project"])[1]
+    of, kpi = scoping(registry), kpis()
+    for r in rows: r.update(scope=of(r["project"])[1], **kpi.get(r["loop"], {}))
     keys = ["loop", "project", "scope", "runtime", "job", "schedule", "status", "last_run", "result", "detail",
             "next_due", "pass_rate", "checks", "cost", "history", "checked_by", "supervisor", "supervisor_issue",
             "role", "escalates_to", "escalates_default", "break_glass", "escalation_issue",
-            "charter", "orders", "prompt", "runner", "report", "log", "floor", "target"]
+            "charter", "orders", "prompt", "runner", "report", "log", "floor", "target", *KPI.values()]
     rows = [{k: r.get(k) for k in keys} for r in rows]
 
     meta = [{"label": "Built", "value": now.isoformat(timespec="minutes")},
@@ -750,7 +779,7 @@ def build():
             {"label": "Refresh", "value": C["refresh"]},
             {"label": "Registry", "value": None if health else str(C["registry"]).replace(str(Path.home()), "~")},
             {"label": "Builder", "value": str(Path(__file__).resolve()).replace(str(Path.home()), "~")},
-            {"label": "uid", "value": str(os.getuid())}]
+            {"label": "uid", "value": str(os.getuid())}, *evals()]
     items = waiting(now, of, loose + warn)
     changes = improvements({r["loop"]: r.get("scope") or "General" for r in rows})
     write("loops", rows, meta)

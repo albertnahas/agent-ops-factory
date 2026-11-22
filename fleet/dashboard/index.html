@@ -69,6 +69,9 @@ button.fx-kpi:focus-visible { outline: 2px solid var(--color-fg); outline-offset
 .fx-cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: var(--cds-gap-md); align-items: start; }
 
 .fx-list { list-style: none; margin: 0; padding: 0; }
+.fx-eval { display: grid; gap: 2px; padding: 9px 14px; }
+.fx-eval > span { color: var(--color-fg-muted); font-size: var(--cds-font-size-caption); }
+.fx-eval > b { font-weight: 600; }
 .fx-list > li + li { border-top: 1px solid var(--color-border-line); }
 .fx-row { all: unset; box-sizing: border-box; width: 100%; display: grid; grid-template-columns: 8px minmax(0, 1fr) auto 14px; align-items: center; column-gap: 10px; padding: 10px 14px; cursor: pointer; }
 .fx-row { border-left: 3px solid transparent; }
@@ -318,6 +321,10 @@ textarea.fx-input { resize: vertical; }
         <span id="legend-glass" hidden><i class="glass"></i>Break-glass</span>
         <span><i class="gap"></i>Nobody reads it</span>
       </div>
+    </section>
+    <section class="fx-card" id="evals" data-sec="c2">
+      <header><h2>Evaluations</h2></header>
+      <div data-draw="evals" data-source="loops changes"></div>
     </section>
     <section class="fx-card" id="improver" data-sec="c1" hidden>
       <header><h2>Improver</h2><span class="fx-muted" data-draw="improver-rate" data-source="changes">—</span></header>
@@ -617,7 +624,8 @@ const loopActs = (r) => {
 const changesOf = (loop) => { const c = dash.data('changes'); return c.status === 'ok' ? c.data.filter((x) => loop == null || x.loop === loop) : null; };
 const OUTCOME = (c) => c.outcome === 'reverted' ? ['bad', 'Reverted'] : c.outcome === 'pending' ? ['none', 'Pending'] : c.outcome === 'closed' ? ['none', 'Closed']
   : c.moved === true ? ['ok', 'Moved'] : c.moved === false ? ['warn', 'Kept, flat'] : ['none', c.outcome];
-const hitRate = (rows) => { const read = rows.filter((c) => ['kept', 'reverted'].includes(c.outcome)); return [read.filter((c) => c.outcome === 'kept' && c.moved === true).length, read.length]; };
+/* a change that adds a Good check or changes a check moves no Good, so it isn't a hit or a miss */
+const hitRate = (rows) => { const read = rows.filter((c) => ['kept', 'reverted'].includes(c.outcome) && !['measure', 'check_detection'].includes(c.metric)); return [read.filter((c) => c.outcome === 'kept' && c.moved === true).length, read.length]; };
 const changeDetail = (c) => (more) => {
   [['Why', c.hypothesis], ['Metric', c.metric], ['Baseline', c.baseline],
     ['Replay', c.replay_before != null || c.replay_after != null ? (c.replay_before ?? '—') + ' before, ' + (c.replay_after ?? '—') + ' after' : null],
@@ -646,6 +654,12 @@ const loopChanges = (r) => {
   box.append(el('b', '', 'Changes by the improver'), ul);
   return box;
 };
+/* a loop's KPI, from the improver's weekly read: its Good against the Floor and, below it, the attempts left before it
+   comes to you; a loop whose Good isn't measured has no KPI yet */
+const goodText = (r) => r.kpi === 'met' || r.kpi === 'below'
+  ? [r.kpi_value + ' vs Floor ' + (r.floor || r.kpi_bar), r.kpi === 'met' ? 'met' : r.kpi_since ? 'below since ' + dayMonth(String(r.kpi_since)) : 'below',
+    r.kpi === 'below' && 'attempt ' + r.kpi_attempts + ' of ' + (r.kpi_of ?? 2), r.kpi_escalated && 'sent to you'].filter(Boolean).join(' · ')
+  : 'not measured · ' + (r.floor ? 'Floor ' + r.floor : 'no Floor set');
 const loopMore = (r) => (more) => {
   if (r.detail) { const p = el('p'); p.append(el('b', '', 'Last result: '), document.createTextNode(r.detail)); more.append(p); }
   more.append(el('p', '', [LABEL[r.status], r.schedule, r.job && r.job !== r.loop && r.job, r.checks && r.checks + ' checks passed',
@@ -655,7 +669,8 @@ const loopMore = (r) => (more) => {
     more.append(el('p', '', [r.checked_by && 'Read by ' + r.checked_by, r.supervisor && 'supervised by ' + r.supervisor,
       r.escalates_to && 'escalates to ' + r.escalates_to, r.role && 'role ' + r.role].filter(Boolean).join(' · ')));
     if (r.break_glass) { const p = el('p'); p.append(el('b', '', 'Break-glass: '), document.createTextNode(r.break_glass)); more.append(p); }
-    const p = el('p'); p.append(el('b', '', 'Good: '), document.createTextNode(r.floor ? 'Floor ' + r.floor + (r.target ? ' · Target ' + r.target : '') : 'not set'));
+    const p = el('p'); p.append(el('b', '', 'Good: '), document.createTextNode([goodText(r), r.target && 'Target ' + r.target,
+      r.pass_rate != null && 'health: ' + Math.round(100 * r.pass_rate) + '% of checks passed'].filter(Boolean).join(' · ')));
     more.append(p);
   }
   const changes = loopChanges(r); if (changes) more.append(changes);
@@ -1115,6 +1130,34 @@ dash.draw('improver-list', (ul) => {
     right.append(el('span', '', x.outcome === 'pending' && x.read_date ? 'read ' + rel(x.read_date) : label));
     return expandRow('c:' + x.id, [dot(tone, label), titleCell(x.change || x.id, [nameOf(x), x.metric].filter(Boolean).join(' · ')), right], changeDetail(x), tone === 'bad' ? 'bad' : null);
   });
+});
+
+/* every evaluation in one card: each loop's KPI (its Good against its Floor), the fleet KPIs, health, the replay eval of
+   the monitor and the improver's hit rate. What has no data yet says not measured rather than hiding. */
+dash.draw('evals', (box) => {
+  const l = dash.data('loops'); box.replaceChildren();
+  if (l.status !== 'ok') return failed(box, 'evaluations', l.status);
+  const rows = scoped(l.data).filter((r) => !NOT_LOOP.includes(r.project)), measured = rows.filter((r) => r.kpi === 'met' || r.kpi === 'below');
+  const below = measured.filter((r) => r.kpi === 'below'), pct = (n, d) => Math.round(100 * n / d) + '%';
+  const checks = rows.map((r) => String(r.checks || '').match(/^(\d+) of (\d+)$/)).filter(Boolean), passed = checks.reduce((a, m) => a + +m[1], 0), ran = checks.reduce((a, m) => a + +m[2], 0);
+  const ch = changesOf(), [hits, read] = ch ? hitRate(scoped(ch)) : [0, 0];
+  const lines = [
+    ['Loops at or above their Floor', measured.length ? pct(measured.length - below.length, measured.length) + ' of measured (' + (measured.length - below.length) + ' of ' + measured.length + ')' : 'not measured'],
+    ['Loops whose Good is measured', rows.length ? pct(measured.length, rows.length) + ' (' + measured.length + ' of ' + rows.length + ')' : 'not measured'],
+    ['Loops with a Floor', rows.length ? rows.filter((r) => r.floor).length + ' of ' + rows.length : 'not measured'],
+    ['Health: checks passed', ran ? pct(passed, ran) + ' (' + passed + ' of ' + ran + ')' : 'not measured'],
+    ...(l.meta || []).filter((m) => /^Eval: /.test(m.label)).map((m) => [m.label.slice(6), m.value]),
+    ['Improver hit rate', read ? hits + ' of ' + read + ' read changes moved their Good' : 'not measured: no change read yet']];
+  const dl = el('ul', 'fx-list');
+  lines.forEach(([k, v]) => { const li = el('li', 'fx-eval'); li.append(el('span', '', k), el('b', '', String(v))); dl.append(li); });
+  box.append(dl);
+  if (below.length) {
+    const head = el('h3', 'fx-group'); head.append(el('span', '', 'Below the bar'), el('span', '', String(below.length)));
+    const ul = el('ul', 'fx-list');
+    below.forEach((r) => ul.append(expandRow('b:' + r.loop, [dot(r.kpi_escalated ? 'bad' : 'warn', 'Below'),
+    titleCell(nameOf(r), r.kpi_value + ' vs ' + r.kpi_bar + ' · attempt ' + r.kpi_attempts + ' of ' + (r.kpi_of ?? 2) + (r.kpi_escalated ? ' · sent to you' : ''))], loopMore(r))));
+    box.append(head, ul);
+  }
 });
 
 /* waiting tab */
