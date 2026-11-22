@@ -125,37 +125,58 @@ def launchd_jobs():
             "interval": pl.get("StartInterval"),
             "oneoff": bool(cal) and all("Month" in c and "Day" in c for c in (cal if isinstance(cal, list) else [cal])),
             "daemon": bool(pl.get("KeepAlive") or (pl.get("RunAtLoad") and not cal and not pl.get("StartInterval"))),
+            "keepalive": bool(pl.get("KeepAlive")),
             "log_at": dt.datetime.fromtimestamp(max(stamps)).replace(microsecond=0) if stamps else None,
         }
     return jobs
 
 MACROS = {"@yearly": "0 0 1 1 *", "@annually": "0 0 1 1 *", "@monthly": "0 0 1 * *", "@weekly": "0 0 * * 0",
           "@daily": "0 0 * * *", "@midnight": "0 0 * * *", "@hourly": "0 * * * *"}
-RUNNERS = {"sh", "bash", "zsh", "env", "exec", "nice", "nohup", "caffeinate", "timeout", "python", "python3", "node", "ruby", "perl"}
+RUNNERS = {"sh", "bash", "zsh", "env", "exec", "nice", "nohup", "caffeinate", "timeout", "flock", "chronic", "ionice",
+           "python", "python3", "node", "ruby", "perl"}
+BUILTINS = {"cd", "source", ".", "test", "[", "[[", "echo", "printf", "export", "set", "true", "false", ":", "sleep", "ulimit", "umask"}
+
+def cron_words(cmd):
+    """A crontab command as shell words and operators, as cron's shell reads it; `sh -c "..."` is read inside."""
+    lex = shlex.shlex(cmd, posix=True, punctuation_chars=True)
+    lex.whitespace_split = True
+    try: words = list(lex)
+    except ValueError: words = cmd.split()
+    for i, w in enumerate(words[:-1]):
+        if re.fullmatch(r"-\w*c\w*", w) and i and Path(words[i - 1]).name in {"sh", "bash", "zsh"}:
+            return cron_words(words[i + 1]) + words[i + 2:]
+    return words
 
 def cron_name(cmd):
-    """The script a crontab command runs: inside `sh -c "..."`, past `cd dir &&`, shells, interpreters, flags,
-    numbers, redirects and VAR=value."""
-    cmd = re.sub(r"\s*(&&|\|\||;|\|)\s*", r" \1 ", cmd)
-    try: words = shlex.split(cmd)
-    except ValueError: words = cmd.split()
+    """The script a crontab command runs: past shells, interpreters, wrappers, builtins like `cd dir &&`, flags,
+    numbers, redirects and VAR=value. With a wrapper and no path-like word, the wrapper's last word."""
     seg = []
-    for i, w in enumerate(words + [";"]):
-        if w.startswith("-") and "c" in w and Path(words[i - 1]).name in RUNNERS and i + 1 < len(words):
-            return cron_name(words[i + 1])
-        if w not in ("&&", "||", ";", "|"):
+    for w in cron_words(cmd) + [";"]:
+        if w not in {"&&", "||", ";", "|", "&", "(", ")"}:
             seg.append(w); continue
-        names, target = [], False
-        for x in seg:
-            if target or x.startswith("-") or x.isdigit() or "=" in x:
-                target = False; continue
-            if re.match(r"^\d*&?[<>]", x):
-                target = not re.search(r"[<>]&?\S", x); continue  # `> file` names its file next; `>file`, `2>&1` don't
-            names.append(Path(re.split(r"\d*&?[<>]", x)[0]).name)
-        if names and names[0] != "cd":
-            return next((n for n in names if n not in RUNNERS), names[0])
+        words, skip = [], False
+        for k, x in enumerate(seg):
+            if skip or x.startswith("-") or "=" in x or x.isdigit() and k + 1 < len(seg) and re.fullmatch(r"[<>&]+", seg[k + 1]):
+                skip = False; continue
+            if re.fullmatch(r"[<>&|]+", x):
+                skip = not x.endswith("&") and x != ">&"; continue  # a redirect: its file, or `2>&1`'s fd, isn't the script
+            if not x.isdigit(): words.append(x)
+        if words and Path(words[0]).name not in BUILTINS:
+            names = [Path(x).name for x in words]
+            if names[0] not in RUNNERS: return names[0]
+            rest = [(n, x) for n, x in zip(names, words) if n not in RUNNERS] or [(names[0], words[0])]
+            return next((n for n, x in rest if "/" in x or "." in n), rest[-1][0])
         seg = []
-    return Path(words[0]).name if words else "?"
+    return "?"
+
+def cron_output(cmd):
+    """The file a crontab command's output goes to (stdout's, else stderr's), relative to $HOME, where cron runs it."""
+    words, outs = cron_words(cmd), {}
+    for i, w in enumerate(words[:-1]):
+        if w in (">", ">>", "&>", "&>>", ">|"):
+            outs.setdefault("2" if i and words[i - 1] == "2" else "1", words[i + 1])
+    f = outs.get("1") or outs.get("2")
+    return f and Path.home() / Path(os.path.expandvars(f)).expanduser()
 
 def cron_jobs():
     """Crontab lines as jobs named cron:<script name>; a later line with the same name gets a numeric suffix.
@@ -166,12 +187,13 @@ def cron_jobs():
     for line in tab.splitlines():
         parts = line.split()
         if not parts or line.lstrip().startswith("#") or "=" in parts[0]: continue
-        expr, cmd = (MACROS[parts[0]], parts[1:]) if parts[0] in MACROS else (" ".join(parts[:5]), parts[5:])
-        if not cmd or parts[0].startswith("@") and parts[0] not in MACROS: continue  # @reboot: no calendar to check
-        name = "cron:" + cron_name(" ".join(cmd))
+        macro = parts[0] in MACROS
+        expr = MACROS[parts[0]] if macro else " ".join(parts[:5])
+        cmd = re.split(r"\s+", line.strip(), maxsplit=1 if macro else 5)[-1] if len(parts) > (1 if macro else 5) else ""
+        if not cmd or parts[0].startswith("@") and not macro: continue  # @reboot: no calendar to check
+        name = "cron:" + cron_name(cmd)
         while name in jobs: name += "+"
-        log = re.search(r"(?<![0-9])&?>>?\s*([^\s&|;]+)", " ".join(cmd))
-        log = log and Path(os.path.expandvars(log.group(1))).expanduser()
+        log = cron_output(cmd)
         jobs[name] = {"spec": cron_spec(expr), "schedule": expr, "loaded": True, "vendor": False, "oneoff": False,
                       "exit": None, "interval": None, "daemon": False, "has_log": bool(log and str(log) != "/dev/null"),
                       "log_at": dt.datetime.fromtimestamp(log.stat().st_mtime).replace(microsecond=0) if log and log.is_file() else None}
@@ -228,7 +250,8 @@ def discovered(jobs, routines, tasks, led, week):
               for n, r in routines.items() if r.get("enabled") and (r.get("cron") or r.get("last_finished_at"))]
     loops += [{"Loop": t, "Job": f"task:{t}", "Runtime": "app", "Schedule": x.get("cron") or ""} for t, x in tasks.items() if x.get("enabled")]
     loops += [{"Loop": n, "Job": ""} for n, l in led.items() if l["last"] >= week and n not in {r["Loop"] for r in loops}]
-    services = [{"Service": k, "Job": k, "What it is": "kept running by launchd"} for k, j in mine.items() if j["daemon"]]
+    services = [{"Service": k, "Job": k, "What it is": "kept running by launchd" if j["keepalive"] else "runs once at login"}
+                for k, j in mine.items() if j["daemon"]]
     return loops, services
 
 def tables():

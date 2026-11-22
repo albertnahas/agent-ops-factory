@@ -103,6 +103,7 @@ expect "health: a non-zero exit is failing"    "[ \"\$(status com.example.price-
 expect "health: an old log makes the last run unknown, not silent" "jq -e '.rows[] | select(.loop == \"com.example.weekly-review\") | .status == \"no record\" and .last_run == null and (.detail | test(\"unknown\"))' $L >/dev/null"
 expect "health: a routine past its period is silent" "[ \"\$(status competitor-digest)\" = silent ]"
 expect "health: a job launchd keeps running is a service" "jq -e '.rows[] | select(.loop == \"com.example.notes-sync\") | .project == \"Service\" and .status == \"service\"' $L >/dev/null"
+expect "health: a job run only at login is a service that says so" "jq -e '.rows[] | select(.loop == \"com.example.login-mount\") | .project == \"Service\" and .schedule == \"runs once at login\"' $L >/dev/null"
 expect "health: a dated job is a one-off"      "[ \"\$(status com.example.launch-reminder)\" = one-off ]"
 expect "health: unloaded and vendor jobs stay out" "! jq -e '.rows[] | select(.loop | test(\"old-experiment|vendor\"))' $L >/dev/null"
 expect "health: cron with an output file ran"  "[ \"\$(status cron:backup.sh)\" = ran ]"
@@ -116,10 +117,18 @@ j = {'com.me.digest': {'loaded': True, 'vendor': False, 'oneoff': False, 'daemon
 l, _ = discovered(j, {}, {}, {'digest': {'last': '2099'}}, '2000'); assert [r['Loop'] for r in l] == ['digest'], l\""
 expect "health: an exit code with no log time is no record" "[ \"\$(status com.example.cache-warm)\" = 'no record' ]"
 expect "health: sh -c, cd and timeout are skipped; &> is an output file" "[ \"\$(status cron:nightly-export.sh)\" = ran ]"
-expect "cron names: past cd, shells, numbers and redirects" "python3 -c \"import sys; sys.path.insert(0, 'fleet'); from fleet import cron_name as c
-cases = {'cd /a && ./run.sh >> l 2>&1': 'run.sh', 'PATH=/x timeout 60 python3 /o/job.py': 'job.py', 'backup.sh>>/tmp/l 2>&1': 'backup.sh',
-         '/bin/sh -lc \\\"cd /x; ./y.sh\\\"': 'y.sh', 'nice -n 5 /x/z.sh > /tmp/out': 'z.sh'}
-bad = {k: c(k) for k, v in cases.items() if c(k) != v}; assert not bad, bad\""
+cat > "$H/cron-cases.py" <<'PY'
+import sys; from pathlib import Path; sys.path.insert(0, 'fleet'); from fleet import cron_name, cron_output
+names = {'cd /a && ./run.sh >> l 2>&1': 'run.sh', 'PATH=/x timeout 60 python3 /o/job.py': 'job.py', 'backup.sh>>/tmp/l 2>&1': 'backup.sh',
+         '/bin/sh -lc "cd /x; ./y.sh"': 'y.sh', 'nice -n 5 /x/z.sh > /tmp/out': 'z.sh', 'bash -lc "source ~/.profile; /a/h.sh"': 'h.sh',
+         'test -x f && f': 'f', '[ -f x ] && y': 'y', '( cd /a && ./z.sh )': 'z.sh', 'timeout -s KILL 300 x': 'x', 'flock -n lock x': 'x',
+         "sh -c 'echo hi; x'": 'x', 'rsync -a src dst': 'rsync'}
+outs = {'/a/q.sh >> "/t/sp ace/q.log" 2>&1': '/t/sp ace/q.log', 'bash -c "x > inner.log"': str(Path.home() / 'inner.log'),
+        'x &> /t/r.log': '/t/r.log', 'x 2> /t/err.log': '/t/err.log', 'x 2>&1 >> /t/o.log': '/t/o.log', 'x 2>&1': 'None'}
+bad = {k: cron_name(k) for k, v in names.items() if cron_name(k) != v} | {k: cron_output(k) for k, v in outs.items() if str(cron_output(k)) != v}
+assert not bad, bad
+PY
+expect "cron: names past shells, wrappers, builtins and redirects; output files quoted, relative or &>" "python3 $H/cron-cases.py"
 cp -R "$H" "$H.reg" && printf '## Registry\n\n| Loop | Project | Runtime | Job | Schedule |\n|---|---|---|---|---|\n| weekly | Ops | mac | com.example.weekly-review | weekly |\n' > "$H.reg/REGISTRY.md"
 sed -i.bak "s|$H|$H.reg|g" "$H.reg/fleet.json" "$H.reg/bin/"* && AGENT_OPS_DIR="$H.reg" PATH="$H.reg/bin:$PATH" python3 fleet/fleet.py >/dev/null
 expect "with a registry, an old log still means silent" "jq -e '.rows[] | select(.loop == \"weekly\") | .status == \"silent\"' $H.reg/fleet/loops.json >/dev/null"

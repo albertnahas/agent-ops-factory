@@ -504,7 +504,7 @@ dash.draw('k-loops-sub', (e) => {
   if (!loops) return;
   e.append(meter([[ok / loops, 'var(--color-ok)'], [(attn - down) / loops, 'var(--color-warn)'], [down / loops, 'var(--color-bad)']]), el('span', 's', ok + (health() ? ' ran' : ' healthy')));
 });
-dash.draw('k-attn-sub', (e) => { const f = countOf('failing'); e.textContent = f == null ? '—' : f ? f + ' failing' : 'none failing'; });
+dash.draw('k-attn-sub', (e) => { const f = countOf('failing'); e.textContent = f == null ? '—' : f ? f + ' failing or silent' : 'none failing'; });
 dash.draw('k-wait-sub', (e) => { const o = countOf('soon'); e.textContent = o == null ? '—' : o ? o + ' due within 2 days' : 'none due soon'; });
 dash.draw('k-cost', (e) => { const c = dash.data('cost'); e.textContent = c.status === 'ok' ? '$' + c.data.toLocaleString('en') : '—'; });
 
