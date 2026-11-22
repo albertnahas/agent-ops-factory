@@ -159,7 +159,7 @@ expect "the registry-only check names every escalation issue" "! python3 fleet/f
 # folders), the Orders and dated report its charter names, a routine's page, a task's prompt, a job's script.
 mkdir -p "$AGENT_OPS_DIR/docs/orders" "$AGENT_OPS_DIR/docs/reports" "$AGENT_OPS_DIR/tasks/nightly" "$AGENT_OPS_DIR/co/shop/docs" "$AGENT_OPS_DIR/co2/shop/docs"
 printf '# Ops\n\nNot [orders/x.md] yet: first read [orders/ops.md](./orders/ops.md).\n\n## Steps\n\n`notes/YYYY-MM-DD.md`\n\n## Daily report\n\nWrite `docs/reports/YYYY-MM-DD.md`.\n' > "$AGENT_OPS_DIR/docs/OPS.md"
-printf '## Good\n\n<!-- mission -->\n- **Outcome:** more orders\n- **Floor:** at least 30 orders a week\n<!-- /mission -->\n' >> "$AGENT_OPS_DIR/docs/OPS.md"
+printf '## Mission\n\n<!-- mission -->\nMore orders.\n\n- **Floor:** at least 30 orders a week\n- **Source:** the orders table\n<!-- /mission -->\n' >> "$AGENT_OPS_DIR/docs/OPS.md"
 printf '# Orders\n\nTarget: at least 40 orders a week\n' > "$AGENT_OPS_DIR/docs/orders/ops.md"
 touch "$AGENT_OPS_DIR/docs/orders/ops.md" "$AGENT_OPS_DIR/docs/reports/2026-11-20.md" "$AGENT_OPS_DIR/docs/reports/2026-11-21.md" "$AGENT_OPS_DIR/docs/reports/index.md" "$AGENT_OPS_DIR/tasks/nightly/SKILL.md"
 cat > "$AGENT_OPS_DIR/REGISTRY.md" <<EOF
