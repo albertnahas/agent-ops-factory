@@ -206,6 +206,7 @@ button.fx-kpi:focus-visible { outline: 2px solid var(--color-fg); outline-offset
 .fx-fdetail p { margin: 0; overflow-wrap: anywhere; }
 .fx-fdetail .fx-defs { pointer-events: auto; margin-top: 4px; }
 .fx-defs { align-items: center; }
+.fx-defs .none { font-size: 13px; color: var(--color-fg-muted); }
 .fx-defs .k { width: 100%; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; color: var(--color-fg-muted); }
 .fx-legend { display: flex; flex-wrap: wrap; gap: 6px 14px; padding: 10px 14px; border-top: 1px solid var(--color-border-line); font-size: 11px; color: var(--color-fg-muted); }
 .fx-legend span { display: inline-flex; align-items: center; gap: 5px; }
@@ -427,11 +428,13 @@ const copyBtn = (cmd, label) => {
    page can only link to http and https */
 const DEFS = [['charter', 'Charter'], ['orders', 'Orders'], ['prompt', (r) => /^https?:/.test(r.prompt) ? 'Routine' : 'Prompt'],
   ['runner', (r) => /\.plist$/.test(r.runner) ? 'Plist' : 'Run script'], ['report', 'Latest report'], ['log', 'Run log']];
+const registered = (r) => !NOT_LOOP.includes(r.project) && r.checked_by != null;
 const defsRow = (r) => {
   const defs = DEFS.filter(([k]) => r[k]);
-  if (!defs.length) return null;
+  const none = registered(r) && !r.charter;
+  if (!defs.length && !none) return null;
   const row = el('div', 'fx-acts fx-defs');
-  row.append(el('span', 'k', 'Defined by'), ...defs.map(([k, name]) => {
+  row.append(el('span', 'k', 'Defined by'), ...(none ? [el('span', 'none', 'Charter: none')] : []), ...defs.map(([k, name]) => {
     const label = typeof name === 'function' ? name(r) : name;
     return linkBtn(r[k], label) || copyBtn(r[k], label + ' path');
   }));
@@ -493,7 +496,7 @@ const retirePrompt = (r) => 'Retire the scheduled loop "' + r.loop + '" (' + [r.
   + 'Then run python3 ' + (metaOf('Builder') || 'fleet.py') + ' and confirm it is gone.';
 const loopActs = (r) => {
   const acts = el('div', 'fx-acts');
-  if (r.runtime === 'mac' && !NOT_LOOP.includes(r.project) && r.status !== 'paused' && r.job) acts.append(copyBtn('launchctl kickstart gui/' + metaOf('uid') + '/' + r.job, 'Copy run-now command'));
+  if (r.runtime === 'mac' && !NOT_LOOP.includes(r.project) && !['paused', 'missing'].includes(r.status) && r.job) acts.append(copyBtn('launchctl kickstart gui/' + metaOf('uid') + '/' + r.job, 'Copy run-now command'));
   if (r.project === 'Service' && r.status === 'failing') acts.append(copyBtn('launchctl bootout gui/' + metaOf('uid') + '/' + r.job, 'Copy stop command'));
   acts.append(copyBtn(retirePrompt(r), 'Copy retire prompt'));
   return acts.childElementCount ? acts : null;
@@ -537,6 +540,14 @@ const loopMore = (r) => (more) => {
   if (r.detail) { const p = el('p'); p.append(el('b', '', 'Last result: '), document.createTextNode(r.detail)); more.append(p); }
   more.append(el('p', '', [LABEL[r.status], r.schedule, r.job && r.job !== r.loop && r.job, r.checks && r.checks + ' checks passed',
     r.cost != null ? '$' + r.cost.toLocaleString('en', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + ' in 30 days' : ledger() && /cloud|db|app/.test(r.runtime || '') ? 'cost not metered' : null].filter(Boolean).join(' · ')));
+  if (r.status === 'no check') more.append(el('p', '', 'Nothing writes a pass or fail line for it, so a run that did nothing looks like one that worked.'));
+  if (registered(r)) {
+    more.append(el('p', '', [r.checked_by && 'Read by ' + r.checked_by, r.supervisor && 'supervised by ' + r.supervisor,
+      r.escalates_to && 'escalates to ' + r.escalates_to, r.role && 'role ' + r.role].filter(Boolean).join(' · ')));
+    if (r.break_glass) { const p = el('p'); p.append(el('b', '', 'Break-glass: '), document.createTextNode(r.break_glass)); more.append(p); }
+    const p = el('p'); p.append(el('b', '', 'Good: '), document.createTextNode(r.floor ? 'Floor ' + r.floor + (r.target ? ' · Target ' + r.target : '') : 'not set'));
+    more.append(p);
+  }
   const changes = loopChanges(r); if (changes) more.append(changes);
   const defs = defsRow(r); if (defs) more.append(defs);
   const acts = loopActs(r); if (acts) more.append(acts);

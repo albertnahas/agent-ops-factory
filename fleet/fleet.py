@@ -355,12 +355,18 @@ def job_links(j):
 
 def definitions(reg, kind, ref, item, roots):
     """A registry loop's charter, its Orders (the first `orders/<name>.md` its charter names that is beside it), its prompt (a
-    routine's claude.ai page, a desktop task's SKILL.md), its latest report, and whether the charter says `status: paused`."""
+    routine's claude.ai page, a desktop task's SKILL.md), its latest report, whether the charter says `status: paused`, the
+    Floor its Good section keeps inside `mission` markers, and the Target line of its Orders."""
     charter = locate(reg.get("Charter"), reg.get("Project", ""), roots)
     text = read(charter) if charter else ""
     orders = next((f for f in (charter.parent / "orders" / n for n in re.findall(r"orders/([\w.-]+\.md)", text)) if exists(f)), None)
     task = C["tasks"] / ref / "SKILL.md"
+    good = re.search(r"^## Good\b(.*?)(?=^## |\Z)", text, re.M | re.S)
+    kept = "".join(re.findall(r"<!-- mission -->(.*?)<!-- /mission -->", good.group(1), re.S)) if good else ""
+    floor = re.search(r"^[-*\s]*\*\*Floor:\*\*\s*(.+?)\s*$", kept, re.M)
+    target = orders and re.search(r"^[-*\s]*\**Target(?::\**|\**:)\s*(.+?)\s*$", read(orders), re.M | re.I)
     return {"charter": where(charter), "orders": where(orders),
+            "floor": floor.group(1) if floor else None, "target": target.group(1) if target else None,
             "prompt": f"https://claude.ai/code/routines/{item['id']}" if kind == "routine" and (item or {}).get("id")
                       else where(task) if kind == "task" and task.is_file() else None,
             "report": newest_report(charter, text) if charter else None,
@@ -669,8 +675,9 @@ def build():
         j = jobs.get(svc["Job"], {})
         rows.append({"loop": svc["Service"], "project": "Service", "runtime": "mac", "job": svc["Job"],
                      "schedule": svc.get("What it is", ""), "break_glass": reasons.get(svc["Service"]), **job_links(j),
-                     "status": "paused" if not j.get("loaded") else "service" if j.get("exit") in (0, None) else "failing",
-                     "detail": f"last run exited {j['exit']}" if j.get("exit") not in (0, None) else ""})
+                     "status": "missing" if not j else "paused" if not j.get("loaded") else "service" if j.get("exit") in (0, None) else "failing",
+                     "detail": f"last run exited {j['exit']}" if j.get("exit") not in (0, None)
+                               else f"nothing on this machine runs a job named '{svc['Job']}'" if not j else ""})
 
     for label, j in jobs.items():
         if label in claimed or j["vendor"] or not j["loaded"]: continue
@@ -701,7 +708,7 @@ def build():
     keys = ["loop", "project", "scope", "runtime", "job", "schedule", "status", "last_run", "result", "detail",
             "next_due", "pass_rate", "checks", "cost", "history", "checked_by", "supervisor", "supervisor_issue",
             "role", "escalates_to", "escalates_default", "break_glass", "escalation_issue",
-            "charter", "orders", "prompt", "runner", "report", "log"]
+            "charter", "orders", "prompt", "runner", "report", "log", "floor", "target"]
     rows = [{k: r.get(k) for k in keys} for r in rows]
 
     meta = [{"label": "Built", "value": now.isoformat(timespec="minutes")},
