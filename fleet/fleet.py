@@ -5,7 +5,6 @@ Sources: the registry file, launchd plists, your crontab, the run ledger, <out>/
 desktop tasks, written by the claude.ai sync in fleet/SYNC.md), and optionally a queue file, GitHub PRs and decision memos.
 fleet/README.md says how each status is decided."""
 import datetime as dt, functools, json, math, os, plistlib, re, shlex, shutil, subprocess, sys, urllib.parse
-from collections import Counter
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
@@ -40,9 +39,15 @@ name = lambda v: str(v) if isinstance(v, (str, int, float)) and str(v).strip() e
 def when(s):
     """A timestamp as naive local time to the second, or None. Takes Z, offsets and any fraction, as python 3.9 doesn't."""
     if not isinstance(s, str): return None
-    s = re.sub(r"Z$", "+00:00", re.sub(r"\.(\d+)", lambda m: "." + m.group(1)[:6].ljust(6, "0"), s.strip()))
+    s = re.sub(r"\.(\d+)", lambda m: "." + m.group(1)[:6].ljust(6, "0"), s.strip())
+    s = re.sub(r"([+-]\d\d)(\d\d)$", r"\1:\2", re.sub(r"Z$", "+00:00", s))  # date's %z: +0100
     try: t = dt.datetime.fromisoformat(s); return (t.astimezone().replace(tzinfo=None) if t.tzinfo else t).replace(microsecond=0)
     except (ValueError, OverflowError): return None  # not a time, or a "never" like 9999-12-31Z
+
+def money(v):
+    """A cost as a finite number, else 0."""
+    try: return v if isinstance(v, (int, float)) and not isinstance(v, bool) and math.isfinite(v) else 0
+    except OverflowError: return 0  # an int too big for a float
 
 def check_of(loop):
     """checks/<loop>.py when the name is a plain file name and the file is there (a name too long for one is no file)."""
@@ -69,19 +74,20 @@ def cells(line, outer=True):
 
 def table(md, heading, *keys):
     """Rows of the first markdown table under `## heading`, as dicts keyed by header, and what's wrong with the rows
-    left out: more cells than headers (an unescaped |) or a blank key cell."""
+    left out: more cells than headers (an unescaped |), a blank key cell, or a first key a row above has (the first counts)."""
     if f"## {heading}" not in md: return [], []
     sec = md.split(f"## {heading}", 1)[1].split("\n## ", 1)[0]
     rows = [l for l in sec.split("\n") if l.startswith("|")]
     if len(rows) < 2: return [], []
-    head, out, bad = cells(rows[0]), [], []
+    head, out, bad, seen = cells(rows[0]), [], [], set()
     for l in rows[2:]:
         c = cells(l)
         r = dict(zip(head, c + [""] * len(head)))
         wrong = any(c[len(head):]) and f"{len(c)} cells under {len(head)} headers (a | in a cell is \\|)" or \
-                next((f"no {k}" for k in keys if not r.get(k)), None)
+                next((f"no {k}" for k in keys if not r.get(k)), None) or \
+                keys and r[keys[0]] in seen and f"a row above has this {keys[0]}; the first one counts"
         if wrong: bad.append(f"{heading} row {next(filter(None, c), '')[:60]}: {wrong}")
-        else: out.append(r)
+        else: out.append(r); seen.add(keys and r[keys[0]])
     return out, bad
 
 # --- schedules: launchd calendar dicts and crons share one form, {Minute, Hour, Day, Month, Weekday} -> sets
@@ -366,11 +372,10 @@ def ledger(now):
     for l in lines(C["ledger"]):
         try: r = json.loads(l)
         except (ValueError, RecursionError): continue
-        if not isinstance(r, dict) or not name(r.get("loop")) or not when(r.get("date")): continue
-        cost, detail = r.get("cost"), r.get("detail")
-        runs.append({**r, "loop": name(r["loop"]), "date": when(r["date"]).isoformat(),
-                     "cost": cost if isinstance(cost, (int, float)) and not isinstance(cost, bool) and math.isfinite(cost) else 0,
-                     "detail": "" if detail is None else str(detail)})
+        loop, date = (name(r.get("loop")), when(r.get("date"))) if isinstance(r, dict) else (None, None)
+        if loop and date:
+            runs.append({**r, "loop": loop, "date": date.isoformat(), "cost": money(r.get("cost")),
+                         "detail": "" if r.get("detail") is None else str(r["detail"])})
     if not runs: return {}, None
     runs.sort(key=lambda r: r["date"])
     by = {}
@@ -384,7 +389,7 @@ def ledger(now):
         win_checks = [r for r in checks if r["date"] >= since]
         win_claude = [r for r in claude if r["date"] >= since]
         if checks:
-            last_ok, detail = checks[-1]["check"] == "pass", " ".join((checks[-1].get("detail") or "").split())
+            last_ok, detail = checks[-1]["check"] == "pass", " ".join(checks[-1]["detail"].split())
             passes, total = sum(r["check"] == "pass" for r in win_checks), len(win_checks)
         else:
             last_ok = not failed(claude[-1])
@@ -397,7 +402,7 @@ def ledger(now):
             "last": max(r["date"] for r in rs), "last_ok": last_ok, "detail": detail[:200],
             "passes": passes, "total": total, "chronic": last7.count("fail") >= 3,
             "fails7": f"{last7.count('fail')} of last {len(last7)}",
-            "cost": round(sum(r.get("cost") or 0 for r in win_claude), 2),
+            "cost": round(sum(r["cost"] for r in win_claude), 2),
             "has_checks": bool(checks), "history": history,
         }
     return out, first
@@ -436,13 +441,8 @@ def links(registry, services, glass, bad=()):
     where the loop sends what needs a person; blank means its project's manager, else the master, else you (always you for the master). Once a loop
     has Role master, only it and the Break-glass table may reach you; escalation_issue says what breaks that. A cycle is
     drawn once, from its first loop by name; the other loops on it, and those whose chain runs into it, name that loop.
-    A name on two rows keeps the first. Returns (loops, break-glass reasons by name, issues that belong to no one loop:
-    the `bad` rows tables() left out, names on two rows, Break-glass rows that name nothing)."""
-    twice = [f"{n}: {c} registry rows have this name; the first one counts"
-             for n, c in Counter(r["Loop"] for r in registry).items() if c > 1]
-    first = {}
-    for r in registry: first.setdefault(r["Loop"], r)
-    registry = list(first.values())
+    Returns (loops, break-glass reasons by name, issues that belong to no one loop: the `bad` rows tables() left out
+    and Break-glass rows that name nothing)."""
     named = [(r["Loop"], r["Job"]) for r in registry] + [(r["Service"], r["Job"]) for r in services]
     alias = {k: n for n, j in named for k in (j, j.partition(":")[2]) if k} | {n: n for n, _ in named}
     resolve = lambda c: "you" if c.lower() == "you" else alias.get(c, c)
@@ -492,7 +492,7 @@ def links(registry, services, glass, bad=()):
                   esc[loop]]
         l["escalation_issue"] = "; ".join(i for i in issues if i) or None
     known = set(out) | {s["Service"] for s in services}
-    loose = list(bad) + twice + [f"{who}: break-glass names no loop or service in the registry" for who in reasons if who not in known] + \
+    loose = list(bad) + [f"{who}: break-glass names no loop or service in the registry" for who in reasons if who not in known] + \
             [f"{who}: its break-glass row needs a reason" for who, why in reasons.items() if who in known - set(out) and not why]
     return out, reasons, loose
 
@@ -502,11 +502,11 @@ def snapshot():
     try: s = json.loads((C["out"] / "cloud.json").read_text(errors="replace"))
     except (OSError, ValueError, RecursionError): s = {}
     s = s if isinstance(s, dict) else {}
-    items = lambda key, id: {name(r[id]): {
+    items = lambda key, id: {n: {
         "id": name(r.get("id")), "enabled": bool(r.get("enabled")), "cron": r.get("cron") if isinstance(r.get("cron"), str) else None,
         "next_run_at": when(r.get("next_run_at")), "last_finished_at": when(r.get("last_finished_at")),
         "last_status": None if r.get("last_status") is None else str(r["last_status"]).lower()[:100]}
-        for r in (s.get(key) if isinstance(s.get(key), list) else []) if isinstance(r, dict) and name(r.get(id))}
+        for r in (s.get(key) if isinstance(s.get(key), list) else []) if isinstance(r, dict) for n in [name(r.get(id))] if n}
     return when(s.get("at")), items("routines", "name"), items("tasks", "id")
 
 def build():
@@ -718,7 +718,7 @@ def waiting(now, of, issues=()):
     for line in lines(Path(q["path"]).expanduser()) if q else []:
         f = cells(line, outer=False)
         f = f[1:-1] if len(f) == 9 and not f[0] and not f[-1] else f  # written as a markdown table
-        if "|" not in line or f[0].lower() == "due" or set(line) <= set("-|: \t\r"): continue  # prose, header, separator
+        if len(f) != 7 and not re.match(r"\|?\s*\d{4}-\d\d-\d\d", line.strip()) or f[0].lower() == "due": continue  # prose, header, separator
         if len(f) != 7:
             items.append({"kind": "Queue", "source": "Queue", "tag": "To do", "title": "A queue line that can't be read",
                           "item": line.strip(), "action": "give it the 7 cells (a | in a cell is \\|)", "where": "queue",

@@ -9,7 +9,7 @@ from fleet import C, when
 D = C["out"]
 rec = json.loads((D / "receipt.json").read_text()) if (D / "receipt.json").exists() else {}
 snap = json.loads((D / "cloud.json").read_text()) if (D / "cloud.json").exists() else {}
-at = when(rec.get("at")).timestamp() if when(rec.get("at")) else 0
+at = (t := when(rec.get("at"))) and t.timestamp() or 0
 page = hashlib.sha256((Path(__file__).resolve().parent / "dashboard/index.html").read_bytes()).hexdigest()
 bad = []
 if set(rec.get("blobs", {})) != {"loops", "waiting"}: bad.append("receipt lacks the two uploads")
@@ -17,7 +17,7 @@ if at < int(max((D / f).stat().st_mtime for f in ("loops.json", "waiting.json"))
 if any(isinstance(v, (list, dict)) for f in ("loops", "waiting") for r in json.loads((D / f"{f}.json").read_text())["rows"] for v in r.values()):
     bad.append("a data file has a cell that isn't a scalar, which claude.ai can't draw")
 if rec.get("page") != page: bad.append("the dashboard runs an older page than the kit's")
-if not when(snap.get("at")) or abs(at - when(snap["at"]).timestamp()) > 3600:
+if not (t := when(snap.get("at"))) or abs(at - t.timestamp()) > 3600:
     bad.append(f"cloud snapshot from {(snap.get('at') or 'never')[:16]}, not this run")
 if any(set(r) != {"id", "name", "enabled", "cron", "next_run_at", "last_status", "last_finished_at"} for r in snap.get("routines", [])):
     bad.append("cloud snapshot not in the fleet.py shape")

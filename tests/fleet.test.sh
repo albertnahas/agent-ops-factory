@@ -193,7 +193,7 @@ get() { jq -r --arg l "$1" ".rows[] | select(.loop == \$l) | $2" "$O/fleet/loops
 reg() { printf '## Registry\n\n| Loop | Project | Runtime | Job | Schedule | Charter | Outcome check | Checked by | Supervisor |\n|---|---|---|---|---|---|---|---|---|\n'; printf '%s\n' "$@"; }
 row() { echo "| $1 | ${3:-P} | cloud | routine:$1 | daily | | | you | ${2:-} |"; }
 routine() { printf '{"name":%s,"enabled":%s,"cron":"0 6 * * *","next_run_at":%s,"last_status":%s,"last_finished_at":%s}' "$1" "${2:-true}" "${3:-null}" "${4:-null}" "${5:-null}"; }
-cloud() { echo "{\"at\":\"$(date +%FT%T%z | sed 's/\(..\)$/:\1/')\",\"routines\":[$1],\"tasks\":${2:-[]}}" > "$O/fleet/cloud.json"; }
+cloud() { echo "{\"at\":\"$(date +%FT%T%z)\",\"routines\":[$1],\"tasks\":${2:-[]}}" > "$O/fleet/cloud.json"; }
 scalar() { jq -se 'all(.[].rows[][]; type != "array" and type != "object")' "$O/fleet/loops.json" "$O/fleet/waiting.json" >/dev/null; }
 
 mk ledger; reg "$(row a)" > "$O/REGISTRY.md"; cloud "$(routine '"a"')"
@@ -210,6 +210,10 @@ expect "the latest date is the last run, wherever its line sits" "[ \"\$(get a .
 expect "a cost that isn't a finite number counts as 0" "[ \"\$(get a .cost)\" = 0 ]"
 expect "a numeric loop name is a string"       "[ \"\$(get 12345 .status)\" = unregistered ] && jq -e 'all(.rows[]; .loop | type == \"string\")' $O/fleet/loops.json >/dev/null"
 expect "no text in the data can end the page's script" "grep 'window.FLEET' $O/fleet/dashboard.html | grep -v '<!--' | grep -q 'u003c!--'"
+
+mk tz; reg "$(row a)" > "$O/REGISTRY.md"; cloud "$(routine '"a"')"
+printf '{"loop":"a","date":"%s","subtype":"success","cost":1%s}\n' "$(date +%FT%T%z)" "$(printf '0%.0s' $(seq 400))" > "$O/runs.jsonl"
+expect "a +0100 offset is read; a 400-digit cost counts as 0" "build && [ \"\$(get a .last_run)\" != null ] && [ \"\$(get a .cost)\" = 0 ]"
 
 mk cloud; reg "$(row a)" "$(row b)" "$(row c)" > "$O/REGISTRY.md"
 echo "{\"at\":\"$(date -u +%FT%TZ)\",\"routines\":[$(routine '"a"' true null '"CANCELLED"' '"2026-11-21T06:00:00.123456789Z"'),
@@ -243,9 +247,9 @@ expect "a crontab line cron would reject has no next run" "[ \"\$(get cron:x.sh 
 
 mk qdir; mkdir "$O/QUEUE.md"
 expect "a queue path that is a folder is no queue" "build"
-mk queue; printf '# Queue\n2026-12-01 | decision | Pick A | B price | You | decide | priced | agent\n2026-12-02 | decision | A \\| B | you | decide | x | agent\n| 2026-12-03 | todo | outer | YOU | do | x | agent |\n | todo | no date | You | do | x | \n' > "$O/QUEUE.md"
+mk queue; printf '# Queue\nFormat: due | kind | item\n2026-12-01 | decision | Pick A | B price | You | decide | priced | agent\n2026-12-02 | decision | A \\| B | you | decide | x | agent\n| 2026-12-03 | todo | outer | YOU | do | x | agent |\n | todo | no date | You | do | x | \n' > "$O/QUEUE.md"
 W=$O/fleet/waiting.json
-expect "a queue line with a stray | is flagged, not dropped" "build && jq -e '[.rows[] | select(.title | startswith(\"A queue line\"))] | length == 1' $W >/dev/null"
+expect "a queue line with a stray | is flagged, not dropped; prose with a | is skipped" "build && jq -e '[.rows[] | select(.title | startswith(\"A queue line\"))] | length == 1' $W >/dev/null"
 expect "a queue needs no header; \\| is a pipe; outer pipes, blank end cells and owner case are fine" "jq -e '[.rows[].item] | index(\"A | B\") and index(\"outer\") and index(\"no date\") and length == 4' $W >/dev/null"
 
 mk reg; L300=$(printf 'l%.0s' $(seq 300)); echo "open('$O/ran', 'w')" > "$O/pwn.py"
@@ -254,14 +258,14 @@ mk reg; L300=$(printf 'l%.0s' $(seq 300)); echo "open('$O/ran', 'w')" > "$O/pwn.
   for l in t2:t1 t1:ta ta:tb tb:tc tc:tb; do row "${l%%:*}" "${l#*:}"; done; } > "$O/REGISTRY.md"
 expect "a long, odd or U+2028 name doesn't stop the build" "build && [ -n \"\$(get \"$L300\" .loop)\" ] && [ -n \"\$(get \"\$(printf 'u\xe2\x80\xa8v')\" .loop)\" ]"
 expect "a loop name with ../ runs no check outside checks/" "[ ! -e $O/ran ]"
-expect "two rows with one name keep their own first row's links" "[ \"\$(get dup .checked_by | head -1)\" = you ]"
+expect "two rows with one name are one loop, the first row's" "[ \$(get dup .loop | wc -l) -eq 1 ] && [ \"\$(get dup .checked_by)\" = you ]"
 expect "a row with a stray | is left out; \\| is a pipe in a name" "[ -z \"\$(get x .loop)\" ] && [ \"\$(get 'esc | aped' .project)\" = 'Social algorithms' ]"
 expect "an empty cell past the last header is fine" "[ -n \"\$(get g .loop)\" ]"
 expect "spellings of a project share the first; a project called General is General" "[ \"\$(get 'esc | aped' .scope)\" = Social-Algorithms ] && [ \"\$(get g .scope)\" = General ]"
 expect "a chain that runs into a supervision cycle is flagged" "get t2 .supervisor_issue | grep -q 'runs into the cycle through tb' && get tc .supervisor_issue | grep -q 'in the cycle through tb'"
 build --check
-expect "the registry's issues wait on you on the page" "jq -e '[.rows[] | select(.kind == \"Registry\") | .item] | any(startswith(\"dup: 2\")) and any(test(\"cells under 9 headers\"))' $O/fleet/waiting.json >/dev/null"
-expect "--check names a duplicate, a broken row and each cycle once" "grep -q 'dup: 2 registry rows' $O/said && grep -q 'cells under 9 headers' $O/said && [ \$(grep -o 'comes back to it' $O/said | wc -l) -eq 1 ]"
+expect "the registry's issues wait on you on the page" "jq -e '[.rows[] | select(.kind == \"Registry\") | .item] | any(test(\"row dup: a row above\")) and any(test(\"cells under 9 headers\"))' $O/fleet/waiting.json >/dev/null"
+expect "--check names a duplicate, a broken row and each cycle once" "grep -q 'row dup: a row above has this Loop' $O/said && grep -q 'cells under 9 headers' $O/said && [ \$(grep -o 'comes back to it' $O/said | wc -l) -eq 1 ]"
 mk chain; { reg "$(row c1)"; for i in $(seq 2 2000); do row "c$i" "c$((i - 1))"; done; } > "$O/REGISTRY.md"
 expect "--check walks a 2000-deep supervisor chain in a blink" "perl -e 'alarm 3; exec @ARGV' env AGENT_OPS_DIR=$O FLEET_CONFIG=$O/fleet.json python3 fleet/fleet.py --check"
 mk none

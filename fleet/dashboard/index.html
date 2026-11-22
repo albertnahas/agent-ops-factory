@@ -917,7 +917,8 @@ dash.draw('wait-list', (box) => {
   const mine = scoped(w.data);
   if (!mine.length) { const d = el('div', 'fx-card fx-empty'); d.append(icon('check', 16), el('span', '', 'Nothing waits on you.')); box.append(d); return; }
   const groups = [['Due now', (d) => d <= 0, 'bad'], ['This week', (d) => d > 0 && d <= 7, 'warn'], ['Later', (d) => d > 7, 'c0'],
-    ['PRs to review', (d, r) => isNaN(d) && r.tag === 'PR review', 'c1'], ['Open decisions, no date', (d, r) => isNaN(d) && r.tag !== 'PR review', 'c4']];
+    ['PRs to review', (d, r) => isNaN(d) && r.tag === 'PR review', 'c1'], ['To do, no date', (d, r) => isNaN(d) && r.tag === 'To do', 'c2'],
+    ['Open decisions, no date', (d, r) => isNaN(d) && r.tag === 'Decision', 'c4']];
   groups.forEach(([name, test, sec]) => {
     const rows = mine.filter((r) => test(dueIn(r), r));
     if (!rows.length) return;
