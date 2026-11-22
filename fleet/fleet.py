@@ -132,8 +132,9 @@ def launchd_jobs():
 
 MACROS = {"@yearly": "0 0 1 1 *", "@annually": "0 0 1 1 *", "@monthly": "0 0 1 * *", "@weekly": "0 0 * * 0",
           "@daily": "0 0 * * *", "@midnight": "0 0 * * *", "@hourly": "0 * * * *"}
-RUNNERS = {"sh", "bash", "zsh", "env", "exec", "nice", "nohup", "caffeinate", "timeout", "flock", "chronic", "ionice",
-           "python", "python3", "node", "ruby", "perl"}
+INTERPRETERS = {"sh", "bash", "zsh", "python", "python3", "node", "ruby", "perl"}  # the next word is the script
+WRAPPERS = {"env", "exec", "nice", "nohup", "caffeinate", "timeout", "flock", "chronic", "ionice"}  # their own args come first
+RUNNERS = INTERPRETERS | WRAPPERS
 BUILTINS = {"cd", "source", ".", "test", "[", "[[", "echo", "printf", "export", "set", "true", "false", ":", "sleep", "ulimit", "umask"}
 
 def cron_words(cmd):
@@ -141,7 +142,7 @@ def cron_words(cmd):
     lex = shlex.shlex(cmd, posix=True, punctuation_chars=True)
     lex.whitespace_split = True
     try: words = list(lex)
-    except ValueError: words = cmd.split()
+    except ValueError: words = re.sub(r"[\"']", "", cmd).split()  # an unclosed quote
     for i, w in enumerate(words[:-1]):
         if re.fullmatch(r"-\w*c\w*", w) and i and Path(words[i - 1]).name in {"sh", "bash", "zsh"}:
             return cron_words(words[i + 1]) + words[i + 2:]
@@ -149,7 +150,8 @@ def cron_words(cmd):
 
 def cron_name(cmd):
     """The script a crontab command runs: past shells, interpreters, wrappers, builtins like `cd dir &&`, flags,
-    numbers, redirects and VAR=value. With a wrapper and no path-like word, the wrapper's last word."""
+    numbers, redirects and VAR=value. After an interpreter, the next word; after a wrapper, its last word with a /
+    in it, else its last word."""
     seg = []
     for w in cron_words(cmd) + [";"]:
         if w not in {"&&", "||", ";", "|", "&", "(", ")"}:
@@ -161,41 +163,51 @@ def cron_name(cmd):
             if re.fullmatch(r"[<>&|]+", x):
                 skip = not x.endswith("&") and x != ">&"; continue  # a redirect: its file, or `2>&1`'s fd, isn't the script
             if not x.isdigit(): words.append(x)
-        if words and Path(words[0]).name not in BUILTINS:
+        if words and words[0] not in BUILTINS and Path(words[0]).name not in BUILTINS:
             names = [Path(x).name for x in words]
-            if names[0] not in RUNNERS: return names[0]
-            rest = [(n, x) for n, x in zip(names, words) if n not in RUNNERS] or [(names[0], words[0])]
-            return next((n for n, x in rest if "/" in x or "." in n), rest[-1][0])
+            i = max(k for k, n in enumerate(names) if n in RUNNERS) if names[0] in RUNNERS else -1
+            rest = words[i + 1:] or [words[i]]
+            if i < 0 or names[i] in INTERPRETERS: return Path(rest[0]).name
+            return Path(next((x for x in reversed(rest) if "/" in x), rest[-1])).name
         seg = []
     return "?"
 
-def cron_output(cmd):
-    """The file a crontab command's output goes to (stdout's, else stderr's), relative to $HOME, where cron runs it."""
+def cron_output(cmd, env={}):
+    """The file a crontab command's output goes to (stdout's, else stderr's), relative to $HOME, where cron runs it.
+    Variables come from the crontab's own NAME=value lines; one it doesn't set stays in the path as $NAME."""
     words, outs = cron_words(cmd), {}
     for i, w in enumerate(words[:-1]):
-        if w in (">", ">>", "&>", "&>>", ">|"):
-            outs.setdefault("2" if i and words[i - 1] == "2" else "1", words[i + 1])
+        to, fd = words[i + 1], words[i - 1] if i and words[i - 1].isdigit() else "1"
+        if w in (">", ">>", ">|") or w in ("&>", "&>>") or w == ">&" and not to.isdigit() and to != "-":
+            outs.setdefault(fd, to)
+        elif Path(w).name == "tee" and i and words[i - 1] == "|":
+            outs.setdefault("1", next((x for x in words[i + 1:] if not x.startswith("-")), None))
     f = outs.get("1") or outs.get("2")
-    return f and Path.home() / Path(os.path.expandvars(f)).expanduser()
+    env = {"HOME": str(Path.home()), "LOGNAME": os.environ.get("USER", ""), "USER": os.environ.get("USER", "")} | env
+    f = f and re.sub(r"\$\{?(\w+)\}?", lambda m: env.get(m[1], m[0]), f)
+    return f and Path.home() / Path(f).expanduser()
 
 def cron_jobs():
     """Crontab lines as jobs named cron:<script name>; a later line with the same name gets a numeric suffix.
     Cron keeps no exit codes; the file a line sends its output to says when it last ran."""
-    jobs = {}
+    jobs, env = {}, {}
     if not shutil.which("crontab"): return jobs
     tab = subprocess.run(["crontab", "-l"], capture_output=True, text=True).stdout
     for line in tab.splitlines():
-        parts = line.split()
-        if not parts or line.lstrip().startswith("#") or "=" in parts[0]: continue
+        parts, var = line.split(), re.match(r"\s*(\w+)\s*=\s*(.*)", line)
+        if var: env[var[1]] = var[2].strip().strip("\"'")
+        if not parts or line.lstrip().startswith("#") or var: continue
         macro = parts[0] in MACROS
         expr = MACROS[parts[0]] if macro else " ".join(parts[:5])
         cmd = re.split(r"\s+", line.strip(), maxsplit=1 if macro else 5)[-1] if len(parts) > (1 if macro else 5) else ""
         if not cmd or parts[0].startswith("@") and not macro: continue  # @reboot: no calendar to check
         name = "cron:" + cron_name(cmd)
         while name in jobs: name += "+"
-        log = cron_output(cmd)
+        log = cron_output(cmd, env)
+        unset = log and re.search(r"\$\w+", str(log))
         jobs[name] = {"spec": cron_spec(expr), "schedule": expr, "loaded": True, "vendor": False, "oneoff": False,
-                      "exit": None, "interval": None, "daemon": False, "has_log": bool(log and str(log) != "/dev/null"),
+                      "exit": None, "interval": None, "daemon": False, "has_log": bool(log and str(log) != "/dev/null" and not unset),
+                      "unset": unset and unset[0],
                       "log_at": dt.datetime.fromtimestamp(log.stat().st_mtime).replace(microsecond=0) if log and log.is_file() else None}
     return jobs
 
@@ -244,8 +256,11 @@ def discovered(jobs, routines, tasks, led, week):
     mine = {k: j for k, j in jobs.items() if j["loaded"] and not j["vendor"] and not j["oneoff"]}
     named = {norm(n): n for n in led}  # a job named after a ledger loop is that loop: com.me.digest, cron:digest.sh
     stem = lambda k: Path(k[5:]).stem if k.startswith("cron:") else k.rsplit(".", 1)[-1]
-    loops = [{"Loop": named.get(norm(stem(k)), k), "Job": k, "Runtime": "cron" if k.startswith("cron:") else "mac", "Schedule": j["schedule"]}
-             for k, j in mine.items() if not j["daemon"]]
+    loops = []
+    for k, j in mine.items():
+        n = named.get(norm(stem(k)))
+        if not j["daemon"]: loops.append({"Loop": n if n and n not in {r["Loop"] for r in loops} else k, "Job": k,
+                                          "Runtime": "cron" if k.startswith("cron:") else "mac", "Schedule": j["schedule"]})
     loops += [{"Loop": n, "Job": f"routine:{n}", "Runtime": "cloud", "Schedule": r.get("cron") or "on event"}
               for n, r in routines.items() if r.get("enabled") and (r.get("cron") or r.get("last_finished_at"))]
     loops += [{"Loop": t, "Job": f"task:{t}", "Runtime": "app", "Schedule": x.get("cron") or ""} for t, x in tasks.items() if x.get("enabled")]
@@ -341,7 +356,8 @@ def build():
         elif j and j.get("log_at"):  # cron: no exit code, only the time its output file last changed
             row.update(last_run=iso(j["log_at"]), detail="cron keeps no exit codes; last run is when its output file last changed")
         elif j and j.get("has_log") is False:
-            row["detail"] = "cron keeps no record of runs: send this line's output to a file (>> file 2>&1) to see when it last ran"
+            row["detail"] = (f"its output file uses {j['unset']}, which the crontab doesn't set, so when it last ran is unknown" if j.get("unset") else
+                             "cron keeps no record of runs: send this line's output to a file (>> file 2>&1) to see when it last ran")
         checked = (loop in led and led[loop]["has_checks"]) or check.exists()
         late = False
         if spec and row["last_run"]:

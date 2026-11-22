@@ -107,14 +107,15 @@ expect "health: a job run only at login is a service that says so" "jq -e '.rows
 expect "health: a dated job is a one-off"      "[ \"\$(status com.example.launch-reminder)\" = one-off ]"
 expect "health: unloaded and vendor jobs stay out" "! jq -e '.rows[] | select(.loop | test(\"old-experiment|vendor\"))' $L >/dev/null"
 expect "health: cron with an output file ran"  "[ \"\$(status cron:backup.sh)\" = ran ]"
+expect "health: an output file under a variable the crontab doesn't set has no record" "jq -e '.rows[] | select(.loop == \"cron:photo-sync.sh\") | .status == \"no record\" and (.detail | test(\"PHOTO_LOGS\"))' \$L >/dev/null"
 expect "health: cron with no output file has no record" "[ \"\$(status cron:feed-poller.py)\" = 'no record' ]"
 expect "health: cron names skip shells, @reboot is skipped" "[ \"\$(status cron:never-ran.sh)\" = 'no runs yet' ] && ! jq -e '.rows[] | select(.loop | test(\"on-boot|bash|cd\$\"))' $L >/dev/null"
 expect "health: routines show their last status" "[ \"\$(status repo-dependency-check)\" = ran ] && [ \"\$(status release-notes-draft)\" = failing ] && [ -z \"\$(status paused-idea)\" ]"
 expect "health: nothing unregistered, no cost or pass rate" "jq -e '[.rows[] | select(.status == \"unregistered\" or .cost != null or .pass_rate != null)] == []' $L >/dev/null"
 expect "health: no registry path in the data"  "jq -e '.meta[] | select(.label == \"Registry\") | .value == null' $L >/dev/null"
 expect "health: a job named after a ledger loop is that loop" "python3 -c \"import sys; sys.path.insert(0, 'fleet'); from fleet import discovered
-j = {'com.me.digest': {'loaded': True, 'vendor': False, 'oneoff': False, 'daemon': False, 'schedule': ''}}
-l, _ = discovered(j, {}, {}, {'digest': {'last': '2099'}}, '2000'); assert [r['Loop'] for r in l] == ['digest'], l\""
+j = {k: {'loaded': True, 'vendor': False, 'oneoff': False, 'daemon': False, 'schedule': ''} for k in ('com.me.digest', 'cron:digest.sh')}
+l, _ = discovered(j, {}, {}, {'digest': {'last': '2099'}}, '2000'); assert [r['Loop'] for r in l] == ['digest', 'cron:digest.sh'], l\""
 expect "health: an exit code with no log time is no record" "[ \"\$(status com.example.cache-warm)\" = 'no record' ]"
 expect "health: sh -c, cd and timeout are skipped; &> is an output file" "[ \"\$(status cron:nightly-export.sh)\" = ran ]"
 cat > "$H/cron-cases.py" <<'PY'
@@ -122,11 +123,15 @@ import sys; from pathlib import Path; sys.path.insert(0, 'fleet'); from fleet im
 names = {'cd /a && ./run.sh >> l 2>&1': 'run.sh', 'PATH=/x timeout 60 python3 /o/job.py': 'job.py', 'backup.sh>>/tmp/l 2>&1': 'backup.sh',
          '/bin/sh -lc "cd /x; ./y.sh"': 'y.sh', 'nice -n 5 /x/z.sh > /tmp/out': 'z.sh', 'bash -lc "source ~/.profile; /a/h.sh"': 'h.sh',
          'test -x f && f': 'f', '[ -f x ] && y': 'y', '( cd /a && ./z.sh )': 'z.sh', 'timeout -s KILL 300 x': 'x', 'flock -n lock x': 'x',
-         "sh -c 'echo hi; x'": 'x', 'rsync -a src dst': 'rsync'}
+         "sh -c 'echo hi; x'": 'x', 'rsync -a src dst': 'rsync', '. ~/.profile && /a/dot.sh': 'dot.sh',
+         'flock -n /tmp/lock /a/m.sh': 'm.sh', 'env python3 /o/e.py --out x.txt': 'e.py', '/a/u.sh "unclosed': 'u.sh'}
 outs = {'/a/q.sh >> "/t/sp ace/q.log" 2>&1': '/t/sp ace/q.log', 'bash -c "x > inner.log"': str(Path.home() / 'inner.log'),
-        'x &> /t/r.log': '/t/r.log', 'x 2> /t/err.log': '/t/err.log', 'x 2>&1 >> /t/o.log': '/t/o.log', 'x 2>&1': 'None'}
+        'x &> /t/r.log': '/t/r.log', 'x 2> /t/err.log': '/t/err.log', 'x 2>&1 >> /t/o.log': '/t/o.log', 'x 2>&1': 'None',
+        'x 2>&1 | tee -a /t/tee.log': '/t/tee.log', 'x >& /t/both.log': '/t/both.log', 'x 3> /t/fd3.log': 'None',
+        'x >> $NOPE/a.log': str(Path.home() / '$NOPE/a.log')}
 bad = {k: cron_name(k) for k, v in names.items() if cron_name(k) != v} | {k: cron_output(k) for k, v in outs.items() if str(cron_output(k)) != v}
 assert not bad, bad
+assert str(cron_output('x >> ${L}/a.log', {'L': '/t'})) == '/t/a.log'
 PY
 expect "cron: names past shells, wrappers, builtins and redirects; output files quoted, relative or &>" "python3 $H/cron-cases.py"
 cp -R "$H" "$H.reg" && printf '## Registry\n\n| Loop | Project | Runtime | Job | Schedule |\n|---|---|---|---|---|\n| weekly | Ops | mac | com.example.weekly-review | weekly |\n' > "$H.reg/REGISTRY.md"

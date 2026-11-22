@@ -61,7 +61,9 @@ printf '{\n\t"LastExitStatus" = 0;\n};\n' > "$D/launchctl/com.vendor.updater"
 cat > "$D/crontab" <<EOF
 # m h dom mon dow command
 MAILTO=""
-0 */4 * * * cd $D && ./backup.sh >> $D/logs/backup.log 2>&1
+LOGS=$D/logs
+0 */4 * * * cd $D && ./backup.sh >> \$LOGS/backup.log 2>&1
+45 * * * * $D/photo-sync.sh >> \$PHOTO_LOGS/sync.log 2>&1
 @hourly /usr/bin/python3 $D/feed-poller.py
 0 3 * * * /bin/bash -c "cd $D && timeout 300 ./nightly-export.sh" &> "$D/logs/nightly.log"
 30 2 * * * /bin/bash -lc $D/never-ran.sh >> $D/logs/never-ran.log 2>&1
