@@ -14,16 +14,23 @@ const frames = () => page.evaluate(() => new Promise((r) => requestAnimationFram
 const timed = async (f) => { const t = Date.now(); await f(); await frames(); return Date.now() - t; };
 const ms = {};
 ms.load = await timed(() => page.goto('file://' + file));
+const attention = await page.evaluate(() => document.querySelectorAll('#attention .fx-row').length);
 await page.click('#tab-loops'); await frames();
 const loops = await page.evaluate(() => ({
   cards: document.querySelectorAll('#loop-groups .fx-card').length,
+  firstCard: document.querySelectorAll('#loop-groups .fx-card:first-child .fx-row').length,
+  /* a header's loop count stays inside the header, however long the name */
+  countsVisible: [...document.querySelectorAll('#loop-groups .fx-group small')].every((s) => {
+    const r = s.getBoundingClientRect(); return r.width > 0 && r.right <= s.closest('.fx-group').getBoundingClientRect().right + 1;
+  }),
   /* a name in a card header stays before its count, whatever its script */
   countsAfterNames: [...document.querySelectorAll('#loop-groups .fx-group > span:first-child')].every((s) => {
-    const small = s.querySelector('small'), name = document.createRange(), count = document.createRange();
-    name.setStartBefore(s.firstChild); name.setEndBefore(small); count.setStart(small.firstChild, 0); count.setEnd(small.firstChild, 1);
-    return count.getBoundingClientRect().left >= name.getBoundingClientRect().right - 1;
+    const small = s.querySelector('small'), count = document.createRange(); count.setStart(small.firstChild, 0); count.setEnd(small.firstChild, 1);
+    return count.getBoundingClientRect().left >= s.querySelector('bdi').getBoundingClientRect().right - 1;
   }),
 }));
+loops.firstCardAll = await page.locator('#loop-groups .fx-card:first-child .fx-all button').click({timeout: 1000})
+  .then(() => page.evaluate(() => document.querySelectorAll('#loop-groups .fx-card:first-child .fx-row').length), () => null);
 await page.click('#tab-waiting'); await frames();
 const waiting = await page.evaluate(() => ({
   badge: +document.querySelector('[data-draw="badge-waiting"]').textContent || 0,
@@ -39,7 +46,13 @@ const factory = await page.evaluate(() => ({
   you: document.querySelectorAll('#factory-graph .fx-fend.you').length,
   nobody: document.querySelectorAll('#factory-graph .fx-fend.nobody').length,
   lines: document.querySelectorAll('#factory-graph .fx-fedges path').length,
+  note: !!document.querySelector('#factory-note:not([hidden])'),
+  picks: [...document.querySelectorAll('#factory-graph .fx-btn')].map((b) => b.textContent),
 }));
+if (factory.picks.length) {
+  await page.click('#factory-graph .fx-btn'); await frames();
+  factory.picked = await page.evaluate(() => document.querySelectorAll('#factory-graph .fx-fnode[data-tone]').length);
+}
 ms.overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
 await browser.close();
-console.log(JSON.stringify({ms, errors, factory, loops, waiting: {...waiting, invalid: /Invalid Date|NaN/.test(waiting.text), text: undefined}}));
+console.log(JSON.stringify({ms, errors, attention, factory, loops, waiting: {...waiting, invalid: /Invalid Date|NaN/.test(waiting.text), text: undefined}}));

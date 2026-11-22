@@ -62,7 +62,7 @@ button.fx-kpi:focus-visible { outline: 2px solid var(--color-fg); outline-offset
 .fx-card[data-sec="c4"] { --sec: var(--fx-c4); }
 .fx-card > header { display: flex; align-items: center; justify-content: space-between; gap: var(--cds-gap-sm); padding: 11px 14px; border-bottom: 1px solid var(--color-border-line); }
 .fx-card h2, .fx-group { margin: 0; font-size: var(--cds-font-size-caption); font-weight: 600; color: var(--color-fg); text-transform: uppercase; letter-spacing: .05em; }
-.fx-group { padding: 10px 14px; border-bottom: 1px solid var(--color-border-line); display: flex; justify-content: space-between; }
+.fx-group { padding: 10px 14px; border-bottom: 1px solid var(--color-border-line); display: flex; justify-content: space-between; gap: 12px; }
 .fx-link { all: unset; cursor: pointer; font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); }
 .fx-link:hover { color: var(--color-fg); }
 .fx-link:focus-visible { outline: 2px solid var(--color-fg); outline-offset: 2px; border-radius: 2px; }
@@ -117,7 +117,10 @@ button.fx-kpi:focus-visible { outline: 2px solid var(--color-fg); outline-offset
 .fx-bar { display: flex; align-items: center; justify-content: space-between; gap: var(--cds-gap-sm); padding: 10px 14px; border-bottom: 1px solid var(--color-border-line); }
 .fx-bar .dash-select { min-width: 0; max-width: 60%; }
 .fx-toolbar { border: 1px solid var(--color-border-line); border-radius: var(--cds-radius); background: var(--color-bg); }
-.fx-group > span:first-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fx-group > span:first-child { display: flex; align-items: baseline; min-width: 0; }
+.fx-group > span:first-child > bdi { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fx-group small { flex: none; }
+.fx-list > li.fx-all { grid-column: 1 / -1; }
 .fx-group > span + span { flex: none; }
 .fx-group small { font-weight: 400; text-transform: none; letter-spacing: 0; color: var(--color-fg-muted); margin-left: 8px; }
 
@@ -277,6 +280,7 @@ button.fx-kpi:focus-visible { outline: 2px solid var(--color-fg); outline-offset
           <button type="button" class="fx-ltog" data-problems>Problems</button>
         </div>
         <div class="fx-flayers" aria-hidden="true"><span>Loops</span><span>Checked by</span><span>To you</span></div>
+        <p class="fx-muted" id="factory-note" hidden></p>
         <div class="fx-factory" id="factory-graph" data-draw="factory" data-source="loops"></div>
       </div>
       <div class="fx-legend">
@@ -434,6 +438,15 @@ const reason = (r) => ({
   stale: 'Routine snapshot is out of date',
 }[r.status] || r.detail || '');
 
+/* a long list shows its first `cap` rows and a See all that opens the rest in place, still open after a redraw */
+const capped = (ul, rows, cap, key, row) => {
+  const all = rows.length <= cap || FX.open.has('all:' + key);
+  (all ? rows : rows.slice(0, cap)).forEach((r) => ul.append(row(r)));
+  if (all) return;
+  const li = el('li', 'fx-all'), b = el('button', 'fx-foot', 'See all ' + rows.length); b.type = 'button';
+  b.onclick = () => { FX.open.add('all:' + key); li.remove(); rows.slice(cap).forEach((r) => ul.append(row(r))); };
+  li.append(b); ul.append(li);
+};
 const expandRow = (key, cells, buildMore, tone) => {
   const li = el('li');
   const btn = el('button', 'fx-row'); btn.type = 'button';
@@ -577,9 +590,9 @@ dash.draw('attn-list', (box) => {
   const gaps = scoped(l.data).filter((r) => !NOT_LOOP.includes(r.project) && GAPS.includes(r.status));
   const ul = el('ul', 'fx-list');
   if (!urgent.length) { const li = el('li', 'fx-empty'); li.append(icon('check', 16), el('span', '', health() ? 'Nothing is failing or late.' : 'Nothing is failing, flaky or unregistered.')); ul.append(li); }
-  urgent.forEach((r) => {
+  capped(ul, urgent, 20, 'attn', (r) => {
     const right = el('span', 'r'); right.append(hist(r.history), el('span', '', LABEL[r.status]));
-    ul.append(expandRow('a:' + r.loop, [dot(TONE[r.status], LABEL[r.status]), titleCell(nameOf(r), [r.project, reason(r)].filter(Boolean).join(' · '), null, runtimeMark(r)), right], loopMore(r), TONE[r.status]));
+    return expandRow('a:' + r.loop, [dot(TONE[r.status], LABEL[r.status]), titleCell(nameOf(r), [r.project, reason(r)].filter(Boolean).join(' · '), null, runtimeMark(r)), right], loopMore(r), TONE[r.status]);
   });
   box.append(ul);
   if (gaps.length) {
@@ -625,7 +638,7 @@ dash.draw('loop-list', (box) => {
     name.append(el('bdi', '', project), el('small', '', rs.length + (rs.length === 1 ? ' loop' : ' loops')));
     head.append(name, el('span', '', n ? n + ' need a look' : 'all fine'));
     const ul = el('ul', 'fx-list' + (wide ? ' fx-two' : ''));
-    rs.forEach((r) => ul.append(loopRow(r, 'l:', true)));
+    capped(ul, rs, 25, 'l:' + project, (r) => loopRow(r, 'l:', true));
     card.append(head, ul); box.append(card);
   });
 });
@@ -770,12 +783,26 @@ dash.draw('factory-door', (e) => {
       + (g.hasMaster ? (n > target ? ' ' + (n - target) + ' more ' + (n - target === 1 ? 'goes' : 'go') + ' around the master.' : ' Everything else goes through them.') : ' No loop has Role master yet, so every loop can reach you.')));
   e.append(v, text);
 });
+const FACTORY_ALL = 60;
 dash.draw('factory', (box) => {
   const l = dash.data('loops');
   box.replaceChildren(); box.classList.remove('trace');
   LAYERS.forEach((k) => box.classList.toggle('hide-' + k, FX.hide.has(k)));
   if (!box.clientWidth) return; /* its tab is hidden: the runtime draws it again when the tab opens and the width changes */
   if (l.status !== 'ok') return failed(box, 'loop list', l.status);
+  /* a big fleet on All projects is too many chips for one page: it offers its projects, the most problems first, and a
+     picked project draws with every loop its chains reach */
+  const real = l.data.filter((r) => !NOT_LOOP.includes(r.project)), big = !dash.params().project && real.length > FACTORY_ALL;
+  document.querySelectorAll('#factory-note').forEach((e) => { e.hidden = !big; e.textContent = real.length + ' loops are too many to draw at once. Pick a project:'; });
+  document.querySelectorAll('.fx-flayers').forEach((e) => { e.hidden = big; });
+  if (big) {
+    const picks = el('div', 'fx-acts'), bad = (rs) => rs.filter(problem).length;
+    [...groupBy(real, (r) => r.scope)].sort(([a, ra], [b, rb]) => bad(rb) - bad(ra) || a.localeCompare(b)).forEach(([p, rs]) => {
+      const b = el('button', 'fx-btn', p + ' · ' + (bad(rs) ? bad(rs) + ' with a problem' : rs.length + ' loops')); b.type = 'button';
+      b.onclick = () => dash.setParams({project: p}); picks.append(b);
+    });
+    box.append(picks); return;
+  }
   const g = factoryGraph(l.data, FX.problems);
   if (!g.nodes.size) { box.append(el('div', 'fx-empty', FX.problems ? 'No loop is failing, silent, unchecked or unread.' : 'No loops yet.')); return; }
   const cols = el('div', 'fx-fcols'), chips = new Map(), frames = new Map();
