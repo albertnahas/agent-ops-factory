@@ -181,6 +181,7 @@ expect "every link cell is a scalar"             "jq -e 'all(.rows[][]; type != 
 Q="$AGENT_OPS_DIR/fleet/questions.json"
 qs() { python3 -c "import sys; sys.path.insert(0, 'fleet'); import fleet; r, p, why = fleet.questions(); print(why or '')"; }
 expect "questions follow the spec in order, a row per choice" "python3 -c 'import json,sys; s=json.load(open(\"tests/kit/skills/new-loop/questions.json\")); r=json.load(open(\"$Q\"))[\"rows\"]; sys.exit(0 if [(x[\"form\"],x[\"id\"],x[\"value\"]) for x in r]==[(f,q[\"id\"],v) for f in (\"new\",\"edit\") for q in s[f] for v in [None]+[c[\"value\"] for c in q.get(\"choices\",[])]] and [x[\"route\"] for x in r if x[\"id\"]==\"change\" and x[\"value\"]]==[\"orders\",\"founder\"] else 1)'"
+expect "the spec's defaults are never asked" "jq -e '[.rows[].id] | index(\"limits\") == null' $Q >/dev/null"
 expect "its prompt lines are in meta, every cell a scalar" "jq -e '([.meta[] | select(.label | startswith(\"prompt \")) | .value] == [\"/demo:new-loop\", \"/demo:new-loop edit\"]) and all(.rows[][]; type != \"array\" and type != \"object\")' $Q >/dev/null"
 mkdir -p "$AGENT_OPS_DIR/kit2/skills/new-loop"; jq '.new[0].colour = "red" | .edit[0].kind = "date"' tests/kit/skills/new-loop/questions.json > "$AGENT_OPS_DIR/kit2/skills/new-loop/questions.json"
 expect "a spec this build doesn't know asks nothing, and says why" "AGENT_OPS_KIT=$AGENT_OPS_DIR/kit2 python3 fleet/fleet.py 2>&1 >/dev/null | grep -q 'unknown key colour.*unknown kind date' && jq -e '.rows == []' $Q >/dev/null"
