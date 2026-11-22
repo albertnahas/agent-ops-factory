@@ -34,7 +34,8 @@ const withChanges = page.locator('#loop-groups .fx-row', {has: page.locator('bdi
 if (await withChanges.count()) {
   await withChanges.first().click(); await frames();
   loops.changes = await page.evaluate(() => document.querySelectorAll('#loop-groups .fx-more:not([hidden]) .fx-changes li').length);
-  loops.good = await page.evaluate(() => [...document.querySelectorAll('#loop-groups .fx-more:not([hidden]) p')].map((p) => p.textContent).find((t) => t.startsWith('Good: ')));
+  [loops.good, loops.read] = await page.evaluate(() => { const t = [...document.querySelectorAll('#loop-groups .fx-more:not([hidden]) p')].map((p) => p.textContent);
+    return [t.find((s) => s.startsWith('Good: ')), t.find((s) => s.startsWith('Read by '))]; });
   if (process.env.SHOTS) await withChanges.first().locator('xpath=..').screenshot({path: process.env.SHOTS + '/loop-changes.png'});
 }
 loops.firstCardAll = await page.locator('#loop-groups .fx-card:first-child .fx-all button').click({timeout: 1000})

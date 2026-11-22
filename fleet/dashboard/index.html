@@ -667,7 +667,7 @@ const loopMore = (r) => (more) => {
   if (r.status === 'no check') more.append(el('p', '', 'Nothing writes a pass or fail line for it, so a run that did nothing looks like one that worked.'));
   if (registered(r)) {
     more.append(el('p', '', [r.checked_by && 'Read by ' + r.checked_by, r.supervisor && 'supervised by ' + r.supervisor,
-      r.escalates_to && 'escalates to ' + r.escalates_to, r.role && 'role ' + r.role].filter(Boolean).join(' · ')));
+      r.escalates_to && 'escalates to ' + r.escalates_to, r.role && 'role ' + r.role, r.improver && 'Improver: on'].filter(Boolean).join(' · ')));
     if (r.break_glass) { const p = el('p'); p.append(el('b', '', 'Break-glass: '), document.createTextNode(r.break_glass)); more.append(p); }
     const p = el('p'); p.append(el('b', '', 'Good: '), document.createTextNode([goodText(r), r.target && 'Target ' + r.target,
       r.pass_rate != null && 'health: ' + Math.round(100 * r.pass_rate) + '% of checks passed'].filter(Boolean).join(' · ')));

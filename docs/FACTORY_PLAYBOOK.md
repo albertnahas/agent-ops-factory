@@ -48,6 +48,7 @@ An Orders change lands as its own PR, never a direct push, and `mission-guard or
 - For each Order it keeps, changes or retires it. It changes one only on or after its read date, or early when its stop rule or a P0 fires, so a test gets its full window. Every change is a line in Changes with the reason.
 - It answers every Orders request.
 - An Order that loosens a hard limit or reaches an X surface is X: it goes to you.
+- With an improver ([improver/IMPROVER.md](../improver/IMPROVER.md)), it reviews first each week and the improver runs after it, changing how a loop works within the Orders as they stand. One change to a number at a time: it starts no Order on the metric of a loop's Good while an improver change on that loop is unread (the change's read date is the earliest start), and the improver skips a loop while an open Order moves that metric.
 - A monthly loop doesn't supervise a daily one, because it reads too rarely to steer it. A strategy loop sits beside daily ops, with neither supervising the other. An approved bet becomes an Order on the loop that owns its test, written the day it's approved.
 
 **The mission guard.** The marked blocks are the one part of a charter no agent should change, so a script with no model in it watches them. After your edit lands on the default branch, run the kit's `bin/mission-guard bless <charter>`. From then on:
