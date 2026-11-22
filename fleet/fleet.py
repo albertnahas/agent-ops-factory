@@ -4,7 +4,7 @@ one-off job with its health), <out>/waiting.json (everything waiting on you) and
 Sources: the registry file, launchd plists, your crontab, the run ledger, <out>/cloud.json (Claude routines and
 desktop tasks, written by the claude.ai sync in fleet/SYNC.md), and optionally a queue file, GitHub PRs and decision memos.
 fleet/README.md says how each status is decided."""
-import datetime as dt, json, os, plistlib, re, shutil, subprocess, sys
+import datetime as dt, json, os, plistlib, re, shlex, shutil, subprocess, sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
@@ -115,6 +115,9 @@ def launchd_jobs():
         logs = [Path(pl[k]).expanduser() for k in ("StandardOutPath", "StandardErrorPath") if pl.get(k)]
         stamps = [f.stat().st_mtime for f in logs if f.exists()]
         jobs[label] = {
+            "schedule": f"every {pl['StartInterval'] // 60} min" if pl.get("StartInterval") else
+                        ", ".join(" ".join(str(c.get(k, "*")) for k in ("Minute", "Hour", "Day", "Month", "Weekday"))
+                                  for c in (cal if isinstance(cal, list) else [cal])) if cal else "",
             "vendor": ".app/Contents/" in prog,
             "loaded": info.returncode == 0,
             "exit": None if pid or not code else int(code.group(1)),  # a running job's last exit is history
@@ -122,23 +125,96 @@ def launchd_jobs():
             "interval": pl.get("StartInterval"),
             "oneoff": bool(cal) and all("Month" in c and "Day" in c for c in (cal if isinstance(cal, list) else [cal])),
             "daemon": bool(pl.get("KeepAlive") or (pl.get("RunAtLoad") and not cal and not pl.get("StartInterval"))),
+            "keepalive": bool(pl.get("KeepAlive")),
             "log_at": dt.datetime.fromtimestamp(max(stamps)).replace(microsecond=0) if stamps else None,
         }
     return jobs
 
+MACROS = {"@yearly": "0 0 1 1 *", "@annually": "0 0 1 1 *", "@monthly": "0 0 1 * *", "@weekly": "0 0 * * 0",
+          "@daily": "0 0 * * *", "@midnight": "0 0 * * *", "@hourly": "0 * * * *"}
+INTERPRETERS = {"sh", "bash", "zsh", "python", "python3", "node", "ruby", "perl", "npx", "uvx", "bunx", "tsx", "ts-node"}  # the next word is the script
+WRAPPERS = {"env", "exec", "nice", "nohup", "caffeinate", "timeout", "flock", "chronic", "ionice"}  # their own args come first
+RUNNERS = INTERPRETERS | WRAPPERS
+PACKAGERS = {"npm", "pnpm", "yarn", "bun", "uv", "poetry"}  # `npm run build` runs build
+BUILTINS = {"cd", "source", ".", "test", "[", "[[", "echo", "printf", "export", "set", "true", "false", ":", "sleep", "ulimit", "umask"}
+
+def cron_words(cmd):
+    """A crontab command as shell words and operators, as cron's shell reads it; `sh -c "..."` is read inside."""
+    lex = shlex.shlex(cmd, posix=True, punctuation_chars=True)
+    lex.whitespace_split = True
+    try: words = list(lex)
+    except ValueError: words = re.sub(r"[\"']", "", cmd).split()  # an unclosed quote
+    for i, w in enumerate(words[:-1]):
+        if re.fullmatch(r"-\w*c\w*", w) and i and Path(words[i - 1]).name in {"sh", "bash", "zsh"}:
+            return cron_words(words[i + 1]) + words[i + 2:]
+    return words
+
+def cron_name(cmd):
+    """The script a crontab command runs: past shells, interpreters, wrappers, builtins like `cd dir &&`, flags,
+    numbers, redirects and VAR=value. After an interpreter, the next word; after a wrapper, its last word with a /
+    in it, else its last word."""
+    seg = []
+    for w in cron_words(cmd) + [";"]:
+        if w not in {"&&", "||", ";", "|", "&", "(", ")"}:
+            seg.append(w); continue
+        words, skip = [], False
+        for k, x in enumerate(seg):
+            if skip or x.startswith("-") or "=" in x or x.isdigit() and k + 1 < len(seg) and re.fullmatch(r"[<>&]+", seg[k + 1]):
+                skip = False; continue
+            if re.fullmatch(r"[<>&|]+", x):
+                skip = not x.endswith("&") and x != ">&"; continue  # a redirect: its file, or `2>&1`'s fd, isn't the script
+            if not x.isdigit(): words.append(x)
+        if words and words[0] not in BUILTINS and Path(words[0]).name not in BUILTINS:
+            if Path(words[0]).name in PACKAGERS and "run" in words[1:]: words = words[words.index("run", 1) + 1:] or words
+            names = [Path(x).name for x in words]
+            i = max(k for k, n in enumerate(names) if n in RUNNERS) if names[0] in RUNNERS else -1
+            rest = words[i + 1:] or [words[i]]
+            if i < 0 or names[i] in INTERPRETERS: return Path(rest[0]).name
+            return Path(next((x for x in reversed(rest) if "/" in x), rest[-1])).name
+        seg = []
+    return "?"
+
+def cron_output(cmd, env={}):
+    """The file a crontab command's output goes to (stdout's, else stderr's), relative to $HOME, where cron runs it.
+    A relative path is from the line's last `cd`. Variables come from the crontab's own NAME=value lines; one it
+    doesn't set, or a name worked out as it runs ($(date)), stays in the path with its $."""
+    words, outs, cwd = cron_words(cmd), {}, "."
+    for i, w in enumerate(words[:-1]):
+        to, fd = words[i + 1], words[i - 1] if i and words[i - 1].isdigit() and words[i - 1] + w in cmd else "1"  # `2>`, not `3 >`
+        if w == "cd" and (not i or words[i - 1] in {"&&", ";", "("}): cwd = to
+        elif w in (">", ">>", ">|") or w in ("&>", "&>>") or w == ">&" and not to.isdigit() and to != "-":
+            outs.setdefault(fd, to)
+        elif Path(w).name == "tee" and i and words[i - 1] == "|":
+            outs.setdefault("1", next((x for x in words[i + 1:] if not x.startswith("-")), None))
+    f = next((outs[k] for k in "12" if outs.get(k, "/dev/null") != "/dev/null"), outs.get("1") or outs.get("2"))
+    env = {"HOME": str(Path.home()), "LOGNAME": os.environ.get("USER", ""), "USER": os.environ.get("USER", "")} | env
+    expand = lambda x: Path(re.sub(r"\$\{?(\w+)\}?", lambda m: env.get(m[1], m[0]), re.sub(r"`[^`]*`", "$", x))).expanduser()
+    return f and Path.home() / expand(cwd) / expand(f)
+
 def cron_jobs():
-    """Crontab lines as jobs named cron:<script name>; a later line with the same name gets a numeric suffix."""
-    jobs = {}
+    """Crontab lines as jobs named cron:<script name>; a later line with the same name gets a numeric suffix.
+    Cron keeps no exit codes; the file a line sends its output to says when it last ran."""
+    jobs, env = {}, {}
     if not shutil.which("crontab"): return jobs
     tab = subprocess.run(["crontab", "-l"], capture_output=True, text=True).stdout
     for line in tab.splitlines():
-        parts = line.split()
-        if not parts or line.lstrip().startswith("#") or "=" in parts[0] or len(parts) < 6: continue
-        if parts[0].startswith("@"): continue  # @reboot and friends: no calendar to check
-        name = "cron:" + Path(parts[5]).name
+        parts, var = line.split(), re.match(r"\s*(\w+)\s*=\s*(.*)", line)
+        if var: env[var[1]] = var[2].strip().strip("\"'")
+        if not parts or line.lstrip().startswith("#") or var: continue
+        macro = parts[0] in MACROS
+        expr = MACROS[parts[0]] if macro else " ".join(parts[:5])
+        cmd = re.split(r"\s+", line.strip(), maxsplit=1 if macro else 5)[-1] if len(parts) > (1 if macro else 5) else ""
+        if not cmd or parts[0].startswith("@") and not macro: continue  # @reboot: no calendar to check
+        log = cron_output(cmd, env)
+        unset = log and re.search(r"\$\w*", str(log))
+        has_log = bool(log and str(log) != "/dev/null" and not unset)
+        loop = re.search(r"(?:^|\s)OPS_LOOP=([\w.-]+)", cmd)  # the kit's claude-run logs the loop under $OPS_LOOP
+        name = "cron:" + (loop[1] if loop else log.stem if has_log and cron_name(cmd) in {"claude", "claude-run"} else cron_name(cmd))
         while name in jobs: name += "+"
-        jobs[name] = {"spec": cron_spec(" ".join(parts[:5])), "loaded": True, "vendor": False, "oneoff": False,
-                      "exit": None, "interval": None, "daemon": False, "log_at": None}
+        jobs[name] = {"spec": cron_spec(expr), "schedule": expr, "loaded": True, "vendor": False, "oneoff": False,
+                      "exit": None, "interval": None, "daemon": False, "has_log": has_log,
+                      "unset": unset and unset[0],
+                      "log_at": dt.datetime.fromtimestamp(log.stat().st_mtime).replace(microsecond=0) if log and log.is_file() else None}
     return jobs
 
 # --- the ledger claude-run and ops-check append to
@@ -179,6 +255,25 @@ def ledger(now):
             "has_checks": bool(checks), "history": history,
         }
     return out, first
+
+def discovered(jobs, routines, tasks, led, week):
+    """With no registry, everything found stands in for its own row: loops for scheduled jobs, routines, tasks and
+    recent ledger names, services for jobs launchd keeps running. One-offs and vendors' jobs keep their own paths."""
+    mine = {k: j for k, j in jobs.items() if j["loaded"] and not j["vendor"] and not j["oneoff"]}
+    named = {norm(n): n for n in led}  # a job named after a ledger loop is that loop: com.me.digest, cron:digest.sh
+    stem = lambda k: Path(k[5:]).stem if k.startswith("cron:") else k.rsplit(".", 1)[-1]
+    loops = []
+    for k, j in mine.items():
+        n = named.get(norm(stem(k)))
+        if not j["daemon"]: loops.append({"Loop": n if n and n not in {r["Loop"] for r in loops} else k, "Job": k,
+                                          "Runtime": "cron" if k.startswith("cron:") else "mac", "Schedule": j["schedule"]})
+    loops += [{"Loop": n, "Job": f"routine:{n}", "Runtime": "cloud", "Schedule": r.get("cron") or "on event"}
+              for n, r in routines.items() if r.get("enabled") and (r.get("cron") or r.get("last_finished_at"))]
+    loops += [{"Loop": t, "Job": f"task:{t}", "Runtime": "app", "Schedule": x.get("cron") or ""} for t, x in tasks.items() if x.get("enabled")]
+    loops += [{"Loop": n, "Job": ""} for n, l in led.items() if l["last"] >= week and n not in {r["Loop"] for r in loops}]
+    services = [{"Service": k, "Job": k, "What it is": "kept running by launchd" if j["keepalive"] else "runs once at login"}
+                for k, j in mine.items() if j["daemon"]]
+    return loops, services
 
 def tables():
     md = C["registry"].read_text() if C["registry"].exists() else ""
@@ -236,7 +331,6 @@ def links(registry, services, glass):
 def build():
     now = dt.datetime.now().replace(microsecond=0)
     registry, services, glass = tables()
-    link, reasons, _ = links(registry, services, glass)
     jobs = {**launchd_jobs(), **cron_jobs()}
     led, first = ledger(now)
     snap_file = C["out"] / "cloud.json"
@@ -244,6 +338,9 @@ def build():
     snap_age_h = (now.astimezone() - dt.datetime.fromisoformat(snap["at"])).total_seconds() / 3600 if snap["at"] else None
     routines = {r["name"]: r for r in snap["routines"]}
     tasks = {t["id"]: t for t in snap["tasks"]}
+    health = not registry and not services  # no registry: show every job's own health, nothing a registry would add
+    if health: (registry, services), glass = discovered(jobs, routines, tasks, led, (now - dt.timedelta(days=7)).isoformat()), []
+    link, reasons, _ = links(registry, services, glass)
     window_from = max(first or now.date().isoformat(), (now - dt.timedelta(days=WINDOW)).date().isoformat())
     rows, claimed = [], set()
 
@@ -262,7 +359,7 @@ def build():
         spec, live, j = None, True, None
         if kind == "local":
             j = jobs.get(ref)
-            live = bool(j and j["loaded"])
+            live = (health and not ref) or bool(j and j["loaded"])  # with no registry, a ledger name is live while it logs
             spec = j and j["spec"]
             if j and j["interval"]: row["next_due"] = f"every {j['interval'] // 60} min"
         else:
@@ -293,19 +390,30 @@ def build():
             row["detail"] = (c.stdout or c.stderr).strip()
         elif j and j.get("exit") is not None:  # nothing logged: launchd's last exit and its log file's time
             row.update(result="pass" if j["exit"] == 0 else "fail", last_run=iso(j["log_at"]),
-                       detail="" if j["exit"] == 0 else f"last run exited {j['exit']}")
+                       detail=f"last run exited {j['exit']}" + ("" if j["log_at"] else "; it has no log file, so when it last ran is unknown"))
+        elif j and j.get("log_at"):  # cron: no exit code, only the time its output file last changed
+            row.update(last_run=iso(j["log_at"]), detail="cron keeps no exit codes; last run is when its output file last changed")
+        elif j and j.get("has_log") is False:
+            row["detail"] = ("its output file's name is worked out as it runs, so when it last ran is unknown" if j.get("unset") == "$" else
+                             f"its output file uses {j['unset']}, which the crontab doesn't set, so when it last ran is unknown" if j.get("unset") else
+                             "cron keeps no record of runs: send this line's output to a file (>> file 2>&1) to see when it last ran")
         checked = (loop in led and led[loop]["has_checks"]) or check.exists()
         late = False
         if spec and row["last_run"]:
             prev1, prev2 = nth(fires(spec, now, -1), 0), nth(fires(spec, now, -1), 1)
             late = bool(prev1 and prev2) and now - dt.datetime.fromisoformat(row["last_run"]) > (prev1 - prev2) + dt.timedelta(hours=12)
+        if health and late and j and loop not in led and not check.exists():  # an old log is no proof: scripts often log elsewhere
+            row.update(last_run=None, detail="; ".join(filter(None, [row["detail"], f"its log last changed {j['log_at']:%d %b}, so when it last ran is unknown"])))
+            late = False
         row["status"] = ("stale" if kind != "local" and (snap_age_h is None or snap_age_h > STALE_SNAPSHOT_H)
                          else "paused" if not live
                          else "failing" if row["result"] == "fail"
                          else "silent" if late
-                         else "no runs yet" if not row["last_run"] and not row["result"]
+                         else ("no record" if j and j.get("has_log") is False else "no runs yet") if not row["last_run"] and not row["result"]
                          else "chronic" if loop in led and led[loop]["chronic"]
                          else "healthy" if checked
+                         else "no record" if health and j and not row["last_run"]  # an exit code with no time: not on schedule
+                         else "ran" if health
                          else "no check")
         rows.append(row)
 
@@ -349,17 +457,18 @@ def build():
     rows = [{k: r.get(k) for k in keys} for r in rows]
 
     meta = [{"label": "Built", "value": now.isoformat(timespec="minutes")},
+            {"label": "Mode", "value": "health" if health else "fleet"},
             {"label": "Pass rate and cost window", "value": f"{window_from} to {now.date()}" + (f" (the ledger starts {first})" if first else " (no ledger yet)")},
             {"label": "Routine snapshot", "value": snap["at"] or "none"},
             {"label": "Cost", "value": "Claude API-equivalent estimate from the ledger; loops that don't run through claude-run aren't metered"},
             {"label": "Refresh", "value": C["refresh"]},
-            {"label": "Registry", "value": str(C["registry"]).replace(str(Path.home()), "~")},
+            {"label": "Registry", "value": None if health else str(C["registry"]).replace(str(Path.home()), "~")},
             {"label": "Builder", "value": str(Path(__file__).resolve()).replace(str(Path.home()), "~")},
             {"label": "uid", "value": str(os.getuid())}]
     items = waiting(now, of)
     write("loops", rows, meta)
     write("waiting", items, meta[:1])
-    html(rows, items, meta)
+    html(rows, items, meta, "Loop health" if health else "Loop fleet")
     return rows
 
 # --- what waits on you
@@ -448,7 +557,7 @@ def write(name, rows, meta):
     C["out"].mkdir(parents=True, exist_ok=True)
     (C["out"] / f"{name}.json").write_text(json.dumps({"rows": rows, "meta": meta}, indent=1, ensure_ascii=False) + "\n")
 
-def html(rows, items, meta):
+def html(rows, items, meta, title):
     """The same page the claude.ai dashboard runs, with a local stand-in for its runtime and the data inlined."""
     data = json.dumps({"loops": {"rows": rows, "meta": meta}, "waiting": {"rows": items, "meta": meta[:1]},
                        "look": json.loads((ROOT / "dashboard/look.json").read_text()),
@@ -457,7 +566,7 @@ def html(rows, items, meta):
     shim = (ROOT / "dashboard/local.js").read_text()
     (C["out"] / "dashboard.html").write_text(
         '<!doctype html>\n<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">'
-        f'<title>Loop fleet</title></head><body>\n<script>window.FLEET = {data};</script>\n<script>{shim}</script>\n'
+        f'<title>{title}</title></head><body>\n<script>window.FLEET = {data};</script>\n<script>{shim}</script>\n'
         f'<div id="dash-root">\n{page}\n</div>\n</body></html>\n')
 
 if __name__ == "__main__":
