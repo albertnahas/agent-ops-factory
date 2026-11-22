@@ -13,8 +13,8 @@ flag's detail must match for a real incident to count as caught: the right cause
 "evidence" (something the monitor didn't write: a fix commit, a readback, a doc)}. A flag on a loop between an
 incident's start and 24 hours after its end belongs to it. Flags no label covers are reported as unlabelled.
 
-Exits 1 when detection is under --min-detection or the false share of flags is over --max-false, so a change to
-the builder that hides real failures, or cries wolf more, fails the build."""
+It's a report: the result records --min-detection and --max-false as the floors it's read against, and the dashboard's
+Evaluations card shows it. It exits 1 when one is missed, for whoever wants to gate on it."""
 import argparse, datetime as dt, json, os, re, statistics, subprocess, sys, tempfile
 from pathlib import Path
 
