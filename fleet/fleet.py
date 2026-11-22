@@ -4,7 +4,7 @@ one-off job with its health), <out>/waiting.json (everything waiting on you) and
 Sources: the registry file, launchd plists, your crontab, the run ledger, <out>/cloud.json (Claude routines and
 desktop tasks, written by the claude.ai sync in fleet/SYNC.md), and optionally a queue file, GitHub PRs and decision memos.
 fleet/README.md says how each status is decided."""
-import datetime as dt, functools, json, os, plistlib, re, shlex, shutil, subprocess, sys
+import datetime as dt, functools, json, os, plistlib, re, shlex, shutil, subprocess, sys, urllib.parse
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
@@ -261,7 +261,7 @@ def tilde(path):
 def where(path):
     if not path: return None
     g = on_github(path)
-    return f"https://github.com/{g[0]}/blob/{g[1].split('/', 1)[1]}/{g[2]}" if g else tilde(path.resolve())
+    return f"https://github.com/{g[0]}/blob/{g[1].split('/', 1)[1]}/{urllib.parse.quote(g[2])}" if g else tilde(path.resolve())
 
 def locate(cell, project, roots):
     """The one file a registry cell's first backticked path names, looked for from your home (`~/…`), the registry's folder,

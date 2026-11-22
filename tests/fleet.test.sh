@@ -174,6 +174,9 @@ sed -i.bak 's|`docs/OPS.md` (the charter)|`'"$R"'/docs/OPS.md`|' "$AGENT_OPS_DIR
 python3 fleet/fleet.py >/dev/null
 expect "a charter on GitHub links to its page"    "[ \"\$(def ops charter)\" = https://github.com/demo/shop/blob/main/docs/OPS.md ]"
 expect "its Orders and report come from the default branch" "[ \"\$(def ops orders)\" = https://github.com/demo/shop/blob/main/docs/orders/ops.md ] && [ \"\$(def ops report)\" = https://github.com/demo/shop/blob/main/docs/reports/2026-11-20.md ]"
+w() { python3 -c "import sys; from pathlib import Path; sys.path.insert(0, 'fleet'); from fleet import where; print(where(Path(sys.argv[1])))" "$1"; }
+mkdir -p "$R/my notes" && touch "$R/my notes/a.md" && git -C "$R" add -A && git -C "$R" -c user.name=t -c user.email=t@t commit -qm notes && git -C "$R" update-ref refs/remotes/origin/main HEAD
+expect "a path with spaces links encoded"        "[ \"\$(w \"$R/my notes/a.md\")\" = https://github.com/demo/shop/blob/main/my%20notes/a.md ]"
 
 touch "$AGENT_OPS_DIR/run.sh"
 run() { HOME="$AGENT_OPS_DIR" python3 -c "import sys; sys.path.insert(0, 'fleet'); from fleet import runner; print(runner(sys.argv[1:]) or '')" "$@" | sed "s|^$TMP/||"; }
