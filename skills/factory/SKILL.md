@@ -17,7 +17,7 @@ Show the user what's done and the next step. Wait for their go.
 
 ## 2. The watchman
 
-Follow `KIT/README.md`, "Try it in 5 minutes", in the project: copy the kit in, run the tests, fill in the charter's placeholders and X surfaces, then run one loop and the heartbeat by hand. Offer the cloud watch if the heartbeat runs on a laptop.
+Follow `KIT/README.md`, "Start a loop", in the project: set up its first loop with the kit's `new-loop` skill (or "By hand" under that heading, which copies the kit in and runs its tests), then run that loop and the heartbeat once by hand. Offer the cloud watch if the heartbeat runs on a laptop.
 
 ## 3. Loops
 
