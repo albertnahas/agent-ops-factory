@@ -66,9 +66,9 @@ expect "every cell is a scalar, as on claude.ai" "jq -se 'all(.[].rows[][]; type
 expect "checked by resolves jobs and you, once each" "jq -e '.rows[] | select(.loop == \"reader\") | .checked_by == \"good, you, flaky, reader\"' $L >/dev/null"
 expect "a service's job names the service"   "jq -e '.rows[] | select(.loop == \"watched\") | .checked_by == \"Build\"' $L >/dev/null"
 sup() { jq -r --arg l "$1" '.rows[] | select(.loop == $l) | "\(.supervisor) | \(.supervisor_issue)"' "$L"; }
-expect "a supervisor is a loop or you"         "[ \"\$(sup broken)\" = 'good | null' ] && [ \"\$(sup good)\" = 'you | null' ]"
+expect "a supervisor is a loop or you; a checker is a loop, a service or you" "[ \"\$(sup broken)\" = 'good | checker heartbeat is not a loop, a service or you' ] && [ \"\$(sup good)\" = 'you | null' ]"
 expect "a supervisor's job names its loop"     "[ \"\$(sup reader | cut -d' ' -f1)\" = watched ]"
-expect "no supervisor is fine"                 "[ \"\$(sup lonely)\" = 'null | null' ]"
+expect "no supervisor is fine; no reader is flagged" "[ \"\$(sup lonely)\" = 'null | nobody reads it' ]"
 expect "a missing supervisor is flagged"       "[ \"\$(sup fresh)\" = 'ghost | supervisor ghost is not a loop in the registry' ]"
 expect "a supervision cycle is drawn once, on its first loop" "sup flaky | grep -q 'comes back to it: flaky → flaky' && sup reader | grep -q 'reader → watched → reader' && sup watched | grep -q 'in the cycle through reader'"
 expect "a registered row with no job is paused" "[ \"\$(status jobless)\" = paused ]"
@@ -133,7 +133,7 @@ expect "a target that is no loop is flagged"     "esc astray | grep -q 'escalate
 expect "one manager per project"                "esc boss | grep -q 'Shop has 2 managers' && esc boss2 | grep -q 'Shop has 2 managers'"
 expect "a role is master or manager"            "esc odd | grep -q 'role chief'"
 expect "every cell is still a scalar"           "jq -e 'all(.rows[][]; type != \"array\" and type != \"object\")' $L >/dev/null"
-expect "the registry-only check names every escalation issue" "! python3 fleet/fleet.py --check > $AGENT_OPS_DIR/issues && diff <(jq -r '[.rows[] | select(.escalation_issue) | \"\\(.loop): \\(.escalation_issue)\"] + [\"phantom: break-glass names no loop or service in the registry\"] | join(\"; \")' $L) $AGENT_OPS_DIR/issues"
+expect "the registry-only check names every escalation issue" "! python3 fleet/fleet.py --check > $AGENT_OPS_DIR/issues && diff <(jq -r '[.rows[] | select(.escalation_issue) | \"\\(.loop): \\(.escalation_issue)\"] + [\"phantom: break-glass names no loop or service in the registry\"] | join(\"; \"), \"warning: you: 10 loops name you in Checked by, more than 5; let a supervisor loop read most of them\"' $L) $AGENT_OPS_DIR/issues"
 
 # What defines a loop: its charter (from the registry's folder, or a checkout whose path ends with the cell's leading
 # folders), the Orders and dated report its charter names, a routine's page, a task's prompt, a job's script.
@@ -253,21 +253,58 @@ expect "a queue line with a stray | is flagged, not dropped; prose with a | is s
 expect "a queue needs no header; \\| is a pipe; outer pipes, blank end cells and owner case are fine" "jq -e '[.rows[].item] | index(\"A | B\") and index(\"outer\") and index(\"no date\") and length == 4' $W >/dev/null"
 
 mk reg; L300=$(printf 'l%.0s' $(seq 300)); echo "open('$O/ran', 'w')" > "$O/pwn.py"
-{ reg "$(row dup '' Social-Algorithms)" "| dup | P | cloud | routine:d2 | daily | | | other | x |" "| x | y | broken | table | P | cloud | routine:e | daily | | | you | |" \
-      "$(row 'esc \| aped' '' 'Social algorithms')" "$(row "$(printf 'u\xe2\x80\xa8v')")" "$(row g '' General) |" "$(row "$L300")" "$(row ../pwn)"
+{ reg "$(row dup '' Social-Algorithms)" "| DUP | P | cloud | routine:d2 | daily | | | other | x |" "| x | y | broken | table | P | cloud | routine:e | daily | | | you | |" \
+      "$(row sp '' 'Social algorithms')" "$(row pipe '' 'A \| B')" "$(row "$(printf 'u\xe2\x80\xa8v')")" "$(row g '' General) |" "$(row "$L300")" "$(row ../pwn)" \
+      "$(row you)" "$(row Nobody)" "$(row 'a b')"
   for l in t2:t1 t1:ta ta:tb tb:tc tc:tb; do row "${l%%:*}" "${l#*:}"; done; } > "$O/REGISTRY.md"
-expect "a long, odd or U+2028 name doesn't stop the build" "build && [ -n \"\$(get \"$L300\" .loop)\" ] && [ -n \"\$(get \"\$(printf 'u\xe2\x80\xa8v')\" .loop)\" ]"
+expect "a long name is a loop; an odd or U+2028 name, you or nobody is left out" "build && [ -n \"\$(get \"$L300\" .loop)\" ] && [ -z \"\$(get \"\$(printf 'u\xe2\x80\xa8v')\" .loop)\$(get you .loop)\$(get Nobody .loop)\$(get 'a b' .loop)\" ]"
 expect "a loop name with ../ runs no check outside checks/" "[ ! -e $O/ran ]"
-expect "two rows with one name are one loop, the first row's" "[ \$(get dup .loop | wc -l) -eq 1 ] && [ \"\$(get dup .checked_by)\" = you ]"
-expect "a row with a stray | is left out; \\| is a pipe in a name" "[ -z \"\$(get x .loop)\" ] && [ \"\$(get 'esc | aped' .project)\" = 'Social algorithms' ]"
+expect "two rows with one name in any case are one loop, the first row's" "[ \$(get dup .loop | wc -l) -eq 1 ] && [ -z \"\$(get DUP .loop)\" ] && [ \"\$(get dup .checked_by)\" = you ]"
+expect "a row with a stray | is left out; \\| is a pipe in a cell" "[ -z \"\$(get x .loop)\" ] && [ \"\$(get pipe .project)\" = 'A | B' ]"
 expect "an empty cell past the last header is fine" "[ -n \"\$(get g .loop)\" ]"
-expect "spellings of a project share the first; a project called General is General" "[ \"\$(get 'esc | aped' .scope)\" = Social-Algorithms ] && [ \"\$(get g .scope)\" = General ]"
+expect "spellings of a project share the first; a project called General is General" "[ \"\$(get sp .scope)\" = Social-Algorithms ] && [ \"\$(get g .scope)\" = General ]"
 expect "a chain that runs into a supervision cycle is flagged" "get t2 .supervisor_issue | grep -q 'runs into the cycle through tb' && get tc .supervisor_issue | grep -q 'in the cycle through tb'"
 build --check
-expect "the registry's issues wait on you on the page" "jq -e '[.rows[] | select(.kind == \"Registry\") | .item] | any(test(\"row dup: a row above\")) and any(test(\"cells under 9 headers\"))' $O/fleet/waiting.json >/dev/null"
-expect "--check names a duplicate, a broken row and each cycle once" "grep -q 'row dup: a row above has this Loop' $O/said && grep -q 'cells under 9 headers' $O/said && [ \$(grep -o 'comes back to it' $O/said | wc -l) -eq 1 ]"
-mk chain; { reg "$(row c1)"; for i in $(seq 2 2000); do row "c$i" "c$((i - 1))"; done; } > "$O/REGISTRY.md"
-expect "--check walks a 2000-deep supervisor chain in a blink" "perl -e 'alarm 3; exec @ARGV' env AGENT_OPS_DIR=$O FLEET_CONFIG=$O/fleet.json python3 fleet/fleet.py --check"
+expect "the registry's issues wait on you on the page" "jq -e '[.rows[] | select(.kind == \"Registry\") | .item] | any(test(\"row DUP: a row above\")) and any(test(\"cells under 9 headers\"))' $O/fleet/waiting.json >/dev/null"
+expect "--check names a duplicate, a broken row and each cycle once" "grep -q 'row DUP: a row above has this Loop' $O/said && grep -q 'cells under 9 headers' $O/said && [ \$(grep -o 'comes back to it' $O/said | wc -l) -eq 1 ]"
+expect "--check names each loop name it leaves out" "grep -q 'row you: a loop name is letters' $O/said && grep -q 'row Nobody: a loop name' $O/said && grep -q 'row a b: a loop name' $O/said"
+mk chain; { reg "$(row c1)"; for i in $(seq 2 2000); do echo "| c$i | P | cloud | routine:c$i | daily | | | c$((i - 1)) | c$((i - 1)) |"; done; } > "$O/REGISTRY.md"
+expect "--check walks a 2000-deep supervisor and checker chain in a blink" "perl -e 'alarm 3; exec @ARGV' env AGENT_OPS_DIR=$O FLEET_CONFIG=$O/fleet.json python3 fleet/fleet.py --check"
+# Design answers: who reads a loop, a charter's pause, interval grace, and what claude.ai and launchd say.
+mk readers; { reg "$(row boss)" "| w | P | cloud | routine:w | daily | | | boss, you | boss |" "| self | P | cloud | routine:self | daily | | | self | |" \
+  "| r1 | P | cloud | routine:r1 | daily | | | r2 | |" "| r2 | P | cloud | routine:r2 | daily | | | r1 | |" "| ext | P | cloud | routine:ext | daily | | | vendor | |" \
+  "| via | P | cloud | routine:via | daily | | | Build | |"
+  for i in 1 2 3 4 5; do row "f$i"; done; printf '\n## Services\n\n| Service | Job | What it is |\n|---|---|---|\n| Build | com.b | builds |\n'; } > "$O/REGISTRY.md"
+expect "Checked by: a self-check, a cycle and a stranger are flagged; a service ends a chain" "build && [ \"\$(get self .supervisor_issue)\" = 'Checked by names itself; nobody reads it' ] && [ \"\$(get r1 .supervisor_issue)\" = 'its checkers never reach you' ] && [ \"\$(get ext .supervisor_issue)\" = 'checker vendor is not a loop, a service or you' ] && [ \"\$(get via .supervisor_issue)\" = null ]"
+expect "a loop with a supervisor loop doesn't also name you" "[ \"\$(get w .supervisor_issue)\" = 'Checked by names you, but boss supervises it' ] && [ \"\$(get f1 .supervisor_issue)\" = null ]"
+build --check
+expect "--check warns when more than 5 loops go straight to you" "grep -q '^warning: you: 7 loops name you in Checked by, more than 5' $O/said"
+mk fan; { reg; for i in 1 2 3 4 5 6; do row "f$i"; done; } > "$O/REGISTRY.md"
+expect "the fan-in warning alone prints and exits 0" "build --check && [ \"\$(cat $O/said)\" = 'warning: you: 6 loops name you in Checked by, more than 5; let a supervisor loop read most of them' ]"
+
+mk pause; mkdir "$O/ch"; printf '# P\n\nstatus: paused\n' > "$O/ch/p.md"; printf '# A\n\nstatus: active\n' > "$O/ch/a.md"
+reg '| p | P | cloud | routine:p | daily | `ch/p.md` | | you | |' '| a | P | cloud | routine:a | daily | `ch/a.md` | | you | |' > "$O/REGISTRY.md"
+cloud "$(routine '"p"' true '"2026-01-01T06:00:00Z"'),$(routine '"a"')"
+expect "a charter that says status: paused is paused, not silent" "build && [ \"\$(get p '\"\(.status) \(.next_due)\"')\" = 'paused null' ] && [ \"\$(get a .status)\" = 'no runs yet' ]"
+
+ago() { date -v-"$1"H +%FT%T 2>/dev/null || date -d "$1 hours ago" +%FT%T; }
+mk grace; python3 - "$O/la" <<'P'
+import plistlib, sys
+for n, i in {"five": 300, "hourly": 3600}.items(): open(f"{sys.argv[1]}/{n}.plist", "wb").write(plistlib.dumps({"Label": f"com.t.{n}", "StartInterval": i}))
+open(f"{sys.argv[1]}/yr.plist", "wb").write(plistlib.dumps({"Label": "com.t.yr", "StartCalendarInterval": {"Month": 12, "Day": 25, "Hour": 9}}))
+P
+printf 'PID\tStatus\tLabel\n-\t0\tcom.t.five\n-\t0\tcom.t.hourly\n-\t0\tcom.t.yr\n' > "$O/launchctl.txt"
+reg '| five | P | mac | com.t.five | 5 min | | | you | |' '| hourly | P | mac | com.t.hourly | hourly | | | you | |' > "$O/REGISTRY.md"
+printf '{"loop":"five","date":"%s","check":"pass"}\n{"loop":"hourly","date":"%s","check":"pass"}\n' "$(ago 2)" "$(ago 2)" > "$O/runs.jsonl"
+expect "an interval job is silent after 3 intervals, at least an hour" "build && [ \"\$(get five .status)\" = silent ] && [ \"\$(get hourly .status)\" = healthy ]"
+expect "a plist with Month and Day is yearly" "get com.t.yr .schedule | grep -q '^yearly'"
+
+mk statuses; reg "$(row run)" "$(row can)" "$(row tmo)" "$(row gone)" "$(row late)" > "$O/REGISTRY.md"
+cloud "$(for r in run:running can:cancelled tmo:timed_out; do routine "\"${r%%:*}\"" true null "\"${r#*:}\"" "\"$(day 1)\""; printf ,; done)$(routine '"late"' true "\"$(day 2)\"")"
+expect "a running routine isn't failing; cancelled and timed out are" "build && [ \"\$(get run .status)\" != failing ] && [ \"\$(get can .status)\$(get tmo .status)\" = failingfailing ]"
+expect "a routine claude.ai doesn't list is missing" "[ \"\$(get gone '\"\(.status) \(.next_due)\"')\" = 'missing null' ]"
+expect "a next run claude.ai still had due in the past is silent" "[ \"\$(get late .status)\" = silent ]"
+
 mk none
 expect "--check fails with no registry to check" "! build --check && grep -q 'no Registry rows' $O/said"
 
