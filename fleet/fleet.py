@@ -4,7 +4,7 @@ one-off job with its health), <out>/waiting.json (everything waiting on you) and
 Sources: the registry file, launchd plists, your crontab, the run ledger, <out>/cloud.json (Claude routines and
 desktop tasks, written by the claude.ai sync in fleet/SYNC.md), and optionally a queue file, GitHub PRs and decision memos.
 fleet/README.md says how each status is decided."""
-import datetime as dt, json, os, plistlib, re, shlex, shutil, subprocess, sys
+import datetime as dt, functools, json, os, plistlib, re, shlex, shutil, subprocess, sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
@@ -20,6 +20,7 @@ def load_config():
     return {**cfg, "home": home, "registry": path("registry", "REGISTRY.md"), "ledger": path("ledger", "runs.jsonl"),
             "checks": path("checks", "checks"), "out": path("out", "fleet"),
             "launch_agents": path("launch_agents", Path.home() / "Library/LaunchAgents"),
+            "tasks": path("tasks", Path.home() / ".claude/scheduled-tasks"),
             "refresh": cfg.get("refresh", "Rebuilt by fleet.py"), "waiting": cfg.get("waiting", {})}
 
 C = load_config()
@@ -112,6 +113,7 @@ def launchd_jobs():
         code = re.search(r'"LastExitStatus" = (-?\d+);', info.stdout)
         pid = re.search(r'"PID" = (\d+);', info.stdout)
         cal = pl.get("StartCalendarInterval")
+        args = pl.get("ProgramArguments") or [pl.get("Program", "")]
         logs = [Path(pl[k]).expanduser() for k in ("StandardOutPath", "StandardErrorPath") if pl.get(k)]
         stamps = [f.stat().st_mtime for f in logs if f.exists()]
         jobs[label] = {
@@ -127,6 +129,7 @@ def launchd_jobs():
             "daemon": bool(pl.get("KeepAlive") or (pl.get("RunAtLoad") and not cal and not pl.get("StartInterval"))),
             "keepalive": bool(pl.get("KeepAlive")),
             "log_at": dt.datetime.fromtimestamp(max(stamps)).replace(microsecond=0) if stamps else None,
+            "runner": runner(args) or p, "log": logs[0] if logs else None,
         }
     return jobs
 
@@ -214,8 +217,99 @@ def cron_jobs():
         jobs[name] = {"spec": cron_spec(expr), "schedule": expr, "loaded": True, "vendor": False, "oneoff": False,
                       "exit": None, "interval": None, "daemon": False, "has_log": has_log,
                       "unset": unset and unset[0],
-                      "log_at": dt.datetime.fromtimestamp(log.stat().st_mtime).replace(microsecond=0) if log and log.is_file() else None}
+                      "log_at": dt.datetime.fromtimestamp(log.stat().st_mtime).replace(microsecond=0) if log and log.is_file() else None,
+                      "runner": runner(cron_words(cmd)), "log": log if has_log else None}
     return jobs
+
+# --- what defines a loop: links to its charter, Orders, prompt, run script and latest report. A link is the file's
+# page on GitHub when it is on its repo's default branch, else its path for you to copy; never the file's contents.
+
+def runner(args):
+    """The script a job runs: the last argument naming a file in your home folder (`bash run.sh`, `node watch.mjs`)."""
+    files = [Path(a).expanduser() for a in args if a.startswith(("/", "~"))]
+    return next((f.resolve() for f in reversed(files) if f.is_file() and Path.home().resolve() in f.resolve().parents), None)
+
+def git(cwd, *args):
+    return subprocess.run(["git", "-C", str(cwd), *args], capture_output=True, text=True).stdout.strip()
+
+@functools.cache
+def origin(top):
+    """(owner/name, default branch ref) of a checkout whose origin is on GitHub, else None."""
+    m = re.search(r"github\.com[:/]([^/]+/[^/]+?)(?:\.git)?$", git(top, "remote", "get-url", "origin"))
+    return (m.group(1), git(top, "symbolic-ref", "--short", "refs/remotes/origin/HEAD") or "origin/main") if m else None
+
+def on_github(path):
+    """(owner/name, ref, path in the repo) when path is on its GitHub checkout's default branch, else None. The default
+    branch decides, not this checkout's files, so a stale or partial clone gives the same answer."""
+    top = git(next(a for a in (path, *path.parents) if a.is_dir()), "rev-parse", "--show-toplevel")
+    o = top and origin(top)
+    if not o: return None
+    rel = path.resolve().relative_to(Path(top).resolve()).as_posix()
+    return (*o, rel) if subprocess.run(["git", "-C", top, "cat-file", "-e", f"{o[1]}:{rel}"], capture_output=True).returncode == 0 else None
+
+def exists(path):
+    return path.exists() or bool(on_github(path))
+
+def read(path):
+    g = on_github(path)
+    return git(path.parent, "show", f"{g[1]}:{g[2]}") if g else path.read_text(errors="ignore")
+
+def tilde(path):
+    s, h = str(path), str(Path.home())
+    return "~" + s[len(h):] if s == h or s.startswith(h + "/") else s
+
+def where(path):
+    if not path: return None
+    g = on_github(path)
+    return f"https://github.com/{g[0]}/blob/{g[1].split('/', 1)[1]}/{g[2]}" if g else tilde(path.resolve())
+
+def locate(cell, project, roots):
+    """The one file a registry cell's first backticked path names, looked for from your home (`~/…`), the registry's folder,
+    and each checkout under memo_roots, dropping the cell's leading folders that end the checkout's path (`app/docs/X.md`
+    in …/app); a bare name also in the docs/ of the repo named after the project. None unless they all are one file (two
+    checkouts of a repo hold the same one)."""
+    m = re.search(r"`([^`]+\.\w+)`", cell or "")
+    if not m: return None
+    t = Path(m.group(1)).expanduser()
+    cands = {t} if t.is_absolute() else {C["registry"].parent / t}
+    for repo, tops in ({} if t.is_absolute() else roots).items():
+        for top in tops:
+            cands |= {top.joinpath(*t.parts[k:]) for k in range(len(t.parts)) if k == 0 or top.parts[-k:] == t.parts[:k]}
+            if norm(repo) == norm(project): cands.add(top / "docs" / t)
+    found = {c.resolve() for c in cands if c.is_file()}
+    return found.pop() if len({where(f) for f in found}) == 1 else None
+
+def newest_report(charter, text):
+    """The latest dated file in the folder the charter's report section names (`docs/ops-reports/YYYY-MM-DD.md`, found
+    from the nearest folder above the charter that has it), read from its repo's default branch when the folder is
+    there, else from disk."""
+    for sec in re.split(r"^(?=#{1,4} )", text, flags=re.M):
+        m = re.match(r"#{1,4} .*report", sec, re.I) and re.search(r"([\w./-]+)/YYYY-MM-DD\.md", sec)
+        if not m: continue
+        folder = next((a / m.group(1) for a in charter.parents if exists(a / m.group(1))), None)
+        if not folder: return None
+        g, dated = on_github(folder), re.compile(r"\d{4}-\d{2}-\d{2}\.md$")
+        names = git(charter.parent, "ls-tree", "--full-tree", "--name-only", f"{g[1]}:{g[2]}").splitlines() if g else [f.name for f in folder.iterdir()]
+        latest = max((n for n in names if dated.match(n)), default=None)
+        return latest and where(folder / latest)
+    return None
+
+def job_links(j):
+    """A local job's script (else its plist) and its log file."""
+    j = j or {}
+    return {"runner": where(j.get("runner")), "log": tilde(Path(j["log"]).resolve()) if j.get("log") else None}
+
+def definitions(reg, kind, ref, item, roots):
+    """A registry loop's charter, its Orders (the first `orders/<name>.md` its charter names that is beside it), its prompt (a
+    routine's claude.ai page, a desktop task's SKILL.md) and its latest report."""
+    charter = locate(reg.get("Charter"), reg.get("Project", ""), roots)
+    text = read(charter) if charter else ""
+    orders = next((f for f in (charter.parent / "orders" / n for n in re.findall(r"orders/([\w.-]+\.md)", text)) if exists(f)), None)
+    task = C["tasks"] / ref / "SKILL.md"
+    return {"charter": where(charter), "orders": where(orders),
+            "prompt": f"https://claude.ai/code/routines/{item['id']}" if kind == "routine" and (item or {}).get("id")
+                      else where(task) if kind == "task" and task.is_file() else None,
+            "report": newest_report(charter, text) if charter else None}
 
 # --- the ledger claude-run and ops-check append to
 
@@ -343,6 +437,8 @@ def build():
     link, reasons, _ = links(registry, services, glass)
     window_from = max(first or now.date().isoformat(), (now - dt.timedelta(days=WINDOW)).date().isoformat())
     rows, claimed = [], set()
+    gh = C["waiting"].get("github") or {}
+    roots = checkouts(gh.get("owner"), tuple(gh.get("memo_roots", ())))
 
     def iso(t): return t.isoformat(timespec="minutes") if t else None
 
@@ -356,7 +452,7 @@ def build():
                "schedule": (reg.get("Schedule", "").replace(override.group(0), "") if override else reg.get("Schedule", "")).replace("`", "").strip(" ()"),
                "last_run": None, "result": None, "detail": "", "next_due": None,
                "pass_rate": None, "checks": None, "cost": None, "status": None, **link[loop]}
-        spec, live, j = None, True, None
+        spec, live, j, item = None, True, None, None
         if kind == "local":
             j = jobs.get(ref)
             live = (health and not ref) or bool(j and j["loaded"])  # with no registry, a ledger name is live while it logs
@@ -372,6 +468,7 @@ def build():
                 row["last_run"] = iso(dt.datetime.fromisoformat(item["last_finished_at"].replace("Z", "+00:00")).astimezone().replace(tzinfo=None))
                 row["result"] = "pass" if item.get("last_status") == "succeeded" else "fail"
                 row["detail"] = f"routine run {item.get('last_status')}"
+        row.update(definitions(reg, kind, ref, item, roots), **job_links(j))
         if override: spec = cron_spec(override.group(1), both=True)
         if spec and not (row["next_due"] and kind != "local"):
             row["next_due"] = iso(nth(fires(spec, now, 1), 0))
@@ -421,7 +518,7 @@ def build():
         claimed.add(svc["Job"])
         j = jobs.get(svc["Job"], {})
         rows.append({"loop": svc["Service"], "project": "Service", "runtime": "mac", "job": svc["Job"],
-                     "schedule": svc.get("What it is", ""), "break_glass": reasons.get(svc["Service"]),
+                     "schedule": svc.get("What it is", ""), "break_glass": reasons.get(svc["Service"]), **job_links(j),
                      "status": "paused" if not j.get("loaded") else "service" if j.get("exit") in (0, None) else "failing",
                      "detail": f"last run exited {j['exit']}" if j.get("exit") not in (0, None) else ""})
 
@@ -429,10 +526,10 @@ def build():
         if label in claimed or j["vendor"] or not j["loaded"]: continue
         runtime = "cron" if label.startswith("cron:") else "mac"
         if j["oneoff"]:
-            rows.append({"loop": label, "project": "One-off", "runtime": runtime, "job": label, "status": "one-off",
+            rows.append({"loop": label, "project": "One-off", "runtime": runtime, "job": label, "status": "one-off", **job_links(j),
                          "next_due": iso(nth(fires(j["spec"], now, 1, days=400), 0)), "schedule": "runs once, then removes itself"})
             continue
-        rows.append({"loop": label, "project": "Unregistered", "runtime": runtime, "job": label, "status": "unregistered",
+        rows.append({"loop": label, "project": "Unregistered", "runtime": runtime, "job": label, "status": "unregistered", **job_links(j),
                      "next_due": iso(nth(fires(j["spec"], now, 1), 0)) if j["spec"] else None,
                      "schedule": ("crontab line" if runtime == "cron" else "launchd job") + " in no registry or services row"})
     for name, r in routines.items():
@@ -453,7 +550,8 @@ def build():
     for r in rows: r["scope"] = of(r["project"])[1]
     keys = ["loop", "project", "scope", "runtime", "job", "schedule", "status", "last_run", "result", "detail",
             "next_due", "pass_rate", "checks", "cost", "history", "checked_by", "supervisor", "supervisor_issue",
-            "role", "escalates_to", "escalates_default", "break_glass", "escalation_issue"]
+            "role", "escalates_to", "escalates_default", "break_glass", "escalation_issue",
+            "charter", "orders", "prompt", "runner", "report", "log"]
     rows = [{k: r.get(k) for k in keys} for r in rows]
 
     meta = [{"label": "Built", "value": now.isoformat(timespec="minutes")},
@@ -482,14 +580,16 @@ def short(text, cap=72):
     t = head if len(head) >= 15 and head != t else t
     return t if len(t) <= cap else t[:cap].rsplit(" ", 1)[0] + "…"
 
+@functools.cache
 def checkouts(owner, roots):
+    """Repo name -> its checkouts, for the GitHub repos (of owner, when given) under the roots."""
     seen = {}
     for root in (Path(r).expanduser() for r in roots):
         for g in root.glob("**/.git"):
             if "node_modules" in g.parts or len(g.relative_to(root).parts) > 5: continue
             url = subprocess.run(["git", "-C", str(g.parent), "remote", "get-url", "origin"], capture_output=True, text=True).stdout.strip()
-            m = re.search(rf"github\.com[:/]{re.escape(owner)}/([^/.]+)", url)
-            if m: seen.setdefault(m.group(1), g.parent)
+            m = re.search(rf"github\.com[:/]{re.escape(owner) if owner else '[^/]+'}/([^/.]+)", url)
+            if m: seen.setdefault(m.group(1), []).append(g.parent)
     return seen
 
 def memo_items(owner, repo, path, cfg):
@@ -497,7 +597,7 @@ def memo_items(owner, repo, path, cfg):
     every `**Decision:**` line is filled), and table rows whose last cell is the `awaiting` status."""
     heading, awaiting = cfg.get("decisions", "Founder decisions"), cfg.get("awaiting", "Awaiting founder")
     subprocess.run(["git", "-C", str(path), "fetch", "-q", "origin"], capture_output=True)
-    ref = subprocess.run(["git", "-C", str(path), "rev-parse", "--abbrev-ref", "origin/HEAD"], capture_output=True, text=True).stdout.strip() or "origin/main"
+    ref = git(path, "symbolic-ref", "--short", "refs/remotes/origin/HEAD") or "origin/main"
     hits = subprocess.run(["git", "-C", str(path), "grep", "-l", "-i", "-e", heading, "-e", awaiting, ref, "--", "docs"],
                           capture_output=True, text=True).stdout.split()
     items = []
@@ -544,8 +644,8 @@ def waiting(now, of):
                           "repo": p["repository"]["name"],
                           "since": p["createdAt"][:10]})
         if gh.get("memo_roots"):
-            for repo, path in sorted(checkouts(gh["owner"], gh["memo_roots"]).items()):
-                items += memo_items(gh["owner"], repo, path, gh)
+            for repo, paths in sorted(checkouts(gh["owner"], tuple(gh["memo_roots"])).items()):
+                items += memo_items(gh["owner"], repo, paths[0], gh)
     keys = ["title", "tag", "source", "kind", "item", "action", "where", "link", "due", "since"]
     return sorted(({**{k: i.get(k) for k in keys}, "title": i.get("title") or short(i["item"]),
                     **dict(zip(("project", "scope"), of(i.get("repo"))))} for i in items),
