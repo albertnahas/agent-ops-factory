@@ -1,6 +1,7 @@
 {
   "registry": "~/.agent-ops/REGISTRY.md",
   "ledger": "~/.agent-ops/runs.jsonl",
+  "improvements": "~/.agent-ops/improvements.jsonl",
   "checks": "~/.agent-ops/checks",
   "out": "~/.agent-ops/fleet",
   "refresh": "Rebuilt every 30 minutes by fleet.py",

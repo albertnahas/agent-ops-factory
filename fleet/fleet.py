@@ -22,6 +22,7 @@ def load_config():
             "launch_agents": path("launch_agents", Path.home() / "Library/LaunchAgents"),
             "tasks": path("tasks", Path.home() / ".claude/scheduled-tasks"),
             "jobs": cfg.get("jobs") and Path(cfg["jobs"]).expanduser(),
+            "improvements": path("improvements", "improvements.jsonl"),
             "refresh": cfg.get("refresh", "Rebuilt by fleet.py"), "waiting": cfg.get("waiting", {})}
 
 C = load_config()
@@ -421,6 +422,24 @@ def ledger(now):
         }
     return out, first
 
+IMPROVEMENT = ("id", "date", "loop", "pr", "change", "trace", "hypothesis", "metric", "baseline", "replay_before",
+               "replay_after", "read_date", "outcome", "moved", "result", "revert_pr")
+
+def improvements(scope_of):
+    """The improver's history from improvements.jsonl: a line per change when its PR opens, then lines with the same id
+    as it is read (append only; later fields win). Rows of scalars, newest first, scoped like their loop: a list (the
+    trace's links) as one link a line, anything else not a number or true/false as text."""
+    by = {}
+    for l in lines(C["improvements"]):
+        try: r = json.loads(l)
+        except (ValueError, RecursionError): continue
+        if isinstance(r, dict) and name(r.get("id")): by[str(r["id"])] = {**by.get(str(r["id"]), {}), **r}
+    cell = lambda v: (v if v is None or isinstance(v, (int, float, bool)) else "\n".join(map(str, v)) if isinstance(v, list)
+                      else json.dumps(v) if isinstance(v, dict) else str(v))
+    rows = [{**{k: cell(r.get(k)) for k in IMPROVEMENT}, "outcome": str(r.get("outcome") or "pending").lower(),
+             "scope": scope_of.get(str(r["loop"]), "General")} for r in by.values() if name(r.get("loop"))]
+    return sorted(rows, key=lambda r: str(r["date"] or ""), reverse=True)
+
 def discovered(jobs, routines, tasks, led, week):
     """With no registry, everything found stands in for its own row: loops for scheduled jobs, routines, tasks and
     recent ledger names, services for jobs launchd keeps running. One-offs and vendors' jobs keep their own paths."""
@@ -694,9 +713,11 @@ def build():
             {"label": "Builder", "value": str(Path(__file__).resolve()).replace(str(Path.home()), "~")},
             {"label": "uid", "value": str(os.getuid())}]
     items = waiting(now, of, loose + warn)
+    changes = improvements({r["loop"]: r.get("scope") or "General" for r in rows})
     write("loops", rows, meta)
     write("waiting", items, meta[:1])
-    html(rows, items, meta, "Loop health" if health else "Loop fleet")
+    write("changes", changes, meta[:1])
+    html(rows, items, meta, "Loop health" if health else "Loop fleet", changes)
     return rows
 
 # --- what waits on you
@@ -795,9 +816,10 @@ def write(name, rows, meta):
     C["out"].mkdir(parents=True, exist_ok=True)
     (C["out"] / f"{name}.json").write_text(json.dumps({"rows": rows, "meta": meta}, indent=1, ensure_ascii=False) + "\n")
 
-def html(rows, items, meta, title):
+def html(rows, items, meta, title, changes=()):
     """The same page the claude.ai dashboard runs, with a local stand-in for its runtime and the data inlined."""
     data = json.dumps({"loops": {"rows": rows, "meta": meta}, "waiting": {"rows": items, "meta": meta[:1]},
+                       "changes": {"rows": list(changes), "meta": meta[:1]},
                        "look": json.loads((ROOT / "dashboard/look.json").read_text()),
                        "params": json.loads((ROOT / "dashboard/params.json").read_text())}, ensure_ascii=False).replace("<", "\\u003c")  # no </script> or <!-- can end the script
     page = (ROOT / "dashboard/index.html").read_text()
