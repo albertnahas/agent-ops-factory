@@ -131,6 +131,53 @@ expect "a role is master or manager"            "esc odd | grep -q 'role chief'"
 expect "every cell is still a scalar"           "jq -e 'all(.rows[][]; type != \"array\" and type != \"object\")' $L >/dev/null"
 expect "the registry-only check names every escalation issue" "! python3 fleet/fleet.py --check > $AGENT_OPS_DIR/issues && diff <(jq -r '[.rows[] | select(.escalation_issue) | \"\\(.loop): \\(.escalation_issue)\"] + [\"phantom: break-glass names no loop or service in the registry\"] | join(\"; \")' $L) $AGENT_OPS_DIR/issues"
 
+# What defines a loop: its charter (from the registry's folder, or a checkout whose path ends with the cell's leading
+# folders), the Orders and dated report its charter names, a routine's page, a task's prompt, a job's script.
+mkdir -p "$AGENT_OPS_DIR/docs/orders" "$AGENT_OPS_DIR/docs/reports" "$AGENT_OPS_DIR/tasks/nightly" "$AGENT_OPS_DIR/co/shop/docs" "$AGENT_OPS_DIR/co2/shop/docs"
+printf '# Ops\n\nNot [orders/x.md] yet: first read [orders/ops.md](./orders/ops.md).\n\n## Steps\n\n`notes/YYYY-MM-DD.md`\n\n## Daily report\n\nWrite `docs/reports/YYYY-MM-DD.md`.\n' > "$AGENT_OPS_DIR/docs/OPS.md"
+touch "$AGENT_OPS_DIR/docs/orders/ops.md" "$AGENT_OPS_DIR/docs/reports/2026-11-20.md" "$AGENT_OPS_DIR/docs/reports/2026-11-21.md" "$AGENT_OPS_DIR/docs/reports/index.md" "$AGENT_OPS_DIR/tasks/nightly/SKILL.md"
+cat > "$AGENT_OPS_DIR/REGISTRY.md" <<EOF
+## Registry
+
+| Loop | Project | Runtime | Job | Schedule | Charter | Outcome check | Checked by |
+|---|---|---|---|---|---|---|---|
+| ops | Shop | cloud | routine:ops | daily | \`docs/OPS.md\` (the charter) | | you |
+| nightly | | app | task:nightly | daily | shop repo | | you |
+| bare | | cloud | routine:bare | daily | \`docs/GONE.md\` | | you |
+EOF
+echo "{\"at\":\"$(date +%FT%T%z | sed 's/\(..\)$/:\1/')\",\"routines\":[{\"id\":\"trig_01abc\",\"name\":\"ops\",\"enabled\":true,\"cron\":null,\"next_run_at\":null,\"last_status\":null,\"last_finished_at\":null}],\"tasks\":[{\"id\":\"nightly\",\"enabled\":true,\"cron\":null,\"next_run_at\":null,\"last_finished_at\":null}]}" > "$AGENT_OPS_DIR/fleet/cloud.json"
+echo "{\"launch_agents\": \"$AGENT_OPS_DIR/none\", \"tasks\": \"$AGENT_OPS_DIR/tasks\"}" > "$AGENT_OPS_DIR/fleet.json"
+python3 fleet/fleet.py >/dev/null
+TMP=$(cd "$AGENT_OPS_DIR" && pwd -P)
+def() { jq -r --arg l "$1" --arg k "$2" '.rows[] | select(.loop == $l) | .[$k] // ""' "$L" | sed "s|^$TMP/||"; }
+expect "a charter is found from the registry's folder"  "[ \"\$(def ops charter)\" = docs/OPS.md ]"
+expect "its Orders are the first orders file it names"  "[ \"\$(def ops orders)\" = docs/orders/ops.md ]"
+expect "its report is the newest dated file its report section names" "[ \"\$(def ops report)\" = docs/reports/2026-11-21.md ]"
+expect "a routine links to its claude.ai page"   "[ \"\$(def ops prompt)\" = https://claude.ai/code/routines/trig_01abc ]"
+expect "a task links to its prompt file"         "[ \"\$(def nightly prompt)\" = tasks/nightly/SKILL.md ]"
+expect "a charter cell with no path, or a missing file, links nothing" "[ -z \"\$(def nightly charter)\$(def bare charter)\$(def bare orders)\$(def bare report)\" ]"
+expect "every link cell is a scalar"             "jq -e 'all(.rows[][]; type != \"array\" and type != \"object\")' $L >/dev/null"
+touch "$AGENT_OPS_DIR/co/shop/docs/LOOP.md"
+loc() { python3 -c "import sys; from pathlib import Path; sys.path.insert(0, 'fleet'); from fleet import locate
+co = Path('$AGENT_OPS_DIR'); print(locate('\`$1\`', '$2', {'shop': [co / 'co/shop', co / 'co2/shop']}) or '')" | sed "s|^$TMP/||"; }
+expect "leading folders that end a checkout's path drop" "[ \"\$(loc shop/docs/LOOP.md '')\" = co/shop/docs/LOOP.md ]"
+expect "a bare name looks in the project's docs" "[ \"\$(loc LOOP.md Shop)\" = co/shop/docs/LOOP.md ] && [ -z \"\$(loc LOOP.md Blog)\" ]"
+touch "$AGENT_OPS_DIR/co2/shop/docs/LOOP.md"
+expect "two different files are no answer"      "[ -z \"\$(loc LOOP.md Shop)\" ]"
+# On GitHub: a file on the default branch links to its page, read from that branch, so an uncommitted report is skipped.
+R="$AGENT_OPS_DIR/gh/shop"; mkdir -p "$R/docs/orders" "$R/docs/reports"
+cp "$AGENT_OPS_DIR/docs/OPS.md" "$R/docs/OPS.md"; touch "$R/docs/orders/ops.md" "$R/docs/reports/2026-11-20.md"
+git -C "$R" init -q && git -C "$R" add -A && git -C "$R" -c user.name=t -c user.email=t@t commit -qm init && git -C "$R" branch -qM main
+git -C "$R" remote add origin https://github.com/demo/shop.git && git -C "$R" update-ref refs/remotes/origin/main HEAD && git -C "$R" symbolic-ref refs/remotes/origin/HEAD refs/remotes/origin/main
+touch "$R/docs/reports/2026-11-21.md"
+sed -i.bak 's|`docs/OPS.md` (the charter)|`'"$R"'/docs/OPS.md`|' "$AGENT_OPS_DIR/REGISTRY.md"
+python3 fleet/fleet.py >/dev/null
+expect "a charter on GitHub links to its page"    "[ \"\$(def ops charter)\" = https://github.com/demo/shop/blob/main/docs/OPS.md ]"
+expect "its Orders and report come from the default branch" "[ \"\$(def ops orders)\" = https://github.com/demo/shop/blob/main/docs/orders/ops.md ] && [ \"\$(def ops report)\" = https://github.com/demo/shop/blob/main/docs/reports/2026-11-20.md ]"
+
+run() { python3 -c "import sys; sys.path.insert(0, 'fleet'); from fleet import runner; print(runner(sys.argv[1:]) or '')" "$@"; }
+expect "a job's script is its last argument in your home" "[ \"\$(run /bin/bash \"\$PWD/tests/fleet.test.sh\" morning)\" = \"\$(pwd -P)/tests/fleet.test.sh\" ] && [ -z \"\$(run /bin/bash -c 'echo hi')\" ]"
+
 # Schedules: the next two fires after 10:00 on Sunday 22 Nov 2026 (or the day given), as crontab reads them.
 fires() { python3 -c "import sys, datetime as dt; sys.path.insert(0, 'fleet'); from fleet import cron_spec, fires, nth
 g = lambda: fires(cron_spec('$1', $2), dt.datetime(2026, 11, ${3:-22}, 10), 1, 400); print(' '.join(str(nth(g(), i))[:16] for i in range(2)))"; }

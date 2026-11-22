@@ -196,6 +196,9 @@ button.fx-kpi:focus-visible { outline: 2px solid var(--color-fg); outline-offset
 .fx-fdetail { position: sticky; bottom: 0; z-index: 2; pointer-events: none; margin-top: 12px; padding: 10px 12px; border: 1px solid var(--color-border-line); border-radius: 8px; background: var(--color-bg); box-shadow: 0 -2px 12px rgb(0 0 0 / .12); display: grid; gap: 4px; font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); min-height: 3.2em; }
 .fx-fdetail b { color: var(--color-fg); font-weight: 600; font-size: var(--cds-font-size-body); }
 .fx-fdetail p { margin: 0; overflow-wrap: anywhere; }
+.fx-fdetail .fx-defs { pointer-events: auto; margin-top: 4px; }
+.fx-defs { align-items: center; }
+.fx-defs .k { width: 100%; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; color: var(--color-fg-muted); }
 .fx-legend { display: flex; flex-wrap: wrap; gap: 6px 14px; padding: 10px 14px; border-top: 1px solid var(--color-border-line); font-size: 11px; color: var(--color-fg-muted); }
 .fx-legend span { display: inline-flex; align-items: center; gap: 5px; }
 .fx-legend i { display: inline-block; width: 16px; border-top: 1.5px solid var(--color-fg-muted); }
@@ -403,6 +406,20 @@ const copyBtn = (cmd, label) => {
     .catch(() => { txt.replaceWith(el('code', '', cmd)); });
   return b;
 };
+/* what defines a loop, from fleet.py: a web page opens in a new tab; a file on this machine copies its path, since a
+   page can only link to http and https */
+const DEFS = [['charter', 'Charter'], ['orders', 'Orders'], ['prompt', (r) => /^https?:/.test(r.prompt) ? 'Routine' : 'Prompt'],
+  ['runner', (r) => /\.plist$/.test(r.runner) ? 'Plist' : 'Run script'], ['report', 'Latest report'], ['log', 'Run log']];
+const defsRow = (r) => {
+  const defs = DEFS.filter(([k]) => r[k]);
+  if (!defs.length) return null;
+  const row = el('div', 'fx-acts fx-defs');
+  row.append(el('span', 'k', 'Defined by'), ...defs.map(([k, name]) => {
+    const label = typeof name === 'function' ? name(r) : name;
+    return linkBtn(r[k], label) || copyBtn(r[k], label + ' path');
+  }));
+  return row;
+};
 const reason = (r) => ({
   failing: r.detail || 'Last outcome check failed',
   silent: 'No run since ' + rel(r.last_run),
@@ -459,6 +476,7 @@ const loopMore = (r) => (more) => {
   if (r.detail) { const p = el('p'); p.append(el('b', '', 'Last result: '), document.createTextNode(r.detail)); more.append(p); }
   more.append(el('p', '', [LABEL[r.status], r.schedule, r.job && r.job !== r.loop && r.job, r.checks && r.checks + ' checks passed',
     r.cost != null ? '$' + r.cost.toLocaleString('en', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + ' in 30 days' : ledger() && /cloud|db|app/.test(r.runtime || '') ? 'cost not metered' : null].filter(Boolean).join(' · ')));
+  const defs = defsRow(r); if (defs) more.append(defs);
   const acts = loopActs(r); if (acts) more.append(acts);
 };
 const loopRow = (r, key, grouped) => {
@@ -621,6 +639,7 @@ dash.draw('svc-list', (ul) => {
     const right = el('span', 'r', r.status === 'one-off' ? rel(r.next_due) : LABEL[r.status]);
     ul.append(expandRow('s:' + r.loop, [dot(r.status === 'failing' ? 'bad' : TONE[r.status], LABEL[r.status]), titleCell(r.loop, r.job !== r.loop ? r.job : r.schedule), right], (more) => {
       more.append(el('p', '', [r.schedule, r.detail].filter(Boolean).join('. ')));
+      const defs = defsRow(r); if (defs) more.append(defs);
       const acts = loopActs(r); if (acts) more.append(acts);
     }));
   });
@@ -778,6 +797,7 @@ dash.draw('factory', (box) => {
   col.checkers.append(ribbon);
   cols.append(col.workers, col.checkers, col.ends);
   const detail = el('div', 'fx-fdetail'); detail.hidden = true; detail.setAttribute('aria-live', 'polite');
+  detail.onclick = (e) => e.stopPropagation();
   box.append(cols, detail);
   document.querySelectorAll('[data-sups]').forEach((e) => { e.hidden = !g.sups.length; });
   document.querySelectorAll('#legend-glass').forEach((e) => { e.hidden = !g.glass.length; });
@@ -859,6 +879,7 @@ dash.draw('factory', (box) => {
     if (sup) detail.append(el('p', '', 'Orders from ' + label(sup) + '.'));
     if (kids.length) detail.append(el('p', '', 'Writes Orders for ' + kids.join(', ') + '.'));
     [n.row.supervisor_issue, n.row.escalation_issue].filter(Boolean).forEach((i) => detail.append(el('p', 'warn', i[0].toUpperCase() + i.slice(1) + '.')));
+    const defs = defsRow(n.row); if (defs) detail.append(defs);
   };
   /* pointing only lights a chain; tapping also fills the card, so the page's height never moves under the pointer */
   const trace = (id, tell) => {

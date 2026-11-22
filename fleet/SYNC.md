@@ -8,7 +8,7 @@ FACTORY = the folder holding this file's parent (the agent-ops-factory checkout 
 
 1. **Snapshot.** Call RemoteTrigger with action "list", and the scheduled-tasks tool `list_scheduled_tasks`. Write D/cloud.json as exactly:
    `{"at": "<now, ISO 8601 with offset>", "routines": [...], "tasks": [...]}`
-   - per routine, enabled or not: `{"name", "enabled", "cron": cron_expression or null when empty, "next_run_at": next_run_at or null when cron_expression is empty, "last_status": last_run.status lowercased without "ROUTINE_RUN_STATUS_" ("succeeded", "failed"), or null with no last_run, "last_finished_at": last_run.finished_at or null}`
+   - per routine, enabled or not: `{"id", "name", "enabled", "cron": cron_expression or null when empty, "next_run_at": next_run_at or null when cron_expression is empty, "last_status": last_run.status lowercased without "ROUTINE_RUN_STATUS_" ("succeeded", "failed"), or null with no last_run, "last_finished_at": last_run.finished_at or null}`
    - per scheduled task: `{"id": taskId, "enabled", "cron": cronExpression or null, "next_run_at": nextRunAt or null, "last_finished_at": lastRunAt or null}`
    Copy those fields only. Never copy a prompt, token, environment or any other field: routine prompts hold secrets.
 2. **Build.** Bash: `python3 FACTORY/fleet/fleet.py`. It writes D/loops.json, D/waiting.json and D/dashboard.html. If it fails, skip to step 6.

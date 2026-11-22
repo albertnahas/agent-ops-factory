@@ -17,7 +17,7 @@ if at < max((D / f).stat().st_mtime for f in ("loops.json", "waiting.json")): ba
 if rec.get("page") != page: bad.append("the dashboard runs an older page than the kit's")
 if not snap.get("at") or abs(at - dt.datetime.fromisoformat(snap["at"]).timestamp()) > 3600:
     bad.append(f"cloud snapshot from {(snap.get('at') or 'never')[:16]}, not this run")
-if any(set(r) != {"name", "enabled", "cron", "next_run_at", "last_status", "last_finished_at"} for r in snap.get("routines", [])):
+if any(set(r) != {"id", "name", "enabled", "cron", "next_run_at", "last_status", "last_finished_at"} for r in snap.get("routines", [])):
     bad.append("cloud snapshot not in the fleet.py shape")
 print("; ".join(bad) or f"dashboard synced at {rec['at'][:16]}, {len(snap.get('routines', []))} routines")
 sys.exit(1 if bad else 0)

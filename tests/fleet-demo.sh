@@ -7,7 +7,7 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 export AGENT_OPS_DIR=${1:-$(mktemp -d)}
 mkdir -p "$AGENT_OPS_DIR/fleet"
-echo "{\"launch_agents\": \"$AGENT_OPS_DIR/none\", \"refresh\": \"Demo data\"}" > "$AGENT_OPS_DIR/fleet.json"
+echo "{\"launch_agents\": \"$AGENT_OPS_DIR/none\", \"tasks\": \"$AGENT_OPS_DIR/none\", \"refresh\": \"Demo data\"}" > "$AGENT_OPS_DIR/fleet.json"
 # Most loops are cloud routines; two are desktop-app tasks, and one is a launchd job, which shows as paused (not loaded here).
 runtime() { case $1 in fleet-sync|life-review) echo app;; app-beta) echo mac;; *) echo cloud;; esac; }
 job() { case $(runtime "$1") in app) echo "task:$1";; mac) echo "com.demo.$1";; *) echo "routine:$1";; esac; }
@@ -18,6 +18,15 @@ supervisor() { case $1 in *-daily-ops) ;; shop-*) echo shop-daily-ops;; blog-wri
 role() { case $1 in master) echo master;; shop-daily-ops|app-daily-ops) echo manager;; esac; }
 escalates() { case $1 in blog-links) echo you;; esac; }
 day() { date -v-"$1"d +%FT0"$2":00:00 2>/dev/null || date -d "$1 days ago" +%FT0"$2":00:00; }
+# Two charters, each naming its Orders and its dated report, so a loop's detail links to what defines it.
+charter() { case $1 in shop-daily-ops) echo '`charters/SHOP_OPS.md`';; shop-social-*) echo '`charters/SHOP_SOCIAL.md`';; esac; }
+mkdir -p "$AGENT_OPS_DIR/charters/orders" "$AGENT_OPS_DIR/charters/reports/ops" "$AGENT_OPS_DIR/charters/reports/social"
+for c in OPS:ops SOCIAL:social; do
+  printf '# Shop %s loop\n\nRead [orders/%s.md](./orders/%s.md) right after this file.\n\n## Report\n\n`reports/%s/YYYY-MM-DD.md`\n' \
+    "${c#*:}" "${c#*:}" "${c#*:}" "${c#*:}" > "$AGENT_OPS_DIR/charters/SHOP_${c%:*}.md"
+  printf '# Orders\n' > "$AGENT_OPS_DIR/charters/orders/${c#*:}.md"
+  for d in 2 1 0; do printf '# Report\n' > "$AGENT_OPS_DIR/charters/reports/${c#*:}/$(day "$d" 6 | cut -c1-10).md"; done
+done
 
 loops=(
   # loop|project|checked by|outcomes, oldest first (p pass, f fail, - none)|days since last run
@@ -54,7 +63,7 @@ loops=(
 )
 {
   printf '## Registry\n\n| Loop | Project | Runtime | Job | Schedule | Charter | Outcome check | Checked by | Supervisor | Escalates to | Role |\n|---|---|---|---|---|---|---|---|---|---|---|\n'
-  for l in "${loops[@]}"; do IFS='|' read -r name project by _ _ <<< "$l"; echo "| $name | $project | $(runtime "$name") | $(job "$name") | daily | | | $by | $(supervisor "$name") | $(escalates "$name") | $(role "$name") |"; done
+  for l in "${loops[@]}"; do IFS='|' read -r name project by _ _ <<< "$l"; echo "| $name | $project | $(runtime "$name") | $(job "$name") | daily | $(charter "$name") | | $by | $(supervisor "$name") | $(escalates "$name") | $(role "$name") |"; done
   printf '\n## Services\n\n| Service | Job | What it is |\n|---|---|---|\n| Fleet build | com.demo.fleet-build | rebuilds the dashboard |\n| payments-watch | com.demo.payments-watch | disputes and refunds |\n'
   printf '\n## Break-glass\n\n| Who | Why |\n|---|---|\n| shop-e2e-smoke | production down |\n| payments-watch | money at risk |\n'
 } > "$AGENT_OPS_DIR/REGISTRY.md"
@@ -71,7 +80,7 @@ loops=(
   echo "{\"loop\":\"stray-script\",\"date\":\"$(day 1 6)\",\"subtype\":\"success\"}"
 } > "$AGENT_OPS_DIR/runs.jsonl"
 routines=$(for l in "${loops[@]}"; do IFS='|' read -r name _ _ _ _ <<< "$l"; [ "$(runtime "$name")" = cloud ] || continue
-  printf '{"name":"%s","enabled":true,"cron":"0 6 * * *","next_run_at":null,"last_status":null,"last_finished_at":null},' "$name"; done)
+  printf '{"id":"trig_demo_%s","name":"%s","enabled":true,"cron":"0 6 * * *","next_run_at":null,"last_status":null,"last_finished_at":null},' "${name//-/_}" "$name"; done)
 tasks=$(for l in "${loops[@]}"; do IFS='|' read -r name _ _ _ _ <<< "$l"; [ "$(runtime "$name")" = app ] || continue
   printf '{"id":"%s","enabled":true,"cron":"0 6 * * *","next_run_at":null,"last_finished_at":null},' "$name"; done)
 echo "{\"at\":\"$(date +%FT%T%z | sed 's/\(..\)$/:\1/')\",\"routines\":[${routines%,}],\"tasks\":[${tasks%,}]}" > "$AGENT_OPS_DIR/fleet/cloud.json"

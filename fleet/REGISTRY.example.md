@@ -9,6 +9,7 @@ Every scheduled loop you run, one row each. `fleet/fleet.py` reads the two table
 - **Supervisor** (optional) is the loop that writes this loop's Orders (`docs/orders/<name>.md`). One per loop at most, and one loop can supervise many. Leave it blank for none.
 - **Escalates to** (optional) is where the loop sends anything that needs a person: a loop, or `you`. Blank means its project's manager, else the master, else you. Fill it only to override that.
 - **Role** (optional) is `master` for the one loop that may message you, or `manager` for the loop that takes its project's escalations (one per project). Once a loop is the master, `fleet.py --check` fails on any other loop that escalates to you, unless it's in the Break-glass table.
+- **Charter** is a backticked path to the loop's charter, which the dashboard links to, with the Orders and latest report the charter names (`fleet/README.md`, "What defines a loop"). Words alone link nothing.
 - **Project** groups the dashboard; leave it empty for loops that serve no one project (they show under General, with any project `fleet.json` lists under `general`).
 
 ## Registry
