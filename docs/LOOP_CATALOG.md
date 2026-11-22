@@ -2,7 +2,7 @@
 
 The loop types a product ends up needing, taken from the fleet that runs OpenWhen and a handful of side projects. `skills/plan-loops` reads a project and picks from this list. Start with the fewest loops that cover the product's real risks: one loop that runs well beats five that page you.
 
-A loop is a trigger, one job written down as a charter (`docs/AGENT_LOOP.md`), an outcome check with no model in it, and a ledger line per run (`bin/claude-run`, `bin/ops-check`). Anything missing one of those isn't a loop yet. Daemons, dashboards and model-free watchers are services: they go in the registry's Services table, not its loop table.
+A loop is a trigger, one job written down as a charter (`docs/AGENT_LOOP.md`), an outcome check with no model in it, and a ledger line per run (`bin/claude-run`, `bin/ops-check`), all from [agent-ops-kit](https://github.com/albertnahas/agent-ops-kit). Anything missing one of those isn't a loop yet. Daemons, dashboards and model-free watchers are services: they go in the registry's Services table, not its loop table.
 
 **Checked by** is who reads a loop's output after its own check passes: another loop (daily ops grades the fix agent's PRs), a script (the heartbeat), or you. Every loop names one, because an output nobody checks is how a loop drifts. The fleet dashboard draws these links.
 

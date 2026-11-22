@@ -12,11 +12,11 @@ A trigger, one job written down as a charter, an outcome check with no model in 
 
 Build the factory from the watchman outward. A loop you can't see fail is worse than no loop.
 
-1. **The watchman.** Copy the kit in and run its tests ([README, "Try it in 5 minutes"](../README.md#try-it-in-5-minutes)). Every Claude call goes through `bin/claude-run`, every run ends with `bin/ops-check`, and `bin/heartbeat.py` runs daily. If the heartbeat lives on a laptop, add the cloud watch from [examples/heartbeat-watch-prompt.md](../examples/heartbeat-watch-prompt.md).
-2. **Daily ops on one product.** One charter from [AGENT_LOOP.md](AGENT_LOOP.md) with your own X surfaces, and the PR grader. Run it by hand, then on a schedule. For the first week, read every report and every grade before you trust them.
+1. **The watchman.** Copy the kit in and run its tests ([README, "Try it in 5 minutes"](https://github.com/albertnahas/agent-ops-kit#try-it-in-5-minutes)). Every Claude call goes through `bin/claude-run`, every run ends with `bin/ops-check`, and `bin/heartbeat.py` runs daily. If the heartbeat lives on a laptop, add the cloud watch from [examples/heartbeat-watch-prompt.md](https://github.com/albertnahas/agent-ops-kit/tree/main/examples/heartbeat-watch-prompt.md).
+2. **Daily ops on one product.** One charter from the kit's [AGENT_LOOP.md](https://github.com/albertnahas/agent-ops-kit/blob/main/docs/AGENT_LOOP.md) with your own X surfaces, and the PR grader. Run it by hand, then on a schedule. For the first week, read every report and every grade before you trust them.
 3. **A smoke test**, once a deploy can break a journey. It needs no model and costs nothing.
 4. **The fleet dashboard and registry**, as soon as you run more than one loop ([fleet/](../fleet/README.md), the `fleet` skill).
-5. **Support desk and fix on demand**, once strangers write to you and you trust your deploy ([examples/support-agent/](../examples/support-agent/README.md)).
+5. **Support desk and fix on demand**, once strangers write to you and you trust your deploy ([examples/support-agent/](https://github.com/albertnahas/agent-ops-kit/tree/main/examples/support-agent/README.md)).
 6. **Growth, social and strategy**, after launch, each when its "needs it when" holds in the catalog.
 
 The `plan-loops` skill reads a project and proposes loops from [LOOP_CATALOG.md](LOOP_CATALOG.md) in this spirit: the fewest that cover the real risks, usually one to three per project.
@@ -27,7 +27,7 @@ Every loop has a row in one registry, added in the same change that schedules it
 
 **Checked by** is the column people skip, and the one that matters most. It names who reads a loop's output after its own check passes: another loop, the heartbeat, or you. An output nobody checks is how a loop drifts. The catalog says who usually checks each kind of loop.
 
-Write the outcome check before the prompt. If you can't say what proves the run did its job, the loop isn't ready. The check reads something the run didn't write: the PR exists, the post reads back from the platform, the report has every section. Success is the check passing, not Claude's exit code. [checks/report-landed.sh](../checks/report-landed.sh) is a worked example, and the "Rules that came from running these" in the catalog say why.
+Write the outcome check before the prompt. If you can't say what proves the run did its job, the loop isn't ready. The check reads something the run didn't write: the PR exists, the post reads back from the platform, the report has every section. Success is the check passing, not Claude's exit code. [checks/report-landed.sh](https://github.com/albertnahas/agent-ops-kit/blob/main/checks/report-landed.sh) is a worked example, and the "Rules that came from running these" in the catalog say why.
 
 Every runner exports `OPS_LOOP=<registry name>`, so the ledger, the heartbeat and the dashboard all agree on which loop is which. `plan-loops` builds each new loop in this order: charter, check, runner, hand run, schedule, registry row.
 
@@ -35,7 +35,7 @@ Every runner exports `OPS_LOOP=<registry name>`, so the ledger, the heartbeat an
 
 Two budgets, and the second runs out first.
 
-**Money.** Every Claude call carries `--max-turns` and `--max-budget-usd` ([scripts/run.sh](../scripts/run.sh) sets both). The heartbeat alerts on a run over 3x that loop's median and writes `COSTS.md`. Read that table weekly. Set a weekly ceiling per loop, and give any loop above it one line in its charter saying why it's worth the money. `COSTS.md` only knows Claude's cost. Paid APIs your loops call aren't in it.
+**Money.** Every Claude call carries `--max-turns` and `--max-budget-usd` ([scripts/run.sh](https://github.com/albertnahas/agent-ops-kit/blob/main/scripts/run.sh) sets both). The heartbeat alerts on a run over 3x that loop's median and writes `COSTS.md`. Read that table weekly. Set a weekly ceiling per loop, and give any loop above it one line in its charter saying why it's worth the money. `COSTS.md` only knows Claude's cost. Paid APIs your loops call aren't in it.
 
 **Your attention.** Aim for at most one message a day from the whole fleet. A loop messages you only when it's blocked on you, and both of these are true:
 - the next step needs you: your login, your money, your identity, a decision only you make, or something physical;
@@ -89,7 +89,7 @@ The test measures demand directly, with signups, replies or pre-orders, because 
 
 **Your part.** Approve, reject or defer each bet in the memo's "Founder decisions" section by its deadline. The dashboard lists open decision sections from your repos' `docs/` (`waiting.github.memo_roots` in `fleet.json`). Silence means undecided: the bet is carried to the next memo, never assumed approved. A bet that reopens a settled decision says which one and what's different this time.
 
-**After you decide.** An approved bet's test is filed the same day, as a queue line or in the owning loop's charter, and only the test gets built. On the read date, the next memo reports the number against the kill rule. A killed bet goes into [DECISIONS.md](DECISIONS.md) so it isn't proposed again in the same form. A bet that clears comes back with its next, bigger test. Only once the evidence is strong enough does it get built, as normal graded PRs, with money, identity and data surfaces still X.
+**After you decide.** An approved bet's test is filed the same day, as a queue line or in the owning loop's charter, and only the test gets built. On the read date, the next memo reports the number against the kill rule. A killed bet goes into [DECISIONS.md](https://github.com/albertnahas/agent-ops-kit/blob/main/docs/DECISIONS.md) so it isn't proposed again in the same form. A bet that clears comes back with its next, bigger test. Only once the evidence is strong enough does it get built, as normal graded PRs, with money, identity and data surfaces still X.
 
 Example of one bet in a memo (an imaginary product):
 

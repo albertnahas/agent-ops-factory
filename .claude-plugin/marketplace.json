@@ -1,0 +1,12 @@
+{
+  "name": "agent-ops-factory",
+  "description": "Claude Code plugins for running a software factory of scheduled agent loops.",
+  "owner": { "name": "Albert Nahas", "url": "https://github.com/albertnahas" },
+  "plugins": [
+    {
+      "name": "agent-ops-factory",
+      "source": "./",
+      "description": "Start a software factory, plan the loops a project needs and see every loop on one dashboard."
+    }
+  ]
+}

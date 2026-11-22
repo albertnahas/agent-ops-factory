@@ -5,7 +5,7 @@ description: Start a software factory for a project, meaning the scheduled Claud
 
 # Factory
 
-KIT is the agent-ops-kit folder: two levels up from this skill's base directory. The playbook is `KIT/docs/FACTORY_PLAYBOOK.md`. Read it first and follow its order. This skill only sequences the work. The detail lives in the files the playbook links, and in the `plan-loops` and `fleet` skills.
+FACTORY is the agent-ops-factory folder: two levels up from this skill's base directory. KIT is the agent-ops-kit checkout: `$AGENT_OPS_KIT`, default `~/.agent-ops/kit`. The playbook is `FACTORY/docs/FACTORY_PLAYBOOK.md`. Read it first and follow its order. This skill only sequences the work. The detail lives in the files the playbook links, and in the `plan-loops` and `fleet` skills.
 
 Nothing gets scheduled, and no crontab, routine or task gets written, without the user's yes.
 
@@ -17,7 +17,7 @@ Show the user what's done and the next step. Wait for their go.
 
 ## 2. The watchman
 
-Follow the README's "Try it in 5 minutes" in the project: copy the kit in, run the tests, fill in the charter's placeholders and X surfaces, then run one loop and the heartbeat by hand. Offer the cloud watch if the heartbeat runs on a laptop.
+Follow `KIT/README.md`, "Try it in 5 minutes", in the project: copy the kit in, run the tests, fill in the charter's placeholders and X surfaces, then run one loop and the heartbeat by hand. Offer the cloud watch if the heartbeat runs on a laptop.
 
 ## 3. Loops
 

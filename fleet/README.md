@@ -6,7 +6,7 @@ One page for every scheduled loop you run, across all your projects: whether eac
 python3 fleet/fleet.py && open ~/.agent-ops/fleet/dashboard.html
 ```
 
-It works with nothing set up: an empty fleet shows as such. It gets useful once your loops have a registry (`REGISTRY.example.md`) and log through `bin/claude-run` and `bin/ops-check`. The `fleet` skill sets all of this up for you and never changes a job you already run.
+It works with nothing set up: an empty fleet shows as such. It gets useful once your loops have a registry (`REGISTRY.example.md`) and log through agent-ops-kit's `bin/claude-run` and `bin/ops-check`. The `fleet` skill sets all of this up for you and never changes a job you already run.
 
 ## What it reads
 

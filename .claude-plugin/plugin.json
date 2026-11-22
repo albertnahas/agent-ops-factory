@@ -1,0 +1,10 @@
+{
+  "name": "agent-ops-factory",
+  "version": "0.4.0",
+  "description": "An AI software factory for one person: a playbook for starting one, a planner for the loops a project needs, and one dashboard for every loop's health, cost and checker. Needs agent-ops-kit.",
+  "author": { "name": "Albert Nahas", "url": "https://github.com/albertnahas" },
+  "homepage": "https://github.com/albertnahas/agent-ops-factory",
+  "repository": "https://github.com/albertnahas/agent-ops-factory",
+  "license": "MIT",
+  "keywords": ["software-factory", "claude-code", "ai-agents", "autonomous-agents", "agent-ops", "loops", "dashboard"]
+}
