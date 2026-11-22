@@ -51,7 +51,7 @@ Open a loop, in the lists or by tapping it on the Factory tab, and the buttons u
 - A file on its repo's default branch on GitHub links to its page there, read from that branch, so a stale clone or an uncommitted file doesn't count. Any other file shows its path, and the button copies it: a claude.ai page can only link to web addresses.
 - A cloud routine's page needs its id in `cloud.json`, which the claude.ai sync (`SYNC.md`) writes.
 - A registered loop whose charter isn't found says **Charter: none**, so the gap shows. Write `none` in the Charter cell when there is none.
-- Above the buttons, the panel says who reads the loop, who supervises it, where it escalates, its role and any break-glass reason, then **Good**: the `**Floor:**` line of the charter's `## Good` section, read only inside its `mission` markers, and the `Target:` line of its Orders. With no Floor it says Good: not set. A loop that is Unchecked says what that costs: nothing writes a pass or fail line for it.
+- Above the buttons, the panel says who reads the loop, who supervises it, where it escalates, its role and any break-glass reason, then **Good**: the `**Floor:**` line the charter keeps in its Mission, read only inside `mission` markers, and any `Target:` line of its Orders. With no Floor it says Good: not set. A loop that is Unchecked says what that costs: nothing writes a pass or fail line for it.
 - A service whose job nothing on this machine runs is Missing, not Paused.
 
 ## Start or change a loop

@@ -159,7 +159,7 @@ expect "the registry-only check names every escalation issue" "! python3 fleet/f
 # folders), the Orders and dated report its charter names, a routine's page, a task's prompt, a job's script.
 mkdir -p "$AGENT_OPS_DIR/docs/orders" "$AGENT_OPS_DIR/docs/reports" "$AGENT_OPS_DIR/tasks/nightly" "$AGENT_OPS_DIR/co/shop/docs" "$AGENT_OPS_DIR/co2/shop/docs"
 printf '# Ops\n\nNot [orders/x.md] yet: first read [orders/ops.md](./orders/ops.md).\n\n## Steps\n\n`notes/YYYY-MM-DD.md`\n\n## Daily report\n\nWrite `docs/reports/YYYY-MM-DD.md`.\n' > "$AGENT_OPS_DIR/docs/OPS.md"
-printf '## Good\n\n<!-- mission -->\n- **Outcome:** more orders\n- **Floor:** at least 30 orders a week\n<!-- /mission -->\n' >> "$AGENT_OPS_DIR/docs/OPS.md"
+printf '## Mission\n\n<!-- mission -->\nMore orders.\n\n- **Floor:** at least 30 orders a week\n- **Source:** the orders table\n<!-- /mission -->\n' >> "$AGENT_OPS_DIR/docs/OPS.md"
 printf '# Orders\n\nTarget: at least 40 orders a week\n' > "$AGENT_OPS_DIR/docs/orders/ops.md"
 touch "$AGENT_OPS_DIR/docs/orders/ops.md" "$AGENT_OPS_DIR/docs/reports/2026-11-20.md" "$AGENT_OPS_DIR/docs/reports/2026-11-21.md" "$AGENT_OPS_DIR/docs/reports/index.md" "$AGENT_OPS_DIR/tasks/nightly/SKILL.md"
 cat > "$AGENT_OPS_DIR/REGISTRY.md" <<EOF
@@ -180,8 +180,8 @@ expect "a charter is found from the registry's folder"  "[ \"\$(def ops charter)
 expect "its Orders are the first orders file it names"  "[ \"\$(def ops orders)\" = docs/orders/ops.md ]"
 expect "its report is the newest dated file its report section names" "[ \"\$(def ops report)\" = docs/reports/2026-11-21.md ]"
 expect "Good is the charter's Floor and its Orders' Target" "[ \"\$(def ops floor)\" = 'at least 30 orders a week' ] && [ \"\$(def ops target)\" = 'at least 40 orders a week' ] && [ -z \"\$(def nightly floor)\" ]"
-printf '# Orders\n' > "$AGENT_OPS_DIR/docs/orders/ops.md"; sed -i.bak 's|^<!-- /mission -->$||; s|^- \*\*Outcome:\*\* more orders$|- **Outcome:** more orders\n<!-- /mission -->|' "$AGENT_OPS_DIR/docs/OPS.md"; python3 fleet/fleet.py >/dev/null
-expect "a Floor outside the mission markers, or no Target, shows nothing" "[ -z \"\$(def ops floor)\$(def ops target)\" ]"
+printf '# Orders\n' > "$AGENT_OPS_DIR/docs/orders/ops.md"; python3 -c 'import sys; p=sys.argv[1]; s=open(p).read(); open(p,"w").write(s.replace("<!-- /mission -->\n", "").replace("More orders.\n", "More orders.\n<!-- /mission -->\n"))' "$AGENT_OPS_DIR/docs/OPS.md"; python3 fleet/fleet.py >/dev/null
+expect "a Floor outside the mission markers, or no Target, shows nothing" "sed -n '/<!-- \\/mission -->/,\$p' $AGENT_OPS_DIR/docs/OPS.md | grep -q '^- \\*\\*Floor:' && [ -z \"\$(def ops floor)\$(def ops target)\" ]"
 expect "a routine links to its claude.ai page"   "[ \"\$(def ops prompt)\" = https://claude.ai/code/routines/trig_01abc ]"
 expect "a task links to its prompt file"         "[ \"\$(def nightly prompt)\" = tasks/nightly/SKILL.md ]"
 expect "a charter cell with no path, or a missing file, links nothing" "[ -z \"\$(def nightly charter)\$(def bare charter)\$(def bare orders)\$(def bare report)\" ]"

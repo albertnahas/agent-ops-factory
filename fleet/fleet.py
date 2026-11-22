@@ -358,13 +358,12 @@ def job_links(j):
 def definitions(reg, kind, ref, item, roots):
     """A registry loop's charter, its Orders (the first `orders/<name>.md` its charter names that is beside it), its prompt (a
     routine's claude.ai page, a desktop task's SKILL.md), its latest report, whether the charter says `status: paused`, the
-    Floor its Good section keeps inside `mission` markers, and the Target line of its Orders."""
+    Floor its Mission keeps inside `mission` markers, and the Target line of its Orders."""
     charter = locate(reg.get("Charter"), reg.get("Project", ""), roots)
     text = read(charter) if charter else ""
     orders = next((f for f in (charter.parent / "orders" / n for n in re.findall(r"orders/([\w.-]+\.md)", text)) if exists(f)), None)
     task = C["tasks"] / ref / "SKILL.md"
-    good = re.search(r"^## Good\b(.*?)(?=^## |\Z)", text, re.M | re.S)
-    kept = "".join(re.findall(r"<!-- mission -->(.*?)<!-- /mission -->", good.group(1), re.S)) if good else ""
+    kept = "".join(re.findall(r"<!-- mission -->(.*?)<!-- /mission -->", text, re.S))
     floor = re.search(r"^[-*\s]*\*\*Floor:\*\*\s*(.+?)\s*$", kept, re.M)
     target = orders and re.search(r"^[-*\s]*\**Target(?::\**|\**:)\s*(.+?)\s*$", read(orders), re.M | re.I)
     return {"charter": where(charter), "orders": where(orders),
