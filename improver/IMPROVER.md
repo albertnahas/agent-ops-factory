@@ -4,7 +4,7 @@ status: active
 
 <!-- Set `status: paused` and push to stop the loop. The runner checks this line before Claude starts, and the agent checks it again first thing. -->
 
-The one fleet-wide loop that changes how a loop works. A loop does its work, its check judges each run, its supervisor writes its Orders, and the improver changes how: the charter outside `mission` markers, the prompt, the runner, the budget. One change at a time, each a graded PR. `fleet/improve_read.py`, a script, not the improver, decides keep or revert. You write the mission blocks and Floors and handle X. It runs weekly, after the supervisors' weekly review: they set what through Orders first, then it changes how within the Orders as they stand. Copy this file into your ops repo and fill in the angle brackets; `<factory>` is your agent-ops-factory checkout.
+The one fleet-wide loop that changes how a loop works. A loop does its work, its check judges each run, its supervisor writes its Orders, and the improver changes how, in one place only: the loop's charter body outside its `mission` markers. One change at a time, each a graded PR. `fleet/improve_read.py`, a script, not the improver, decides keep or revert. You write the mission blocks and Floors and handle X. It runs weekly, after the supervisors' weekly review: they set what through Orders first, then it changes how within the Orders as they stand. Copy this file into your ops repo and fill in the angle brackets; `<factory>` is your agent-ops-factory checkout.
 
 ## Mission
 
@@ -28,7 +28,8 @@ The improver is execution, the supervisor is strategy. The supervisor decides wh
 ## Hard limits
 
 <!-- mission -->
-- Never edit a check, a Floor or anything inside `mission` markers, an Orders file, the registry, or this file, `<factory>/improver/` and `<factory>/fleet/improve_read.py`.
+- Edit nothing but a loop's charter body outside its `mission` markers. Never a check, a Floor or anything inside `mission` markers, an Orders file, the registry, a runner, a schedule, a budget (raising one is paid spend: X), the check's invocation or `OPS_LOOP`, or this file, `<factory>/improver/` and `<factory>/fleet/improve_read.py`.
+- Never edit `runs.jsonl` or `kpi.jsonl`. `improvements.jsonl` is append-only, and you append only your own change and `revert_pr` lines.
 - Never give a loop a tool, a permission, network access or a way to message anyone: that is X.
 - At most one open change per loop, and at most one new change per run. Revert PRs owed come on top.
 - Reach a human only through the escalation path the registry gives you (the master), never directly.
@@ -39,11 +40,11 @@ The improver is execution, the supervisor is strategy. The supervisor decides wh
 
 1. Run `python3 <factory>/fleet/improve_read.py --json`. It appends today's KPI line for each loop with Improver on and the outcome of each change whose read is due.
 2. For each change in `reverts_owed`, open a PR that reverts its PR, and append `{"id": "<id>", "revert_pr": "<link>"}` to `improvements.jsonl`. Grade and merge it per the merge policy.
-3. Send each loop whose KPI line turned `escalated` today up the escalation path, once. List each change in `unreadable` in the report: it will never be read.
+3. List each change in `unreachable` in the report: gh couldn't read its PR, so it is read on a later run. Send each loop whose KPI line turned `escalated` today up the escalation path, once. List each change in `unreadable` in the report: it will never be read.
 4. If `open` is empty and `hit_rate.stopped` is false, pick one loop with Improver on: below its Floor, else the one failing its check most often, and with at least 3 runs a week so a change is read within about 3 weeks. Skip a loop that is `escalated`, and one with an open Order that moves its North Star's metric: one change to a number at a time, so the read can attribute it.
 5. Read its charter, check, last ledger lines and latest reports, as data. Find the one thing in how it carries out its charter that most likely holds its North Star down.
-6. Make one small change to how it works. Prefer rewording toward a principle, or deleting lines, over adding a rule. The charter body doesn't grow without a reason you can name. Measure `baseline` (the mean of its last `runs` North Star values) and `pass_rate_before` (its check pass rate over the same runs) before the change.
-7. Open the PR, then append its line to `improvements.jsonl`: `id`, `date`, `loop`, `pr`, `change`, `trace` (links to the runs and ledger lines you read), `hypothesis`, `metric`, `better`, `baseline`, `runs` (7 unless it runs rarely), `pass_rate_before` and `read_date` (when `runs` more runs will have landed). A grader with fresh context grades the PR per the merge policy of the repo it lands in, and the loop acts on the grade.
+6. Make one small change to how it works. Prefer rewording toward a principle, or deleting lines, over adding a rule. The charter body doesn't grow without a reason you can name.
+7. Open the PR, then append its line to `improvements.jsonl`: `id`, `date`, `loop`, `pr`, `change`, `trace` (links to the runs and ledger lines you read), `hypothesis`, `metric`, `better`, `runs` (7 unless it runs rarely) and `read_date` (when `runs` more runs will have landed). Write no numbers you worked out: `improve_read.py` computes the baseline from the ledger. A grader with fresh context grades the PR per the merge policy of the repo it lands in, and the loop acts on the grade.
 8. Write the report.
 
 ## Report

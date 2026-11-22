@@ -46,35 +46,47 @@ def hit_rate(merged):
     return sum(r["outcome"] == "kept" and r.get("moved") is True for r in read), len(read)
 
 def kpi(loop, rs, first, today):
-    """Today's KPI line: met or below from the latest valued check against its bar; no KPI with no value or no bar."""
+    """Today's KPI line: met or below from the latest valued check against its bar, as of that check's date; no KPI with
+    no value or no bar."""
     valued = [r for r in rs if num(r.get("value"))]
     last = valued[-1] if valued else {}
-    if not num(last.get("bar")): return {"date": today, "loop": loop, "kpi": "no KPI", "value": last.get("value")}
-    line = {"date": today, "loop": loop, "value": last["value"], "bar": last["bar"]}
-    if not ahead(last["bar"], last["value"], last["better"]): return {**line, "kpi": "met"}
+    line = {"date": today, "loop": loop, "as_of": valued and last["at"].date().isoformat() or None, "value": last.get("value")}
+    if not num(last.get("bar")): return {**line, "kpi": "no KPI"}
+    line["bar"] = last["bar"]
+    if not ahead(last["bar"], last["value"], last.get("better")): return {**line, "kpi": "met"}
     streak = []
     for r in reversed(valued):
-        if not num(r.get("bar")) or not ahead(r["bar"], r["value"], r["better"]): break
+        if not num(r.get("bar")) or not ahead(r["bar"], r["value"], r.get("better")): break
         streak.append(r)
     since = streak[-1]["at"].date().isoformat()
     attempts = sum(r.get("loop") == loop and str(r.get("date", "")) >= since for r in first.values())
     return {**line, "kpi": "below", "since": since, "attempts": attempts, "of": OF, "escalated": attempts >= OF}
 
-def outcome(c, rs):
-    """The outcome line for an open change, or None while its PR is open or too few valued checks ran since it merged."""
-    pr = json.loads(subprocess.run([GH, "pr", "view", c["pr"], "--json", "state,mergedAt"], capture_output=True, text=True, check=True).stdout)
+def state(c):
+    """The change's PR as {state, mergedAt}, or None when gh is missing or can't read it."""
+    r = GH and subprocess.run([GH, "pr", "view", c["pr"], "--json", "state,mergedAt"], capture_output=True, text=True)
+    return json.loads(r.stdout) if r and r.returncode == 0 else None
+
+def outcome(c, pr, rs):
+    """The outcome line for a change whose PR closed, or merged with `runs` valued checks after it; the baseline and pass
+    rate before are the `runs` valued checks before its date and every check in their span. None while it can't be read yet;
+    "unreadable" when too few checks came before it."""
     if pr["state"] == "CLOSED": return {"id": c["id"], "outcome": "closed", "moved": False, "result": "closed without merging"}
     if pr["state"] != "MERGED": return None
-    runs, merged_at = c.get("runs") or 7, when(pr["mergedAt"])
+    runs, merged_at, opened = c.get("runs", 7), when(pr["mergedAt"]), when(str(c.get("date")))
     after = [r for r in rs if r["at"] > merged_at]
     valued = [r for r in after if num(r.get("value"))][:runs]
     if len(valued) < runs: return None
-    span = [r for r in after if r["at"] <= valued[-1]["at"]]
-    mean, rate = sum(r["value"] for r in valued) / runs, sum(r["check"] == "pass" for r in span) / len(span)
-    moved = ahead(mean, c["baseline"], c["better"]) and rate >= c["pass_rate_before"]
-    return {"id": c["id"], "outcome": "kept" if moved else "reverted", "moved": moved,
-            "result": f"mean {mean:.4g} vs baseline {c['baseline']:.4g} ({c['better']} is better) over {runs} runs; "
-                      f"checks passed {rate:.0%} vs {c['pass_rate_before']:.0%} before"}
+    before = [r for r in rs if opened and r["at"] < opened]
+    base = [r for r in before if num(r.get("value"))][-runs:]
+    if len(base) < runs: return "unreadable"
+    mean = lambda vs: sum(r["value"] for r in vs) / runs
+    rate = lambda span: sum(r["check"] == "pass" for r in span) / len(span)
+    baseline, now, was = mean(base), rate([r for r in after if r["at"] <= valued[-1]["at"]]), rate([r for r in before if r["at"] >= base[0]["at"]])
+    moved = ahead(mean(valued), baseline, c["better"]) and now >= was
+    return {"id": c["id"], "outcome": "kept" if moved else "reverted", "moved": moved, "baseline": baseline, "pass_rate_before": was,
+            "result": f"mean {mean(valued):.4g} vs baseline {baseline:.4g} ({c['better']} is better) over {runs} runs; "
+                      f"checks passed {now:.0%} vs {was:.0%} before"}
 
 def read():
     today, (first, merged), by = clock().date().isoformat(), history(), checks()
@@ -82,18 +94,23 @@ def read():
     loops = [r["Loop"] for r in tables()[0] if opted_in(r)]
     kpis = [kpi(l, by.get(l, []), first, today) for l in loops if (today, l) not in done]
     unread = [c for c in merged.values() if c.get("outcome") in (None, "pending")]
-    readable = lambda c: name(c.get("pr")) and name(c.get("loop")) and c.get("better") in ("higher", "lower") \
-                         and num(c.get("baseline")) and num(c.get("pass_rate_before"))
-    open_ = [c for c in unread if readable(c)]
-    outcomes = [o for c in open_ for o in [outcome(c, by.get(str(c["loop"]), []))] if o]
+    runs = lambda v: type(v) is int and v > 0
+    readable = lambda c: name(c.get("pr")) and name(c.get("loop")) and c.get("better") in ("higher", "lower") and runs(c.get("runs", 7))
+    outcomes, unreachable, unreadable = [], [], [c["id"] for c in unread if not readable(c)]
+    for c in (c for c in unread if readable(c)):
+        pr = state(c)
+        o = pr and outcome(c, pr, by.get(str(c["loop"]), []))
+        if not pr: unreachable.append(c["id"])
+        elif o == "unreadable": unreadable.append(c["id"])
+        elif o: outcomes.append(o)
     for f, new in ((C["kpi"], kpis), (C["improvements"], outcomes)):
         with open(f, "a") as out: out.writelines(json.dumps({k: v for k, v in r.items() if v is not None}) + "\n" for r in new)
     for o in outcomes: merged[o["id"]] = {**merged[o["id"]], **o}
     hits, n = hit_rate(merged)
     return {"date": today, "kpi": kpis, "outcomes": outcomes,
             "reverts_owed": [c["id"] for c in merged.values() if c.get("outcome") == "reverted" and not c.get("revert_pr")],
-            "open": [c["id"] for c in open_ if c["id"] not in {o["id"] for o in outcomes}],
-            "unreadable": [c["id"] for c in unread if not readable(c)],
+            "open": [c["id"] for c in unread if c["id"] not in unreadable and c["id"] not in {o["id"] for o in outcomes}],
+            "unreadable": unreadable, "unreachable": unreachable,
             "hit_rate": {"hits": hits, "read": n, "stopped": n >= AFTER and hits / n < FLOOR}}
 
 if __name__ == "__main__":
@@ -102,6 +119,7 @@ if __name__ == "__main__":
     for k in r["kpi"]: print(f"kpi {k['loop']}: {k['kpi']}" + (f" ({k['value']} vs {k['bar']})" if "bar" in k else ""))
     for o in r["outcomes"]: print(f"change {o['id']}: {o['outcome']}, {o['result']}")
     h = r["hit_rate"]
-    if r["unreadable"]: print(f"never read, a field is missing: {', '.join(r['unreadable'])}")
+    if r["unreadable"]: print(f"never read (a field is missing, or too few checks before it): {', '.join(r['unreadable'])}")
+    if r["unreachable"]: print(f"gh couldn't read the PR, so not read today: {', '.join(r['unreachable'])}")
     print(f"open changes: {len(r['open'])} · reverts owed: {', '.join(r['reverts_owed']) or 'none'} · hit rate: {h['hits']} of {h['read']}"
           + (" · stopped: below 1 in 3" if h["stopped"] else ""))
