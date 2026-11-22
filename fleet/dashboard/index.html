@@ -2,7 +2,7 @@
 <style>
 /* Control panel, narrow-first: tabs (Overview, Loops, Waiting), one status line, four numbers, short lists that open for detail. */
 .fx [hidden] { display: none !important; }
-.fx { display: grid; gap: var(--cds-gap-md); font-family: var(--font-anthropic-sans); color: var(--color-fg); font-size: var(--cds-font-size-body); }
+.fx { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--cds-gap-md); font-family: var(--font-anthropic-sans); color: var(--color-fg); font-size: var(--cds-font-size-body); }
 .fx-top { display: flex; align-items: center; justify-content: space-between; gap: var(--cds-gap-sm); }
 .fx-top .dash-select { min-width: 0; max-width: 50%; }
 .fx-top h1 { margin: 0; font-family: var(--font-anthropic-serif); font-weight: 600; letter-spacing: -.01em; font-size: var(--cds-font-size-title); }
@@ -12,6 +12,7 @@
 .fx-tab { flex: 1; font: inherit; font-size: var(--cds-font-size-caption); font-weight: var(--cds-font-weight-medium); color: var(--color-fg-muted); background: none; border: 0; border-radius: 7px; padding: 7px 8px; cursor: pointer; display: inline-flex; justify-content: center; align-items: center; gap: 6px; transition: opacity 120ms; }
 .fx-tab[aria-selected="true"] { background: var(--color-bg); color: var(--color-fg); font-weight: 600; box-shadow: 0 1px 3px rgb(0 0 0 / .12), 0 0 0 1px var(--color-border-line); }
 .fx-tab:focus-visible { outline: 2px solid var(--color-fg); outline-offset: 1px; }
+@media (max-width: 359px) { .fx-tab { padding: 7px 3px; gap: 4px; } }
 .fx-badge { min-width: 18px; padding: 0 6px; border-radius: 999px; font-size: 11px; font-weight: 600; line-height: 18px; text-align: center; background: var(--color-fg); color: var(--color-bg); font-variant-numeric: tabular-nums; }
 .fx-badge:empty { display: none; }
 .fx-pane { display: grid; gap: var(--cds-gap-md); min-width: 0; }
@@ -120,7 +121,7 @@ button.fx-kpi:focus-visible { outline: 2px solid var(--color-fg); outline-offset
 
 /* factory: loops, then the loops that check them, then you; lines are Checked by, drawn from the chips' places */
 #factory-card { --sec: var(--fx-c0, var(--color-fg-muted)); overflow: clip; }
-.fx-fbody { padding: 12px; display: grid; gap: 10px; }
+.fx-fbody { padding: 12px; display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; }
 .fx-flayers, .fx-fcols { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr) 54px; column-gap: 18px; }
 @media (min-width: 640px) { .fx-flayers, .fx-fcols { grid-template-columns: minmax(0, 260px) minmax(0, 220px) 104px; column-gap: clamp(48px, 9vw, 150px); justify-content: center; }
   .fx-fcols .fx-fnode { padding: 5px 8px; gap: 6px; } .fx-fcols .fx-fend { padding: 10px 4px; font-size: var(--cds-font-size-caption); } }
@@ -180,8 +181,16 @@ button.fx-kpi:focus-visible { outline: 2px solid var(--color-fg); outline-offset
 .fx-fdoor > b { font-family: var(--font-anthropic-serif); font-size: 1.75rem; line-height: 1; font-weight: 600; color: var(--tone); font-variant-numeric: tabular-nums; }
 .fx-fdoor > span { display: grid; gap: 1px; font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); }
 .fx-fdoor strong { color: var(--color-fg); font-size: var(--cds-font-size-body); font-weight: 600; }
-.fx-ltog { all: unset; box-sizing: border-box; display: inline-flex; align-items: center; gap: 5px; padding: 3px 8px; border-radius: 999px; border: 1px solid var(--color-border-line); cursor: pointer; color: var(--color-fg); }
-.fx-ltog[aria-pressed="false"] { color: var(--color-fg-muted); text-decoration: line-through; opacity: .7; }
+.fx-fview { display: flex; gap: 4px; overflow-x: auto; scrollbar-width: none; }
+.fx-ltog { all: unset; box-sizing: border-box; flex: 1 1 auto; justify-content: center; white-space: nowrap; display: inline-flex; align-items: center; gap: 5px; padding: 5px 8px; border-radius: 999px; border: 1px solid var(--color-border-line); cursor: pointer; font-size: var(--cds-font-size-caption); font-weight: var(--cds-font-weight-medium); color: var(--color-fg-muted); }
+.fx-ltog i { display: inline-block; width: 14px; border-top: 1.5px solid var(--color-fg-muted); }
+.fx-ltog i.sup { border-top: 2px dashed var(--fx-c4, var(--color-fg)); }
+.fx-ltog i.esc { border-top: 3px solid var(--color-warn); }
+.fx-ltog[aria-pressed="true"] { color: var(--color-fg); background: color-mix(in srgb, var(--color-fg) 8%, var(--color-bg)); border-color: color-mix(in srgb, var(--color-fg) 35%, transparent); }
+.fx-ltog[data-problems][aria-pressed="true"] { color: var(--color-bad); border-color: color-mix(in srgb, var(--color-bad) 50%, transparent); background: color-mix(in srgb, var(--color-bad) 8%, var(--color-bg)); }
+.fx-ltog:hover { color: var(--color-fg); }
+@media (max-width: 419px) { .fx-ltog i { display: none; } }
+@media (max-width: 359px) { .fx-ltog { padding: 5px 4px; font-size: 11px; } }
 .fx-ltog:focus-visible { outline: 2px solid var(--color-fg); outline-offset: 1px; }
 .fx-fnode.sel { box-shadow: 0 0 0 2px var(--color-fg); }
 .fx-fdetail { position: sticky; bottom: 0; z-index: 2; pointer-events: none; margin-top: 12px; padding: 10px 12px; border: 1px solid var(--color-border-line); border-radius: 8px; background: var(--color-bg); box-shadow: 0 -2px 12px rgb(0 0 0 / .12); display: grid; gap: 4px; font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); min-height: 3.2em; }
@@ -256,6 +265,12 @@ button.fx-kpi:focus-visible { outline: 2px solid var(--color-fg); outline-offset
       <div class="fx-fbody">
         <p class="fx-fdoor" data-draw="factory-door" data-source="loops">—</p>
         <p class="fx-muted">Loops check each other's output, supervisors set their Orders, and anything that needs a person climbs to the master before it reaches you. Tap a loop to trace it, or You to see every path in.</p>
+        <div class="fx-fview" role="group" aria-label="Show">
+          <button type="button" class="fx-ltog" data-layer="check"><i></i>Checks</button>
+          <button type="button" class="fx-ltog" data-layer="sup" id="legend-sup" hidden><i class="sup"></i>Supervises</button>
+          <button type="button" class="fx-ltog" data-layer="esc"><i class="esc"></i>Escalates</button>
+          <button type="button" class="fx-ltog" data-problems>Problems</button>
+        </div>
         <div class="fx-flayers" aria-hidden="true"><span>Loops</span><span>Checked by</span><span>To you</span></div>
         <div class="fx-factory" id="factory-graph" data-draw="factory" data-source="loops"></div>
       </div>
@@ -264,9 +279,9 @@ button.fx-kpi:focus-visible { outline: 2px solid var(--color-fg); outline-offset
         <span><span class="fx-dot" data-tone="warn"></span>Needs a look</span>
         <span><span class="fx-dot" data-tone="bad"></span>Failing or silent</span>
         <span><span class="fx-dot" data-tone="none"></span>Not run yet or paused</span>
-        <button type="button" class="fx-ltog" data-layer="check"><i></i>Checks</button>
-        <button type="button" class="fx-ltog" data-layer="sup" id="legend-sup" hidden><i class="sup"></i>Supervises</button>
-        <button type="button" class="fx-ltog" data-layer="esc"><i class="esc"></i>Escalates</button>
+        <span><i></i>Checks</span>
+        <span><i class="sup"></i>Supervises</span>
+        <span><i class="esc"></i>Escalates</span>
         <span id="legend-glass" hidden><i class="glass"></i>Break-glass</span>
         <span><i class="gap"></i>Nobody reads it</span>
       </div>
@@ -609,9 +624,10 @@ dash.draw('svc-count', (e) => {
    a supervisor writes a loop's Orders. Escalates: where a loop sends what needs a person, ending at you through the
    master (the last column), or straight to you from the break-glass list. The page's scope picks the loops, and every
    loop their links reach comes too, so each chain stays whole. */
-const factoryGraph = (rows) => {
+const problem = (r) => ['failing', 'silent', 'chronic', 'no check'].includes(r.status) || !r.checked_by || !!(r.supervisor_issue || r.escalation_issue);
+const factoryGraph = (rows, problems) => {
   const all = new Map(rows.filter((r) => !NOT_LOOP.includes(r.project)).map((r) => [r.loop, r]));
-  const mine = scoped([...all.values()]), loops = [...mine], keep = new Set(loops.map((r) => r.loop));
+  const mine = scoped([...all.values()]).filter((r) => !problems || problem(r)), loops = [...mine], keep = new Set(loops.map((r) => r.loop));
   for (let k = 0; k < loops.length; k++) [...checkers(loops[k]), loops[k].supervisor, loops[k].escalates_to].forEach((c) => { if (all.has(c) && !keep.has(c)) { keep.add(c); loops.push(all.get(c)); } });
   const nodes = new Map(loops.map((r) => [r.loop, {id: r.loop, kind: 'loop', row: r, glass: r.break_glass}]));
   const node = (id) => {
@@ -629,7 +645,7 @@ const factoryGraph = (rows) => {
     esc(r.loop, r.escalates_to, !r.escalates_default, !!r.break_glass && r.escalates_to === 'you');
     if (r.break_glass && r.escalates_to !== 'you') esc(r.loop, 'you', true, true);
   });
-  scoped(rows.filter((r) => r.project === 'Service' && r.break_glass)).forEach((r) => { node(r.loop).glass = r.break_glass; esc(r.loop, 'you', true, true); });
+  scoped(rows.filter((r) => r.project === 'Service' && r.break_glass && !problems)).forEach((r) => { node(r.loop).glass = r.break_glass; esc(r.loop, 'you', true, true); });
   const outs = (id) => edges.filter((e) => e.from === id), ins = (id) => edges.filter((e) => e.to === id);
   const master = (n) => n.kind === 'loop' && n.row.role === 'master';
   nodes.forEach((n) => { n.col = ['you', 'nobody'].includes(n.kind) || master(n) ? 'ends' : n.kind === 'ext' || ins(n.id).length ? 'checkers' : 'workers'; });
@@ -672,16 +688,26 @@ const factoryGraph = (rows) => {
 };
 const fname = (n) => n.kind === 'loop' ? nameOf(n.row) : n.kind === 'you' ? 'You' : n.kind === 'nobody' ? 'Nobody' : n.id;
 const fcurve = (x1, y1, x2, y2) => { const m = (x1 + x2) / 2; return `M${x1},${y1}C${m},${y1} ${m},${y2} ${x2},${y2}`; };
-const LAYERS = ['check', 'sup', 'esc'];
-FX.hide = FX.hide || new Set();
-document.querySelectorAll('.fx-ltog').forEach((b) => {
+/* what the graph shows, remembered per viewer in this browser: the kinds of line, and problems only. The default is
+   escalations alone, the one question the tab answers first: what can reach you */
+const LAYERS = ['check', 'sup', 'esc'], VIEW = 'fx-factory-view';
+if (!FX.hide) {
+  let v = null; try { v = JSON.parse(localStorage.getItem(VIEW)); } catch (e) { /* storage blocked: the default stands */ }
+  FX.hide = new Set(v ? v.hide : ['check', 'sup']); FX.problems = !!(v && v.problems);
+}
+const saveView = () => { try { localStorage.setItem(VIEW, JSON.stringify({hide: [...FX.hide], problems: FX.problems})); } catch (e) { /* not remembered */ } };
+document.querySelectorAll('.fx-ltog[data-layer]').forEach((b) => {
   b.setAttribute('aria-pressed', String(!FX.hide.has(b.dataset.layer)));
   b.onclick = () => {
     const k = b.dataset.layer, off = !FX.hide.has(k);
     if (off) FX.hide.add(k); else FX.hide.delete(k);
-    b.setAttribute('aria-pressed', String(!off));
+    b.setAttribute('aria-pressed', String(!off)); saveView();
     document.querySelectorAll('#factory-graph').forEach((g) => g.classList.toggle('hide-' + k, off));
   };
+});
+document.querySelectorAll('.fx-ltog[data-problems]').forEach((b) => {
+  b.setAttribute('aria-pressed', String(FX.problems));
+  b.onclick = () => { FX.problems = !FX.problems; b.setAttribute('aria-pressed', String(FX.problems)); saveView(); dash.draw('factory'); };
 });
 
 dash.draw('factory-count', (e) => {
@@ -708,8 +734,8 @@ dash.draw('factory', (box) => {
   box.replaceChildren(); box.classList.remove('trace');
   LAYERS.forEach((k) => box.classList.toggle('hide-' + k, FX.hide.has(k)));
   if (l.status !== 'ok') return failed(box, 'loop list', l.status);
-  const g = factoryGraph(l.data);
-  if (!g.nodes.size) { box.append(el('div', 'fx-empty', 'No loops yet.')); return; }
+  const g = factoryGraph(l.data, FX.problems);
+  if (!g.nodes.size) { box.append(el('div', 'fx-empty', FX.problems ? 'No loop is failing, silent, unchecked or unread.' : 'No loops yet.')); return; }
   const cols = el('div', 'fx-fcols'), chips = new Map(), frames = new Map();
   const col = {workers: el('div', 'fx-fcol workers'), checkers: el('div', 'fx-fcol checkers'), ends: el('div', 'fx-fcol ends')};
   const chip = (n) => {
