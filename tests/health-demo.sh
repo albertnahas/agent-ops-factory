@@ -7,12 +7,13 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 export AGENT_OPS_DIR=${1:-$(mktemp -d)}
 D=$AGENT_OPS_DIR
-mkdir -p "$D/bin" "$D/agents" "$D/launchctl" "$D/logs" "$D/fleet"
+mkdir -p "$D/bin" "$D/agents" "$D/logs" "$D/fleet"
+printf 'PID\tStatus\tLabel\n' > "$D/launchctl.txt"  # `launchctl list`: each loaded job's PID, last exit code and label
 echo "{\"launch_agents\": \"$D/agents\", \"refresh\": \"Demo data\"}" > "$D/fleet.json"
 
 cat > "$D/bin/launchctl" <<EOF
 #!/usr/bin/env bash
-[ "\$1" = list ] && [ -f "$D/launchctl/\$2" ] && cat "$D/launchctl/\$2"
+[ "\$1" = list ] && cat "$D/launchctl.txt"
 EOF
 cat > "$D/bin/crontab" <<EOF
 #!/usr/bin/env bash
@@ -45,8 +46,8 @@ for j in "${jobs[@]}"; do
 EOF
   case $code in
     none) ;;
-    run) printf '{\n\t"PID" = 4242;\n\t"LastExitStatus" = 0;\n};\n' > "$D/launchctl/$label" ;;
-    *) printf '{\n\t"LastExitStatus" = %s;\n};\n' "$code" > "$D/launchctl/$label" ;;
+    run) printf '4242\t0\t%s\n' "$label" >> "$D/launchctl.txt" ;;
+    *) printf -- '-\t%s\t%s\n' "$code" "$label" >> "$D/launchctl.txt" ;;
   esac
 done
 cat > "$D/agents/com.vendor.updater.plist" <<EOF
@@ -54,7 +55,7 @@ cat > "$D/agents/com.vendor.updater.plist" <<EOF
 <plist version="1.0"><dict><key>Label</key><string>com.vendor.updater</string>
 <key>ProgramArguments</key><array><string>/Applications/Vendor.app/Contents/MacOS/updater</string></array><key>StartInterval</key><integer>3600</integer></dict></plist>
 EOF
-printf '{\n\t"LastExitStatus" = 0;\n};\n' > "$D/launchctl/com.vendor.updater"
+printf -- '-\t0\tcom.vendor.updater\n' >> "$D/launchctl.txt"
 
 : > "$D/logs/backup.log"; ago "$D/logs/backup.log" 2
 : > "$D/logs/notes-digest.log"; ago "$D/logs/notes-digest.log" $digest
