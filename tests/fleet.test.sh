@@ -49,6 +49,12 @@ EOF
   echo "{\"loop\":\"stray\",\"date\":\"$(day 1)\",\"subtype\":\"success\"}"
   printf 'not json\n{}\n'
 } > "$AGENT_OPS_DIR/runs.jsonl"
+{
+  echo '{"id":"c1","date":"2026-11-01","loop":"broken","pr":"https://github.com/o/r/pull/1","change":"Retry the fetch","trace":["https://x/run/1","runs.jsonl:12"],"metric":"pass rate","read_date":"2026-11-15"}'
+  echo '{"id":"c2","date":"2026-11-08","loop":"good","change":"Shorter prompt","outcome":"pending"}'
+  echo '{"id":"c1","outcome":"kept","moved":true,"result":"pass rate 60% to 90%"}'
+  printf 'not json\n{"id":"orphan"}\n'
+} > "$AGENT_OPS_DIR/improvements.jsonl"
 echo "{\"at\":\"$(date +%FT%T%z | sed 's/\(..\)$/:\1/')\",\"routines\":[$(for r in good broken flaky fresh reader-job lonely watched; do printf '{"name":"%s","enabled":true,"cron":"0 6 * * *","next_run_at":null,"last_status":null,"last_finished_at":null},' $r; done | sed 's/,$//')],\"tasks\":[]}" > "$AGENT_OPS_DIR/fleet/cloud.json"
 
 echo "{\"launch_agents\": \"$AGENT_OPS_DIR/none\", \"general\": [\"blog\"], \"waiting\": {\"queue\": {\"path\": \"$AGENT_OPS_DIR/QUEUE.md\", \"owner\": \"You\"}}}" > "$AGENT_OPS_DIR/fleet.json"
@@ -63,6 +69,9 @@ expect "never run is not run yet"              "[ \"\$(status fresh)\" = 'no run
 expect "a ledger name with no row is unregistered" "[ \"\$(status stray)\" = unregistered ]"
 expect "checked by is a comma list"            "jq -e '.rows[] | select(.loop == \"broken\") | .checked_by == \"good, heartbeat\"' $L >/dev/null"
 expect "every cell is a scalar, as on claude.ai" "jq -se 'all(.[].rows[][]; type != \"array\" and type != \"object\")' $L $AGENT_OPS_DIR/fleet/waiting.json >/dev/null"
+C=$AGENT_OPS_DIR/fleet/changes.json
+expect "the improver's history: one row a change, the last line for an id wins, newest first" "jq -e '[.rows[] | [.id, .outcome, .moved, .result]] == [[\"c2\", \"pending\", null, null], [\"c1\", \"kept\", true, \"pass rate 60% to 90%\"]]' $C >/dev/null"
+expect "a change's trace is one link a line, every cell a scalar" "jq -e '(.rows[] | select(.id == \"c1\") | .trace == \"https://x/run/1\\nruns.jsonl:12\") and all(.rows[][]; type != \"array\" and type != \"object\")' $C >/dev/null"
 expect "checked by resolves jobs and you, once each" "jq -e '.rows[] | select(.loop == \"reader\") | .checked_by == \"good, you, flaky, reader\"' $L >/dev/null"
 expect "a service's job names the service"   "jq -e '.rows[] | select(.loop == \"watched\") | .checked_by == \"Build\"' $L >/dev/null"
 sup() { jq -r --arg l "$1" '.rows[] | select(.loop == $l) | "\(.supervisor) | \(.supervisor_issue)"' "$L"; }
@@ -316,8 +325,8 @@ expect "a blank Decision line leaves the memo's decisions open" "[ \"\$(python3 
 mk sync; build; python3 - "$O/fleet" <<'P'
 import datetime as dt, hashlib, json, os, sys
 d = sys.argv[1]; t = int(dt.datetime.now().timestamp())
-for f in ("loops.json", "waiting.json"): os.utime(f"{d}/{f}", (t + .5, t + .5))
-json.dump({"at": dt.datetime.fromtimestamp(t).isoformat(), "blobs": {"loops": 1, "waiting": 1},
+for f in ("loops.json", "waiting.json", "changes.json"): os.utime(f"{d}/{f}", (t + .5, t + .5))
+json.dump({"at": dt.datetime.fromtimestamp(t).isoformat(), "blobs": {"loops": 1, "waiting": 1, "changes": 1},
            "page": hashlib.sha256(open("fleet/dashboard/index.html", "rb").read()).hexdigest()}, open(f"{d}/receipt.json", "w"))
 json.dump({"at": dt.datetime.fromtimestamp(t).astimezone().isoformat(), "routines": [], "tasks": []}, open(f"{d}/cloud.json", "w"))
 P

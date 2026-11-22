@@ -17,6 +17,7 @@ It works with nothing set up. With no registry it lists every job it finds with 
 | `runs.jsonl` | last run, pass rate, cost, the last 10 outcomes | once loops run through `claude-run` and `ops-check` |
 | `checks/<loop>.py` | an outcome for loops that write no ledger line, like cloud routines | per loop |
 | `fleet/cloud.json` | Claude Code cloud routines and desktop-app tasks: schedule, next and last run | only with the claude.ai sync (`SYNC.md`) |
+| `improvements.jsonl` | the improver's history: each change it made to a loop, what it read, the metric it should move and whether it did | once an improver runs |
 | GitHub, a queue file, decision memos | what waits on you: PRs with your label, owner-you queue lines, open decisions in your repos' `docs/` | optional, `waiting` in `fleet.json` |
 
 Without a ledger, a launchd loop's last exit and the time its log file last changed stand in for its last run, so a fleet you haven't instrumented still shows what failed.
@@ -48,6 +49,10 @@ Open a loop, in the lists or by tapping it on the Factory tab, and the buttons u
 - Orders are the first `orders/<name>.md` the charter names that sits beside it. The latest report is the newest dated file in the folder the charter's report section names (a heading with "report" in it, then a path like `docs/ops-reports/YYYY-MM-DD.md`).
 - A file on its repo's default branch on GitHub links to its page there, read from that branch, so a stale clone or an uncommitted file doesn't count. Any other file shows its path, and the button copies it: a claude.ai page can only link to web addresses.
 - A cloud routine's page needs its id in `cloud.json`, which the claude.ai sync (`SYNC.md`) writes.
+
+## Improver history
+
+Every change an improver makes to a loop is a PR, and each also gets one line in `improvements.jsonl`, next to the run ledger and append-only. The line written when the PR opens holds `id`, `date`, `loop`, `pr` (its link), `change` (one line), `trace` (links to the runs or ledger lines it read, never copied text), `hypothesis`, `metric`, `baseline`, `replay_before` and `replay_after` when a replay proves it, and `read_date`. At the read date one more line with the same `id` adds `outcome` (`kept`, `reverted`, or `closed` for a PR that never merged), `moved` (true or false), `result` and, for a revert, `revert_pr`; later fields win. A loop's panel lists its changes, and the Factory tab's Improver card lists them all with the hit rate: of the merged changes that were read, the share kept that moved their metric. The card shows only once there is a change. The improver's own runs log a ledger line like any loop's, so the heartbeat watches it.
 
 ## Config
 

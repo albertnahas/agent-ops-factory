@@ -1,6 +1,7 @@
 // Opens a built dashboard.html in headless Chromium at phone width and prints one JSON line: how long the page takes to
 // load, open the Factory tab, show its Checks lines and switch scope, what the page threw, and what each tab shows.
-// Usage: node tests/dashboard.check.mjs <dashboard.html> [scope]   Exits 2 when Playwright is missing (set PLAYWRIGHT to
+// Usage: node tests/dashboard.check.mjs <dashboard.html> [scope]   SHOTS=<dir> also saves phone-width screenshots of a loop's
+// change history and the Improver card there.   Exits 2 when Playwright is missing (set PLAYWRIGHT to
 // its index.mjs if it isn't installed where node finds it).
 const pw = await import(process.env.PLAYWRIGHT || 'playwright').catch(() => null);
 if (!pw) { console.error('playwright not found'); process.exit(2); }
@@ -29,6 +30,12 @@ const loops = await page.evaluate(() => ({
     return count.getBoundingClientRect().left >= s.querySelector('bdi').getBoundingClientRect().right - 1;
   }),
 }));
+const withChanges = page.locator('#loop-groups .fx-row', {has: page.locator('bdi', {hasText: /^shop1$/})});
+if (await withChanges.count()) {
+  await withChanges.first().click(); await frames();
+  loops.changes = await page.evaluate(() => document.querySelectorAll('#loop-groups .fx-more:not([hidden]) .fx-changes li').length);
+  if (process.env.SHOTS) await withChanges.first().locator('xpath=..').screenshot({path: process.env.SHOTS + '/loop-changes.png'});
+}
 loops.firstCardAll = await page.locator('#loop-groups .fx-card:first-child .fx-all button').click({timeout: 1000})
   .then(() => page.evaluate(() => document.querySelectorAll('#loop-groups .fx-card:first-child .fx-row').length), () => null);
 await page.click('#tab-waiting'); await frames();
@@ -53,6 +60,12 @@ if (factory.picks.length) {
   await page.click('#factory-graph .fx-btn'); await frames();
   factory.picked = await page.evaluate(() => document.querySelectorAll('#factory-graph .fx-fnode[data-tone]').length);
 }
+const improver = {scope, hidden: await page.locator('#improver').isHidden(), rows: await page.locator('#improver .fx-row').count(), rate: await page.textContent('[data-draw="improver-rate"]')};
+if (improver.rows) {
+  await page.locator('#improver .fx-row').first().click(); await frames();
+  improver.detail = await page.evaluate(() => /Why: .*Replay: /s.test(document.querySelector('#improver .fx-more:not([hidden])')?.textContent || ''));
+  if (process.env.SHOTS) await page.locator('#improver').screenshot({path: process.env.SHOTS + '/improver.png'});
+}
 ms.overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
 await browser.close();
-console.log(JSON.stringify({ms, errors, attention, factory, loops, waiting: {...waiting, invalid: /Invalid Date|NaN/.test(waiting.text), text: undefined}}));
+console.log(JSON.stringify({ms, errors, attention, factory, loops, improver, waiting: {...waiting, invalid: /Invalid Date|NaN/.test(waiting.text), text: undefined}}));

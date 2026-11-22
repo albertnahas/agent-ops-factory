@@ -35,7 +35,14 @@ loops["rows"] += [{**row, "loop": n, "project": p, "scope": p, "checked_by": c} 
 item = {"title": "Pick a price", "tag": "Decision", "source": "Queue", "kind": "Queue", "item": "Pick a price", "action": "decide",
         "where": "queue (decision)", "link": None, "since": None, "project": "", "scope": "General"}
 waiting["rows"] = [{**item, "title": f"due {d}", "due": d} for d in ("tomorrow", "2026-13-45", "99999-01-01", "", None, "2026-11-01", "2099-01-01")]
-html(loops["rows"], waiting["rows"], loops["meta"], "Loop fleet")
+scope = {r["loop"]: r["scope"] for r in loops["rows"]}
+change = lambda i, loop, **k: {"id": f"c{i}", "date": f"2026-11-0{i}", "loop": loop, "scope": scope[loop], "pr": f"https://github.com/o/r/pull/{i}",
+                               "change": f"Change {i} to {loop}", "trace": "https://example.com/run/1\nruns.jsonl:12", "hypothesis": "the fetch times out",
+                               "metric": "pass rate", "baseline": "60%", "replay_before": 0.66, "replay_after": 0.75, "read_date": "2099-01-01",
+                               "outcome": "pending", "moved": None, "result": None, "revert_pr": None, **k}
+changes = [change(5, "shop1", outcome="closed"), change(4, "ops-a", outcome="kept", moved=False), change(3, "shop1"), change(2, "shop1", outcome="reverted", revert_pr="https://github.com/o/r/pull/9"),
+           change(1, "shop1", outcome="kept", moved=True, result="pass rate 90%")]
+html(loops["rows"], waiting["rows"], loops["meta"], "Loop fleet", changes)
 EOF
 cp "$AGENT_OPS_DIR/fleet/dashboard.html" "$AGENT_OPS_DIR/odd.html"
 # a fleet of 70: Shop has 30 loops, 22 of them failing, and Blog 40 healthy ones
@@ -68,6 +75,9 @@ expect "a loop named you or nobody leaves one You and one Nobody" "q odd '.facto
 expect "the scoped count counts the loops it draws"  "q odd '.factory as \$f | \$f.count | startswith(\"\(\$f.loops) loops\")'"
 expect "a right-to-left name keeps its count after it" "q odd '.loops.countsAfterNames'"
 expect "every waiting item is listed, dated or not"  "q odd '.waiting.badge == 7 and .waiting.rows == 7 and (.waiting.invalid | not)'"
+expect "a loop's panel lists its changes"              "q odd '.loops.changes == 4'"
+expect "the Improver card lists the scope's changes and its hit rate" "q odd '.improver.rows == (if .improver.scope == \"Shop\" then 4 else 5 end) and (.improver.rate | startswith(\"1 of 2 moved their metric\")) and .improver.detail'"
+expect "a fleet with no changes shows no Improver card" "q clique '.improver.rows == 0 and .improver.hidden'"
 expect "nothing is wider than the phone"             "q odd '.ms.overflow == 0'"
 expect "a long project name keeps its loop count in view" "q odd '.loops.countsVisible'"
 expect "a project card shows 25 loops, then See all opens the rest in place" "q big '.loops.firstCard == 25 and .loops.firstCardAll == 30'"

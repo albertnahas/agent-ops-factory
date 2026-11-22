@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Outcome check for SYNC.md: the receipt names two uploads, is no older than the data files fleet.py wrote (so the
+"""Outcome check for SYNC.md: the receipt names the three uploads, is no older than the data files fleet.py wrote (so the
 dashboard shows what the builder holds), carries the page it published, and the cloud snapshot was taken in the same run."""
 import hashlib, json, sys
 from pathlib import Path
@@ -12,9 +12,10 @@ snap = json.loads((D / "cloud.json").read_text()) if (D / "cloud.json").exists()
 at = (t := when(rec.get("at"))) and t.timestamp() or 0
 page = hashlib.sha256((Path(__file__).resolve().parent / "dashboard/index.html").read_bytes()).hexdigest()
 bad = []
-if set(rec.get("blobs", {})) != {"loops", "waiting"}: bad.append("receipt lacks the two uploads")
-if at < int(max((D / f).stat().st_mtime for f in ("loops.json", "waiting.json"))): bad.append("data files changed after the last upload")
-if any(isinstance(v, (list, dict)) for f in ("loops", "waiting") for r in json.loads((D / f"{f}.json").read_text())["rows"] for v in r.values()):
+DATA = ("loops", "waiting", "changes")
+if set(rec.get("blobs", {})) != set(DATA): bad.append("receipt lacks the three uploads")
+if at < int(max((D / f"{f}.json").stat().st_mtime for f in DATA)): bad.append("data files changed after the last upload")
+if any(isinstance(v, (list, dict)) for f in DATA for r in json.loads((D / f"{f}.json").read_text())["rows"] for v in r.values()):
     bad.append("a data file has a cell that isn't a scalar, which claude.ai can't draw")
 if rec.get("page") != page: bad.append("the dashboard runs an older page than the kit's")
 if not (t := when(snap.get("at"))) or abs(at - t.timestamp()) > 3600:

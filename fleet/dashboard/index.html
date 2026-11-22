@@ -89,6 +89,9 @@ button.fx-kpi:focus-visible { outline: 2px solid var(--color-fg); outline-offset
 .fx-more p { margin: 0; max-width: 70ch; overflow-wrap: anywhere; }
 .fx-more b { color: var(--color-fg); font-weight: var(--cds-font-weight-medium); }
 .fx-acts { display: flex; flex-wrap: wrap; gap: 6px; }
+.fx-changes { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.fx-changes li { display: grid; grid-template-columns: 8px minmax(0, 1fr) auto; align-items: center; column-gap: 8px; }
+.fx-changes a { color: var(--color-fg); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .fx-btn { display: inline-flex; align-items: center; gap: 6px; font: inherit; font-size: var(--cds-font-size-caption); color: var(--color-fg); background: var(--color-panel); border: 1px solid var(--color-border-line); border-radius: 6px; padding: 5px 10px; cursor: pointer; text-decoration: none; transition: opacity 120ms; }
 .fx-btn:hover { opacity: .8; }
 .fx-btn:focus-visible { outline: 2px solid var(--color-fg); outline-offset: 1px; }
@@ -246,7 +249,7 @@ button.fx-kpi:focus-visible { outline: 2px solid var(--color-fg); outline-offset
     <div class="fx-cols">
       <section class="fx-card" id="attention">
         <header><h2>Needs a look</h2></header>
-        <div data-draw="attn-list" data-source="loops"></div>
+        <div data-draw="attn-list" data-source="loops changes"></div>
       </section>
       <section class="fx-card" id="next-up">
         <header><h2>Next up for you</h2><button type="button" class="fx-link" data-go="waiting">See all</button></header>
@@ -260,7 +263,7 @@ button.fx-kpi:focus-visible { outline: 2px solid var(--color-fg); outline-offset
       <span class="fx-muted" data-draw="loop-count">—</span>
       <select class="dash-select" id="loop-filter" data-draw="loop-filter" aria-label="Show loops" data-source="loops"></select>
     </div>
-    <div class="fx-grid" id="loop-groups" data-draw="loop-list" data-source="loops"></div>
+    <div class="fx-grid" id="loop-groups" data-draw="loop-list" data-source="loops changes"></div>
     <section class="fx-card" id="services">
       <header><h2>Services and one-off jobs</h2><span class="fx-muted" data-draw="svc-count">—</span></header>
       <ul class="fx-list fx-two" data-draw="svc-list" data-source="loops"></ul>
@@ -294,6 +297,10 @@ button.fx-kpi:focus-visible { outline: 2px solid var(--color-fg); outline-offset
         <span id="legend-glass" hidden><i class="glass"></i>Break-glass</span>
         <span><i class="gap"></i>Nobody reads it</span>
       </div>
+    </section>
+    <section class="fx-card" id="improver" data-sec="c1" hidden>
+      <header><h2>Improver</h2><span class="fx-muted" data-draw="improver-rate" data-source="changes">—</span></header>
+      <ul class="fx-list" data-draw="improver-list" data-source="changes"></ul>
     </section>
   </section>
 
@@ -491,10 +498,46 @@ const loopActs = (r) => {
   acts.append(copyBtn(retirePrompt(r), 'Copy retire prompt'));
   return acts.childElementCount ? acts : null;
 };
+/* the improver's changes, from improvements.jsonl: each is a PR to one loop with the metric it should move by a read
+   date. Of the merged changes that were read, kept and moved is a hit; kept and flat, or reverted, is a miss. Pending
+   is not read yet, and closed never merged, so neither counts. */
+const changesOf = (loop) => { const c = dash.data('changes'); return c.status === 'ok' ? c.data.filter((x) => loop == null || x.loop === loop) : null; };
+const OUTCOME = (c) => c.outcome === 'reverted' ? ['bad', 'Reverted'] : c.outcome === 'pending' ? ['none', 'Pending'] : c.outcome === 'closed' ? ['none', 'Closed']
+  : c.moved === true ? ['ok', 'Moved'] : c.moved === false ? ['warn', 'Kept, flat'] : ['none', c.outcome];
+const hitRate = (rows) => { const read = rows.filter((c) => ['kept', 'reverted'].includes(c.outcome)); return [read.filter((c) => c.outcome === 'kept' && c.moved === true).length, read.length]; };
+const changeDetail = (c) => (more) => {
+  [['Why', c.hypothesis], ['Metric', c.metric], ['Baseline', c.baseline],
+    ['Replay', c.replay_before != null || c.replay_after != null ? (c.replay_before ?? '—') + ' before, ' + (c.replay_after ?? '—') + ' after' : null],
+    ['Read on', c.read_date], ['Result', c.result]]
+    .filter(([, v]) => v != null && v !== '').forEach(([k, v]) => { const p = el('p'); p.append(el('b', '', k + ': '), document.createTextNode(String(v))); more.append(p); });
+  const acts = el('div', 'fx-acts');
+  [[c.pr, 'Open PR'], [c.revert_pr, 'Revert PR']].forEach(([u, t]) => { const a = linkBtn(u, t); if (a) acts.append(a); });
+  if (acts.childElementCount) more.append(acts);
+  const trace = String(c.trace || '').split('\n').filter(Boolean);
+  if (trace.length) {
+    const row = el('div', 'fx-acts fx-defs');
+    row.append(el('span', 'k', 'Trace read'), ...trace.map((t, i) => linkBtn(t, 'Trace ' + (i + 1)) || el('code', '', t)));
+    more.append(row);
+  }
+};
+const loopChanges = (r) => {
+  const rows = changesOf(r.loop);
+  if (!rows || !rows.length) return null;
+  const box = el('div'), ul = el('ul', 'fx-changes');
+  rows.forEach((c) => {
+    const [tone, label] = OUTCOME(c), li = el('li'), a = el(/^https?:\/\//.test(c.pr || '') ? 'a' : 'span', '', c.change || c.id);
+    if (a.tagName === 'A') { a.href = c.pr; a.target = '_blank'; a.rel = 'noopener'; }
+    li.append(dot(tone, label), a, el('span', '', label + (c.date ? ' · ' + dayMonth(c.date) : '')));
+    ul.append(li);
+  });
+  box.append(el('b', '', 'Changes by the improver'), ul);
+  return box;
+};
 const loopMore = (r) => (more) => {
   if (r.detail) { const p = el('p'); p.append(el('b', '', 'Last result: '), document.createTextNode(r.detail)); more.append(p); }
   more.append(el('p', '', [LABEL[r.status], r.schedule, r.job && r.job !== r.loop && r.job, r.checks && r.checks + ' checks passed',
     r.cost != null ? '$' + r.cost.toLocaleString('en', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + ' in 30 days' : ledger() && /cloud|db|app/.test(r.runtime || '') ? 'cost not metered' : null].filter(Boolean).join(' · ')));
+  const changes = loopChanges(r); if (changes) more.append(changes);
   const defs = defsRow(r); if (defs) more.append(defs);
   const acts = loopActs(r); if (acts) more.append(acts);
 };
@@ -934,6 +977,23 @@ dash.draw('factory', (box) => {
   box.onclick = () => { FX.fsel = null; trace(null, true); };
   if (!g.nodes.has(FX.fsel)) FX.fsel = null;
   trace(FX.fsel, true);
+});
+
+/* the improver's history: every change, newest first, and its hit rate, the share of read changes that moved their metric */
+dash.draw('improver-rate', (e) => {
+  const rows = changesOf(); if (!rows) { e.textContent = '—'; return; }
+  const mine = scoped(rows), [hits, read] = hitRate(mine), open = mine.filter((c) => c.outcome === 'pending').length;
+  e.textContent = read ? hits + ' of ' + read + ' moved their metric' + (open ? ' · ' + open + ' pending' : '') : open ? open + ' pending, none read yet' : '';
+});
+dash.draw('improver-list', (ul) => {
+  /* a fleet with no improver, or none of its changes in the picked project, shows no card */
+  const c = dash.data('changes'), rows = c.status === 'ok' ? scoped(c.data) : [];
+  ul.replaceChildren(); document.getElementById('improver').hidden = !rows.length;
+  capped(ul, rows, 12, 'improver', (x) => {
+    const [tone, label] = OUTCOME(x), right = el('span', 'r');
+    right.append(el('span', '', x.outcome === 'pending' && x.read_date ? 'read ' + rel(x.read_date) : label));
+    return expandRow('c:' + x.id, [dot(tone, label), titleCell(x.change || x.id, [nameOf(x), x.metric].filter(Boolean).join(' · ')), right], changeDetail(x), tone === 'bad' ? 'bad' : null);
+  });
 });
 
 /* waiting tab */
