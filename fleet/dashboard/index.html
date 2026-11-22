@@ -117,6 +117,8 @@ button.fx-kpi:focus-visible { outline: 2px solid var(--color-fg); outline-offset
 .fx-bar { display: flex; align-items: center; justify-content: space-between; gap: var(--cds-gap-sm); padding: 10px 14px; border-bottom: 1px solid var(--color-border-line); }
 .fx-bar .dash-select { min-width: 0; max-width: 60%; }
 .fx-toolbar { border: 1px solid var(--color-border-line); border-radius: var(--cds-radius); background: var(--color-bg); }
+.fx-group > span:first-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fx-group > span + span { flex: none; }
 .fx-group small { font-weight: 400; text-transform: none; letter-spacing: 0; color: var(--color-fg-muted); margin-left: 8px; }
 
 /* factory: loops, then the loops that check them, then you; lines are Checked by, drawn from the chips' places */
@@ -305,7 +307,9 @@ const URGENT = ['failing', 'silent', 'unregistered', 'chronic', 'stale'];
 const GAPS = ['no check', 'no runs yet', 'no record'];
 /* the project picked at the top: every count, list and tab shows its rows only; '' is all of them */
 const scoped = (rows, {project} = dash.params()) => rows.filter((r) => !project || r.scope === project);
-const checkers = (r) => r.checked_by ? r.checked_by.split(', ') : [];
+/* the graph's two ends aren't names, so a loop called you or nobody stays a loop; a cell that says you means you */
+const YOU = '\0you', NOBODY = '\0nobody', person = (c) => c === 'you' ? YOU : c;
+const checkers = (r) => r.checked_by ? r.checked_by.split(', ').map(person) : [];
 const LABEL = {failing: 'Failing', silent: 'Silent', unregistered: 'Unregistered', chronic: 'Flaky', stale: 'Stale data',
   'no check': 'Unchecked', 'no runs yet': 'Not run yet', 'no record': 'No run record', ran: 'Ran', healthy: 'Healthy', paused: 'Paused', service: 'Running', 'one-off': 'One-off'};
 const TONE = {failing: 'bad', silent: 'bad', unregistered: 'warn', chronic: 'warn', stale: 'warn', 'no check': 'none', 'no runs yet': 'none',
@@ -359,13 +363,15 @@ const icon = (name, size, cls) => {
   s.innerHTML = ICONS[name];
   return s;
 };
-const groupBy = (rows, key) => rows.reduce((m, r) => m.set(key(r), [...(m.get(key(r)) || []), r]), new Map());
+const groupBy = (rows, key) => rows.reduce((m, r) => { const k = key(r); (m.get(k) || m.set(k, []).get(k)).push(r); return m; }, new Map());
 const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
 const dot = (tone, label) => { const d = el('span', 'fx-dot'); d.dataset.tone = tone; if (label) { d.setAttribute('role', 'img'); d.setAttribute('aria-label', label); } return d; };
-const nameOf = (r) => r.loop.replace(/^(?:[\w-]+\.)+(?=[^.]+$)/, '');
+const nameOf = (r) => String(r.loop).replace(/^(?:[\w-]+\.)+(?=[^.]+$)/, '');
 const today = () => new Date().toISOString().slice(0, 10);
 const dayDiff = (iso) => Math.round((new Date(iso + 'T12:00') - new Date(today() + 'T12:00')) / 864e5);
 const dayMonth = (iso) => new Date(iso.slice(0, 10) + 'T12:00').toLocaleDateString('en-GB', {day: 'numeric', month: 'short'});
+/* days until an item is due: NaN when it has no date, or one that doesn't read as a date */
+const dueIn = (r) => r.due ? dayDiff(r.due) : NaN;
 const rel = (iso) => {
   if (!iso || !/^\d{4}-\d{2}-\d{2}/.test(iso)) return iso || '';
   if (iso.length === 10) { const d = dayDiff(iso); return d === 0 ? 'Today' : d === 1 ? 'Tomorrow' : d < 0 ? -d + 'd late' : d < 7 ? new Date(iso + 'T12:00').toLocaleDateString('en-GB', {weekday: 'short'}) : dayMonth(iso); }
@@ -457,7 +463,7 @@ const titleCell = (main, sub, tag, mark) => {
   const t = el('span', 't'); const m = el('span');
   if (tag) m.append(el('span', 'fx-tag', tag));
   if (mark) m.append(mark);
-  m.append(document.createTextNode(main)); t.append(m);
+  m.append(el('bdi', '', main)); t.append(m);
   if (sub) t.append(el('small', '', sub));
   return t;
 };
@@ -485,10 +491,10 @@ const loopRow = (r, key, grouped) => {
   return expandRow(key + r.loop, [dot(TONE[r.status], LABEL[r.status]), titleCell(nameOf(r), [!grouped && r.project, nextText(r)].filter(Boolean).join(' · '), null, runtimeMark(r)), right], loopMore(r));
 };
 const waitRow = (r, key) => {
-  const d = r.due ? dayDiff(r.due) : null;
-  const tone = d == null ? 'none' : d <= 0 ? 'bad' : d <= 2 ? 'warn' : 'none';
+  const d = dueIn(r);
+  const tone = d <= 0 ? 'bad' : d <= 2 ? 'warn' : 'none';
   const right = el('span', 'r');
-  right.append(el('span', d == null ? '' : d <= 0 ? 'late' : d <= 2 ? 'soon' : '', r.due ? rel(r.due) : r.since ? 'since ' + dayMonth(r.since) : ''));
+  right.append(el('span', d <= 0 ? 'late' : d <= 2 ? 'soon' : '', !isNaN(d) ? rel(r.due) : r.due || (r.since ? 'since ' + dayMonth(r.since) : '')));
   return expandRow(key + r.where + r.title, [dot(tone), titleCell(r.title, r.source, r.tag), right], (more) => {
     if (r.item && r.item !== r.title) more.append(el('p', '', r.item));
     if (r.action) { const p = el('p'); p.append(el('b', '', 'Your move: '), document.createTextNode(r.action)); more.append(p); }
@@ -588,7 +594,7 @@ dash.draw('next-list', (ul) => {
   const w = dash.data('waiting');
   ul.replaceChildren();
   if (w.status !== 'ok') return failed(ul, 'waiting list', w.status);
-  const next = scoped(w.data).filter((r) => r.due).slice(0, 5);
+  const next = scoped(w.data).filter((r) => !isNaN(dueIn(r))).slice(0, 5);
   if (!next.length) { const li = el('li', 'fx-empty'); li.append(icon('check', 16), el('span', '', 'Nothing dated waits on you.')); ul.append(li); return; }
   next.forEach((r) => ul.append(waitRow(r, 'n:')));
 });
@@ -615,8 +621,8 @@ dash.draw('loop-list', (box) => {
     const n = urgent(rs), wide = rs.length > 8;
     const card = el('section', 'fx-card' + (wide ? ' fx-span' : ''));
     card.dataset.sec = n ? (rs.some((r) => TONE[r.status] === 'bad') ? 'bad' : 'warn') : 'c0';
-    const head = el('h3', 'fx-group'), name = el('span', '', project);
-    name.append(el('small', '', rs.length + (rs.length === 1 ? ' loop' : ' loops')));
+    const head = el('h3', 'fx-group'), name = el('span');
+    name.append(el('bdi', '', project), el('small', '', rs.length + (rs.length === 1 ? ' loop' : ' loops')));
     head.append(name, el('span', '', n ? n + ' need a look' : 'all fine'));
     const ul = el('ul', 'fx-list' + (wide ? ' fx-two' : ''));
     rs.forEach((r) => ul.append(loopRow(r, 'l:', true)));
@@ -657,32 +663,37 @@ dash.draw('svc-count', (e) => {
 const problem = (r) => ['failing', 'silent', 'chronic', 'no check'].includes(r.status) || !r.checked_by || !!(r.supervisor_issue || r.escalation_issue);
 const factoryGraph = (rows, problems) => {
   const all = new Map(rows.filter((r) => !NOT_LOOP.includes(r.project)).map((r) => [r.loop, r]));
-  const mine = scoped([...all.values()]).filter((r) => !problems || problem(r)), loops = [...mine], keep = new Set(loops.map((r) => r.loop));
-  for (let k = 0; k < loops.length; k++) [...checkers(loops[k]), loops[k].supervisor, loops[k].escalates_to].forEach((c) => { if (all.has(c) && !keep.has(c)) { keep.add(c); loops.push(all.get(c)); } });
+  const loops = scoped([...all.values()]).filter((r) => !problems || problem(r)), keep = new Set(loops.map((r) => r.loop));
+  for (let k = 0; k < loops.length; k++) [...checkers(loops[k]), loops[k].supervisor, loops[k].escalates_to].map(person).forEach((c) => { if (all.has(c) && !keep.has(c)) { keep.add(c); loops.push(all.get(c)); } });
   const nodes = new Map(loops.map((r) => [r.loop, {id: r.loop, kind: 'loop', row: r, glass: r.break_glass}]));
+  const services = new Set(rows.filter((x) => x.project === 'Service').map((x) => x.loop));
   const node = (id) => {
-    if (!nodes.has(id)) nodes.set(id, {id, kind: ['you', 'nobody'].includes(id) ? id : 'ext', service: rows.some((x) => x.loop === id && x.project === 'Service')});
+    if (!nodes.has(id)) nodes.set(id, {id, kind: id === YOU ? 'you' : id === NOBODY ? 'nobody' : 'ext', service: services.has(id)});
     return nodes.get(id);
   };
   const edges = [];
   loops.forEach((r) => {
     const to = checkers(r).filter((c) => c !== r.loop);
-    (to.length ? to : ['nobody']).forEach((c) => { node(c); edges.push({from: r.loop, to: c, i: edges.length}); });
+    (to.length ? to : [NOBODY]).forEach((c) => { node(c); edges.push({from: r.loop, to: c, i: edges.length}); });
   });
   /* escalation: one edge per loop to its Escalates to, plus one straight to you for each break-glass entry */
   const escs = [], esc = (from, to, set, glass) => { node(to); escs.push({from, to, set, glass, i: escs.length}); };
   loops.filter((r) => r.escalates_to).forEach((r) => {
-    esc(r.loop, r.escalates_to, !r.escalates_default, !!r.break_glass && r.escalates_to === 'you');
-    if (r.break_glass && r.escalates_to !== 'you') esc(r.loop, 'you', true, true);
+    esc(r.loop, person(r.escalates_to), !r.escalates_default, !!r.break_glass && r.escalates_to === 'you');
+    if (r.break_glass && r.escalates_to !== 'you') esc(r.loop, YOU, true, true);
   });
-  scoped(rows.filter((r) => r.project === 'Service' && r.break_glass && !problems)).forEach((r) => { node(r.loop).glass = r.break_glass; esc(r.loop, 'you', true, true); });
-  const outs = (id) => edges.filter((e) => e.from === id), ins = (id) => edges.filter((e) => e.to === id);
+  scoped(rows.filter((r) => r.project === 'Service' && r.break_glass && !problems)).forEach((r) => { node(r.loop).glass = r.break_glass; esc(r.loop, YOU, true, true); });
+  /* each node's links, both ways, found once: every lookup below is by node, so a draw stays linear in loops and links */
+  const by = (list, end) => groupBy(list, (e) => e[end]), from = by(edges, 'from'), to = by(edges, 'to');
+  const outs = (id) => from.get(id) || [], ins = (id) => to.get(id) || [];
   const master = (n) => n.kind === 'loop' && n.row.role === 'master';
   nodes.forEach((n) => { n.col = ['you', 'nobody'].includes(n.kind) || master(n) ? 'ends' : n.kind === 'ext' || ins(n.id).length ? 'checkers' : 'workers'; });
   const ends = [...nodes.values()].filter((n) => n.col === 'ends').sort((a, b) => ['loop', 'you', 'nobody'].indexOf(a.kind) - ['loop', 'you', 'nobody'].indexOf(b.kind));
-  const depth = (id, seen) => seen.has(id) ? 0 : Math.max(0, ...outs(id).map((e) => 1 + depth(e.to, new Set([...seen, id]))));
-  const order = [...nodes.values()].filter((n) => n.col === 'checkers').sort((a, b) => depth(b.id, new Set()) - depth(a.id, new Set()) || a.id.localeCompare(b.id)).concat(ends);
-  const rank = (n) => Math.min(...outs(n.id).map((e) => order.indexOf(nodes.get(e.to))));
+  /* how many checkers deep a node's output goes, each node once; a node met again on the way counts 0, so a loop of checkers ends */
+  const depth = new Map(), deep = (id) => { if (!depth.has(id)) { depth.set(id, 0); depth.set(id, Math.max(0, ...outs(id).map((e) => 1 + deep(e.to)))); } return depth.get(id); };
+  nodes.forEach((n) => deep(n.id));
+  const order = [...nodes.values()].filter((n) => n.col === 'checkers').sort((a, b) => depth.get(b.id) - depth.get(a.id) || String(a.id).localeCompare(b.id)).concat(ends);
+  const place = new Map(order.map((n, k) => [n.id, k])), rank = (n) => Math.min(...outs(n.id).map((e) => place.get(e.to)));
   const groups = [...groupBy([...nodes.values()].filter((n) => n.col === 'workers').sort((a, b) => rank(a) - rank(b) || nameOf(a.row).localeCompare(nameOf(b.row))),
     (n) => n.row.project || 'General')];
   const mean = (ns, f) => ns.reduce((s, n) => s + f(n), 0) / ns.length;
@@ -693,28 +704,28 @@ const factoryGraph = (rows, problems) => {
   order.splice(0, order.length, ...order.filter((n) => n.col === 'checkers').sort((a, b) => level(a) - level(b)), ...ends);
   /* everything one node's links touch, both ways; for you, only what escalates to you */
   const walk = (list, id, down) => {
-    const on = new Set([id]), via = new Set(), todo = [id];
-    while (todo.length) { const n = todo.pop(); list.filter((e) => (down ? e.from : e.to) === n).forEach((e) => { const m = down ? e.to : e.from; via.add(e.i); if (!on.has(m)) { on.add(m); todo.push(m); } }); }
+    const next = by(list, down ? 'from' : 'to'), on = new Set([id]), via = new Set(), todo = [id];
+    while (todo.length) { const n = todo.pop(); (next.get(n) || []).forEach((e) => { const m = down ? e.to : e.from; via.add(e.i); if (!on.has(m)) { on.add(m); todo.push(m); } }); }
     return {on, via};
   };
   const chain = (id) => {
-    const c = id === 'you' ? [] : [walk(edges, id, true), walk(edges, id, false)], x = id === 'you' ? [walk(escs, id, false)] : [walk(escs, id, true), walk(escs, id, false)];
+    const c = id === YOU ? [] : [walk(edges, id, true), walk(edges, id, false)], x = id === YOU ? [walk(escs, id, false)] : [walk(escs, id, true), walk(escs, id, false)];
     return {on: new Set([...c, ...x].flatMap((p) => [...p.on])), via: new Set(c.flatMap((p) => [...p.via])), esc: new Set(x.flatMap((p) => [...p.via]))};
   };
   const route = (id) => {
     const prev = new Map([[id, null]]), todo = [id];
-    while (todo.length) { const n = todo.shift(); if (n === 'you') break; outs(n).forEach((e) => { if (!prev.has(e.to)) { prev.set(e.to, n); todo.push(e.to); } }); }
-    if (!prev.has('you') || id === 'you') return null;
-    const path = []; for (let n = 'you'; n != null; n = prev.get(n)) path.unshift(n);
+    while (todo.length) { const n = todo.shift(); if (n === YOU) break; outs(n).forEach((e) => { if (!prev.has(e.to)) { prev.set(e.to, n); todo.push(e.to); } }); }
+    if (!prev.has(YOU) || id === YOU) return null;
+    const path = []; for (let n = YOU; n != null; n = prev.get(n)) path.unshift(n);
     return path;
   };
   /* a loop's escalation route, as its rows say: id → its Escalates to → … until you, a name that is no loop, or a repeat */
-  const ladder = (id) => { const p = [id]; for (let n = all.get(id)?.escalates_to; n && !p.includes(n); n = all.get(n)?.escalates_to) p.push(n); return p; };
+  const ladder = (id) => { const p = [id]; for (let n = all.get(id)?.escalates_to; n && !p.includes(n); n = n !== 'you' && all.get(n)?.escalates_to) p.push(n); return p; };
   /* the doors to you: every node with an escalation straight to you. The target is the master plus the break-glass list */
-  const doors = [...new Set(escs.filter((e) => e.to === 'you').map((e) => e.from))], glass = [...nodes.values()].filter((n) => n.glass);
+  const doors = [...new Set(escs.filter((e) => e.to === YOU).map((e) => e.from))], glass = [...nodes.values()].filter((n) => n.glass);
   /* supervision: a loop's supervisor writes its Orders; you, implied, isn't drawn */
-  const sups = loops.filter((r) => r.supervisor && r.supervisor !== r.loop && nodes.get(r.supervisor)?.kind === 'loop').map((r, i) => ({from: r.supervisor, to: r.loop, i}));
-  return {nodes, edges, escs, outs, ins, order, groups, chain, route, ladder, doors, glass, mine, sups, hasMaster: loops.some((r) => r.role === 'master')};
+  const sups = loops.filter((r) => r.supervisor && r.supervisor !== r.loop && nodes.get(person(r.supervisor))?.kind === 'loop').map((r, i) => ({from: r.supervisor, to: r.loop, i}));
+  return {nodes, edges, escs, outs, ins, order, groups, chain, route, ladder, doors, glass, loops, sups, hasMaster: loops.some((r) => r.role === 'master')};
 };
 const fname = (n) => n.kind === 'loop' ? nameOf(n.row) : n.kind === 'you' ? 'You' : n.kind === 'nobody' ? 'Nobody' : n.id;
 const fcurve = (x1, y1, x2, y2) => { const m = (x1 + x2) / 2; return `M${x1},${y1}C${m},${y1} ${m},${y2} ${x2},${y2}`; };
@@ -742,8 +753,8 @@ document.querySelectorAll('.fx-ltog[data-problems]').forEach((b) => {
 
 dash.draw('factory-count', (e) => {
   const l = dash.data('loops'); if (l.status !== 'ok') { e.textContent = '—'; return; }
-  const g = factoryGraph(l.data), n = g.mine.length, gaps = g.ins('nobody').length;
-  const lost = g.mine.filter((r) => g.outs(r.loop).some((x) => x.to !== 'nobody') && !g.route(r.loop)).length;
+  const g = factoryGraph(l.data), n = g.loops.length, gaps = g.ins(NOBODY).length;
+  const lost = g.loops.filter((r) => g.outs(r.loop).some((x) => x.to !== NOBODY) && !g.route(r.loop)).length;
   e.textContent = n + (n === 1 ? ' loop' : ' loops') + (!n ? '' : !gaps && !lost ? ' · every one is read' : (gaps ? ' · ' + gaps + ' nobody reads' : '') + (lost ? ' · ' + lost + ' never reach you' : ''));
 });
 /* the headline: how many paths can interrupt you, against one master plus the break-glass list */
@@ -763,6 +774,7 @@ dash.draw('factory', (box) => {
   const l = dash.data('loops');
   box.replaceChildren(); box.classList.remove('trace');
   LAYERS.forEach((k) => box.classList.toggle('hide-' + k, FX.hide.has(k)));
+  if (!box.clientWidth) return; /* its tab is hidden: the runtime draws it again when the tab opens and the width changes */
   if (l.status !== 'ok') return failed(box, 'loop list', l.status);
   const g = factoryGraph(l.data, FX.problems);
   if (!g.nodes.size) { box.append(el('div', 'fx-empty', FX.problems ? 'No loop is failing, silent, unchecked or unread.' : 'No loops yet.')); return; }
@@ -770,7 +782,7 @@ dash.draw('factory', (box) => {
   const col = {workers: el('div', 'fx-fcol workers'), checkers: el('div', 'fx-fcol checkers'), ends: el('div', 'fx-fcol ends')};
   const chip = (n) => {
     const b = el('button', 'fx-fnode' + (n.kind === 'loop' ? '' : n.kind === 'ext' ? ' ext' : ' fx-fend ' + n.kind)); b.type = 'button';
-    const read = g.ins(n.id).length, gap = n.kind === 'loop' && g.outs(n.id).every((e) => e.to === 'nobody');
+    const read = g.ins(n.id).length, gap = n.kind === 'loop' && g.outs(n.id).every((e) => e.to === NOBODY);
     const role = n.kind === 'loop' && n.row.role, issue = n.kind === 'loop' && [n.row.supervisor_issue, n.row.escalation_issue].filter(Boolean).join('; ');
     if (gap) b.classList.add('gap');
     if (issue) b.classList.add('issue');
@@ -791,7 +803,7 @@ dash.draw('factory', (box) => {
   g.order.forEach((n) => col[n.col].append(chip(n)));
   const through = g.edges.filter((e) => g.nodes.get(e.from).col === 'workers' && g.nodes.get(e.to).col === 'ends');
   const ribbon = el('div', 'fx-fribbon');
-  const toYou = through.filter((e) => e.to === 'you').length;
+  const toYou = through.filter((e) => e.to === YOU).length;
   if (toYou) ribbon.textContent = toYou + ' you read yourself';
   col.checkers.append(ribbon);
   cols.append(col.workers, col.checkers, col.ends);
@@ -802,64 +814,62 @@ dash.draw('factory', (box) => {
   document.querySelectorAll('#legend-glass').forEach((e) => { e.hidden = !g.glass.length; });
 
   const paths = [];
-  if (box.clientWidth) {
-    const base = box.getBoundingClientRect();
-    const at = (e) => { const r = e.getBoundingClientRect(); return {l: r.left - base.left, r: r.right - base.left, t: r.top - base.top, b: r.bottom - base.top, m: (r.top + r.bottom) / 2 - base.top}; };
-    const pos = new Map([...chips].map(([id, c]) => [id, at(c)])), rb = at(ribbon), gap = at(col.checkers).l - at(col.workers).r;
-    /* a project's loops that escalate to the same place by default share one line from their frame; overrides and
-       break-glass get their own, so what differs from the rule stands out */
-    const lines = [];
-    groupBy(g.escs, (e) => { const n = g.nodes.get(e.from); return !e.set && n.col === 'workers' ? (n.row.project || 'General') + '\n' + e.to : 'x' + e.i; })
-      .forEach((es, k) => lines.push({key: 'x' + lines.length, es, from: es.length > 1 ? at(frames.get(k.split('\n')[0])) : pos.get(es[0].from),
-        fromCol: g.nodes.get(es[0].from).col, to: es[0].to, glass: es[0].glass}));
-    /* lanes through the ribbon keep the loops' order; ports on a chip's left edge are spread in the order lines arrive */
-    const lanesOf = [...through.map((e) => ({key: 'c' + e.i, y: pos.get(e.from).m})),
-      ...lines.filter((x) => x.fromCol === 'workers' && g.nodes.get(x.to).col === 'ends').map((x) => ({key: x.key, y: x.from.m}))].sort((a, b) => a.y - b.y);
-    const lanes = new Map(lanesOf.map((x, k) => [x.key, rb.t + 26 + (k + .5) * (rb.b - rb.t - 30) / lanesOf.length]));
-    const arrive = (e) => lanes.get('c' + e.i) ?? pos.get(e.from).m;
-    const port = new Map();
-    g.nodes.forEach((n) => { const es = g.ins(n.id).filter((e) => g.nodes.get(e.from).col !== n.col).sort((a, b) => arrive(a) - arrive(b)), p = pos.get(n.id);
-      es.forEach((e, k) => port.set(e.i, p.t + (k + 1) * (p.b - p.t) / (es.length + 1))); });
-    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-    svg.setAttribute('class', 'fx-fedges'); svg.setAttribute('aria-hidden', 'true');
-    const band = document.createElementNS(svg.namespaceURI, 'rect');
-    [['class', 'band'], ['x', rb.l], ['y', rb.t + 20], ['width', Math.max(0, rb.r - rb.l)], ['height', Math.max(0, rb.b - rb.t - 20)], ['rx', 6]].forEach(([k, v]) => band.setAttribute(k, v));
-    if (lanesOf.length) svg.append(band);
-    const add = (d, cls, data) => { const p = document.createElementNS(svg.namespaceURI, 'path'); p.setAttribute('d', d); p.setAttribute('class', cls); Object.assign(p.dataset, data); svg.append(p); paths.push(p); return p; };
-    /* one shape for every link: down a column's spine, round its right side, through a lane, forward or back */
-    const shape = (s, t, sc, tc, lane, y, bulge) => sc === tc && sc === 'ends' ? `M${(s.l + s.r) / 2},${s.b}L${(t.l + t.r) / 2},${t.t}`
-      : sc === tc ? (() => { const k = Math.min(gap * .8, bulge + Math.abs(t.m - s.m) * .2); return `M${s.r},${s.m}C${s.r + k},${s.m} ${t.r + k},${t.m} ${t.r},${t.m}`; })()
-      : lane != null ? fcurve(s.r, s.m, rb.l, lane) + `L${rb.r},${lane}` + fcurve(rb.r, lane, t.l, y).replace(/^M[^C]+/, '')
-      : t.l > s.l ? fcurve(s.r, s.m, t.l, y) : fcurve(s.l, s.m, t.r, y);
-    g.edges.forEach((e) => {
-      const from = g.nodes.get(e.from), to = g.nodes.get(e.to), tone = TONE[from.row ? from.row.status : 'healthy'];
-      add(shape(pos.get(e.from), pos.get(e.to), from.col, to.col, lanes.get('c' + e.i), port.get(e.i) ?? pos.get(e.to).m, 14),
-        e.to === 'nobody' ? 'gap' : tone === 'none' ? 'off' : 'chk', {e: e.i});
-    });
-    g.sups.forEach((e) => {
-      const s = pos.get(e.from), t = pos.get(e.to), o = 5, k = 10;
-      const d = Math.abs(s.l - t.l) < 2 ? `M${s.l},${s.m + o}C${s.l - k},${s.m + o} ${t.l - k},${t.m + o} ${t.l},${t.m + o}`
-        : s.l > t.l ? fcurve(s.l, s.m + o, t.r, t.m + o) : fcurve(s.r, s.m + o, t.l, t.m + o);
-      add(d, 'sup', {s: e.i});
-    });
-    lines.forEach((x) => {
-      const t = pos.get(x.to), d = shape(x.from, t, x.fromCol, g.nodes.get(x.to).col, lanes.get(x.key), t.m, 20), ids = {x: x.es.map((e) => e.i).join(' ')};
-      const p = add(d, 'esc' + (x.glass ? ' glass' : ''), ids);
-      if (x.es.length > 1) p.style.strokeWidth = Math.min(2.5 + x.es.length * .4, 6);
-      add(d, 'flow', ids);
-      if (x.es.length > 1) {
-        const n = document.createElementNS(svg.namespaceURI, 'text');
-        n.setAttribute('x', x.from.r + 4); n.setAttribute('y', x.from.m - 5); n.setAttribute('class', 'esc'); n.dataset.x = ids.x; n.textContent = x.es.length;
-        svg.append(n); paths.push(n);
-      }
-    });
-    box.prepend(svg);
-  }
+  const base = box.getBoundingClientRect();
+  const at = (e) => { const r = e.getBoundingClientRect(); return {l: r.left - base.left, r: r.right - base.left, t: r.top - base.top, b: r.bottom - base.top, m: (r.top + r.bottom) / 2 - base.top}; };
+  const pos = new Map([...chips].map(([id, c]) => [id, at(c)])), rb = at(ribbon), gap = at(col.checkers).l - at(col.workers).r;
+  /* a project's loops that escalate to the same place by default share one line from their frame; overrides and
+     break-glass get their own, so what differs from the rule stands out */
+  const lines = [];
+  groupBy(g.escs, (e) => { const n = g.nodes.get(e.from); return !e.set && n.col === 'workers' ? (n.row.project || 'General') + '\n' + e.to : 'x' + e.i; })
+    .forEach((es, k) => lines.push({key: 'x' + lines.length, es, from: es.length > 1 ? at(frames.get(k.split('\n')[0])) : pos.get(es[0].from),
+      fromCol: g.nodes.get(es[0].from).col, to: es[0].to, glass: es[0].glass}));
+  /* lanes through the ribbon keep the loops' order; ports on a chip's left edge are spread in the order lines arrive */
+  const lanesOf = [...through.map((e) => ({key: 'c' + e.i, y: pos.get(e.from).m})),
+    ...lines.filter((x) => x.fromCol === 'workers' && g.nodes.get(x.to).col === 'ends').map((x) => ({key: x.key, y: x.from.m}))].sort((a, b) => a.y - b.y);
+  const lanes = new Map(lanesOf.map((x, k) => [x.key, rb.t + 26 + (k + .5) * (rb.b - rb.t - 30) / lanesOf.length]));
+  const arrive = (e) => lanes.get('c' + e.i) ?? pos.get(e.from).m;
+  const port = new Map();
+  g.nodes.forEach((n) => { const es = g.ins(n.id).filter((e) => g.nodes.get(e.from).col !== n.col).sort((a, b) => arrive(a) - arrive(b)), p = pos.get(n.id);
+    es.forEach((e, k) => port.set(e.i, p.t + (k + 1) * (p.b - p.t) / (es.length + 1))); });
+  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  svg.setAttribute('class', 'fx-fedges'); svg.setAttribute('aria-hidden', 'true');
+  const band = document.createElementNS(svg.namespaceURI, 'rect');
+  [['class', 'band'], ['x', rb.l], ['y', rb.t + 20], ['width', Math.max(0, rb.r - rb.l)], ['height', Math.max(0, rb.b - rb.t - 20)], ['rx', 6]].forEach(([k, v]) => band.setAttribute(k, v));
+  if (lanesOf.length) svg.append(band);
+  const add = (d, cls, data) => { const p = document.createElementNS(svg.namespaceURI, 'path'); p.setAttribute('d', d); p.setAttribute('class', cls); Object.assign(p.dataset, data); svg.append(p); paths.push(p); return p; };
+  /* one shape for every link: down a column's spine, round its right side, through a lane, forward or back */
+  const shape = (s, t, sc, tc, lane, y, bulge) => sc === tc && sc === 'ends' ? `M${(s.l + s.r) / 2},${s.b}L${(t.l + t.r) / 2},${t.t}`
+    : sc === tc ? (() => { const k = Math.min(gap * .8, bulge + Math.abs(t.m - s.m) * .2); return `M${s.r},${s.m}C${s.r + k},${s.m} ${t.r + k},${t.m} ${t.r},${t.m}`; })()
+    : lane != null ? fcurve(s.r, s.m, rb.l, lane) + `L${rb.r},${lane}` + fcurve(rb.r, lane, t.l, y).replace(/^M[^C]+/, '')
+    : t.l > s.l ? fcurve(s.r, s.m, t.l, y) : fcurve(s.l, s.m, t.r, y);
+  g.edges.forEach((e) => {
+    const from = g.nodes.get(e.from), to = g.nodes.get(e.to), tone = TONE[from.row ? from.row.status : 'healthy'];
+    add(shape(pos.get(e.from), pos.get(e.to), from.col, to.col, lanes.get('c' + e.i), port.get(e.i) ?? pos.get(e.to).m, 14),
+      e.to === NOBODY ? 'gap' : tone === 'none' ? 'off' : 'chk', {e: e.i});
+  });
+  g.sups.forEach((e) => {
+    const s = pos.get(e.from), t = pos.get(e.to), o = 5, k = 10;
+    const d = Math.abs(s.l - t.l) < 2 ? `M${s.l},${s.m + o}C${s.l - k},${s.m + o} ${t.l - k},${t.m + o} ${t.l},${t.m + o}`
+      : s.l > t.l ? fcurve(s.l, s.m + o, t.r, t.m + o) : fcurve(s.r, s.m + o, t.l, t.m + o);
+    add(d, 'sup', {s: e.i});
+  });
+  lines.forEach((x) => {
+    const t = pos.get(x.to), d = shape(x.from, t, x.fromCol, g.nodes.get(x.to).col, lanes.get(x.key), t.m, 20), ids = {x: x.es.map((e) => e.i).join(' ')};
+    const p = add(d, 'esc' + (x.glass ? ' glass' : ''), ids);
+    if (x.es.length > 1) p.style.strokeWidth = Math.min(2.5 + x.es.length * .4, 6);
+    add(d, 'flow', ids);
+    if (x.es.length > 1) {
+      const n = document.createElementNS(svg.namespaceURI, 'text');
+      n.setAttribute('x', x.from.r + 4); n.setAttribute('y', x.from.m - 5); n.setAttribute('class', 'esc'); n.dataset.x = ids.x; n.textContent = x.es.length;
+      svg.append(n); paths.push(n);
+    }
+  });
+  box.prepend(svg);
 
   const say = (id) => {
     detail.replaceChildren(); detail.hidden = !id;
     if (!id) return;
-    const n = g.nodes.get(id), reads = g.ins(id).map((e) => fname(g.nodes.get(e.from))), by = g.outs(id).map((e) => e.to === 'you' ? 'you' : fname(g.nodes.get(e.to)));
+    const n = g.nodes.get(id), reads = g.ins(id).map((e) => fname(g.nodes.get(e.from))), by = g.outs(id).map((e) => e.to === YOU ? 'you' : fname(g.nodes.get(e.to)));
     const label = (k) => k === 'you' ? 'you' : g.nodes.has(k) ? fname(g.nodes.get(k)) : k;
     detail.append(el('b', '', n.kind === 'loop' ? n.row.loop : fname(n)));
     if (n.kind === 'loop') detail.append(el('p', '', [...new Set([LABEL[n.row.status], n.row.project || 'General'])].concat(n.row.role ? ['the ' + n.row.role] : [], n.row.last_run ? ['last run ' + rel(n.row.last_run)] : []).join(' · ')));
@@ -870,7 +880,7 @@ dash.draw('factory', (box) => {
     if (reads.length) detail.append(el('p', '', 'Reads ' + reads.join(', ') + '.'));
     if (n.kind !== 'loop') return;
     const path = g.route(id);
-    detail.append(el('p', '', g.outs(id).every((e) => e.to === 'nobody') ? 'Nobody reads its output.'
+    detail.append(el('p', '', g.outs(id).every((e) => e.to === NOBODY) ? 'Nobody reads its output.'
       : path ? 'Read by ' + by.join(', ') + (path.length > 3 ? '. Reaches you through ' + path.slice(1, -1).map((k) => fname(g.nodes.get(k))).join(' → ') : '') + '.'
       : 'Read by ' + by.join(', ') + ', but the chain never reaches you.'));
     if (n.row.escalates_to) detail.append(el('p', '', 'Escalates to ' + g.ladder(id).slice(1).map(label).join(' → ') + (n.row.escalates_default ? ' (the default)' : '') + '.'));
@@ -883,7 +893,7 @@ dash.draw('factory', (box) => {
   /* pointing only lights a chain; tapping also fills the card, so the page's height never moves under the pointer */
   const trace = (id, tell) => {
     const c = id ? g.chain(id) : {on: new Set(), via: new Set(), esc: new Set()};
-    const sup = new Set(id === 'you' ? [] : g.sups.filter((e) => e.from === id || e.to === id).map((e) => { c.on.add(e.from); c.on.add(e.to); return e.i; }));
+    const sup = new Set(id === YOU ? [] : g.sups.filter((e) => e.from === id || e.to === id).map((e) => { c.on.add(e.from); c.on.add(e.to); return e.i; }));
     box.classList.toggle('trace', !!id);
     chips.forEach((b, k) => { b.classList.toggle('on', c.on.has(k)); b.classList.toggle('sel', k === FX.fsel); b.setAttribute('aria-pressed', String(k === FX.fsel)); });
     paths.forEach((p) => p.classList.toggle('on', 's' in p.dataset ? sup.has(+p.dataset.s) : 'x' in p.dataset ? p.dataset.x.split(' ').some((i) => c.esc.has(+i)) : c.via.has(+p.dataset.e)));
@@ -906,10 +916,10 @@ dash.draw('wait-list', (box) => {
   if (w.status !== 'ok') return failed(box, 'waiting list', w.status);
   const mine = scoped(w.data);
   if (!mine.length) { const d = el('div', 'fx-card fx-empty'); d.append(icon('check', 16), el('span', '', 'Nothing waits on you.')); box.append(d); return; }
-  const groups = [['Due now', (r) => r.due && dayDiff(r.due) <= 0, 'bad'], ['This week', (r) => r.due && dayDiff(r.due) > 0 && dayDiff(r.due) <= 7, 'warn'],
-    ['Later', (r) => r.due && dayDiff(r.due) > 7, 'c0'], ['PRs to review', (r) => !r.due && r.tag === 'PR review', 'c1'], ['Open decisions, no date', (r) => !r.due && r.tag !== 'PR review', 'c4']];
+  const groups = [['Due now', (d) => d <= 0, 'bad'], ['This week', (d) => d > 0 && d <= 7, 'warn'], ['Later', (d) => d > 7, 'c0'],
+    ['PRs to review', (d, r) => isNaN(d) && r.tag === 'PR review', 'c1'], ['Open decisions, no date', (d, r) => isNaN(d) && r.tag !== 'PR review', 'c4']];
   groups.forEach(([name, test, sec]) => {
-    const rows = mine.filter(test);
+    const rows = mine.filter((r) => test(dueIn(r), r));
     if (!rows.length) return;
     const card = el('section', 'fx-card' + (rows.length > 8 ? ' fx-span' : '')); card.dataset.sec = sec; const head = el('h3', 'fx-group');
     head.append(el('span', '', name), el('span', '', String(rows.length)));
