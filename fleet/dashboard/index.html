@@ -217,7 +217,7 @@ button.fx-kpi:focus-visible { outline: 2px solid var(--color-fg); outline-offset
 
 <div class="fx">
   <div class="fx-top" id="top">
-    <div><h1 data-draw="mode" data-source="loops waiting">Loop fleet</h1><p class="fx-muted">Updated <span data-draw="synced">—</span></p></div>
+    <div><h1><span id="title-fleet">Loop fleet</span><span id="title-health" hidden>Loop health</span><span data-draw="mode" data-source="loops waiting"></span></h1><p class="fx-muted">Updated <span data-draw="synced">—</span></p></div>
     <select class="dash-select" id="scope" data-draw="scope" aria-label="Project" data-source="loops waiting"></select>
   </div>
 
@@ -518,8 +518,7 @@ if (['loops', 'factory', 'waiting'].includes(location.hash.slice(1))) go(locatio
 /* header */
 dash.draw('mode', (h) => {
   const w = dash.data('waiting'), quiet = health() && w.status === 'ok' && !w.data.length;
-  h.textContent = health() ? 'Loop health' : 'Loop fleet';
-  const hide = {'tab-factory': health(), 'tab-waiting': quiet, 'next-up': quiet, 'k-cost': !ledger(), 'foot-window': !ledger(), 'foot-registry': health()};
+  const hide = {'title-fleet': health(), 'title-health': !health(), 'tab-factory': health(), 'tab-waiting': quiet, 'next-up': quiet, 'k-cost': !ledger(), 'foot-window': !ledger(), 'foot-registry': health()};
   Object.entries(hide).forEach(([id, off]) => { document.getElementById(id).hidden = off; });
   document.querySelector('[data-go="waiting"].fx-kpi').hidden = quiet;
   if (health() && ['factory', 'waiting'].includes(location.hash.slice(1))) go('overview');
