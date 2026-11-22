@@ -41,4 +41,4 @@ A loop is a trigger, one job written down as a charter (`docs/AGENT_LOOP.md`), a
 - **Chronic failure:** a check failing 3 of its last 7 runs is broken, either the loop or the check. Fix one within a week; pause the loop if neither is fixed in two.
 - **Nobody reads it:** a loop whose output hasn't changed a decision, a PR or a post in 30 days is retired.
 - **Attention is the budget.** At most one message a day to you across the whole fleet. When it goes over, merge alerts or raise thresholds; don't add a loop that pings you.
-- **What a customer waits on runs in the cloud.** A laptop sleeps and travels; support and publishing don't.
+- **Where it runs** follows the kit's [RUNTIMES.md](https://github.com/albertnahas/agent-ops-kit/blob/main/docs/RUNTIMES.md), and every runtime leaves a ledger line the heartbeat reads.
