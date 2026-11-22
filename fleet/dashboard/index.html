@@ -700,7 +700,7 @@ dash.draw('factory-door', (e) => {
   const v = el('b', '', String(n)), text = el('span');
   text.append(el('strong', '', (n === 1 ? 'path' : 'paths') + ' to you'),
     el('span', '', 'Target ' + target + ': the master' + (g.glass.length ? ' and ' + g.glass.length + ' break-glass' : '') + '.'
-      + (g.hasMaster ? (n > target ? ' ' + (n - target) + ' more go around the master.' : ' Everything else goes through them.') : ' No loop has Role master yet, so every loop can reach you.')));
+      + (g.hasMaster ? (n > target ? ' ' + (n - target) + ' more ' + (n - target === 1 ? 'goes' : 'go') + ' around the master.' : ' Everything else goes through them.') : ' No loop has Role master yet, so every loop can reach you.')));
   e.append(v, text);
 });
 dash.draw('factory', (box) => {

@@ -87,7 +87,7 @@ cat > "$AGENT_OPS_DIR/REGISTRY.md" <<EOF
 
 | Loop | Project | Runtime | Job | Schedule | Charter | Outcome check | Checked by | Supervisor | Escalates to | Role |
 |---|---|---|---|---|---|---|---|---|---|---|
-| door | Ops | cloud | routine:door | daily | | | you | | | Master |
+| door | Shop | cloud | routine:door | daily | | | you | | | Master |
 | boss | Shop | cloud | routine:boss | daily | | | you | | | manager |
 | boss2 | Shop | cloud | routine:boss2 | daily | | | you | | | manager |
 | worker | Shop | cloud | routine:worker | daily | | | boss | | | |
@@ -117,7 +117,7 @@ python3 fleet/fleet.py >/dev/null
 esc() { jq -r --arg l "$1" '.rows[] | select(.loop == $l) | "\(.escalates_to) \(.escalates_default) | \(.escalation_issue)"' "$L"; }
 expect "a blank goes to the project's manager"  "[ \"\$(esc worker)\" = 'boss true | null' ]"
 expect "a blank with no manager goes to the master" "[ \"\$(esc lone)\" = 'door true | null' ] && [ \"\$(esc boss | cut -d' ' -f1)\" = door ]"
-expect "the master's blank is you, any case"    "[ \"\$(esc door)\" = 'you true | null' ]"
+expect "the master's blank is you, even beside a manager"    "[ \"\$(esc door)\" = 'you true | null' ]"
 expect "only the master and break-glass reach you" "esc rogue | grep -q 'straight to you' && [ \"\$(esc pager)\" = 'you false | null' ]"
 expect "a break-glass reason is on its row"      "jq -e '[.rows[] | select(.break_glass)] | map(\"\\(.loop)=\\(.break_glass)\") == [\"pager=production down\", \"stripe=money at risk, refunds\"]' $L >/dev/null"
 expect "escalation cycles are flagged, by job too" "esc ping | grep -q 'comes back to it: ping → pong → ping'"

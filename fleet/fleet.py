@@ -189,7 +189,7 @@ def links(registry, services, glass):
     or service's name or its job, with or without the routine:/task: prefix, or you; any other name is kept as written, a
     checker the registry doesn't have. Supervisor, optional, is the one loop that writes this loop's Orders (or you): a
     parent that is no loop, or a chain that comes back to the row, is its supervisor_issue. Escalates to, optional, is
-    where the loop sends what needs a person; blank means its project's manager, else the master, else you. Once a loop
+    where the loop sends what needs a person; blank means its project's manager, else the master, else you (always you for the master). Once a loop
     has Role master, only it and the Break-glass table may reach you; escalation_issue says what breaks that.
     Returns (loops, break-glass reasons by name, issues of Break-glass rows that name nothing)."""
     named = [(r["Loop"], r["Job"]) for r in registry] + [(r["Service"], r["Job"]) for r in services]
@@ -204,7 +204,7 @@ def links(registry, services, glass):
     for loop, k in roles.items():
         if k == "manager": managers.setdefault(projects[loop], []).append(loop)
     def default(loop):
-        up = [m for m in managers.get(projects[loop], [])[:1] + masters[:1] if m != loop]
+        up = [m for m in managers.get(projects[loop], [])[:1] + masters[:1] if m != loop and roles[loop] != "master"]
         return up[0] if up else "you"
     out = {r["Loop"]: {"checked_by": ", ".join(dict.fromkeys(resolve(c.strip()) for c in cell(r, "Checked by").split(",") if c.strip())),
                        "supervisor": resolve(cell(r, "Supervisor")) if cell(r, "Supervisor") else None,
