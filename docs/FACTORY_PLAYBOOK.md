@@ -12,7 +12,7 @@ A trigger, one job written down as a charter, an outcome check with no model in 
 
 Build the factory from the watchman outward. A loop you can't see fail is worse than no loop.
 
-1. **The watchman.** Copy the kit in and run its tests ([README, "Start a loop"](https://github.com/albertnahas/agent-ops-kit#start-a-loop)). Every Claude call goes through `bin/claude-run`, every run ends with `bin/ops-check`, and `bin/heartbeat.py` runs daily. If the heartbeat lives on a laptop, add the cloud watch from [examples/heartbeat-watch-prompt.md](https://github.com/albertnahas/agent-ops-kit/tree/main/examples/heartbeat-watch-prompt.md).
+1. **The watchman.** Set up the kit and its first loop ([README, "Start a loop"](https://github.com/albertnahas/agent-ops-kit#start-a-loop)), or copy it in by hand and run its tests ("By hand", under the same heading). Every Claude call goes through `bin/claude-run`, every run ends with `bin/ops-check`, and `bin/heartbeat.py` runs daily. If the heartbeat lives on a laptop, add the cloud watch from [examples/heartbeat-watch-prompt.md](https://github.com/albertnahas/agent-ops-kit/tree/main/examples/heartbeat-watch-prompt.md).
 2. **Daily ops on one product.** One charter from the kit's [AGENT_LOOP.md](https://github.com/albertnahas/agent-ops-kit/blob/main/docs/AGENT_LOOP.md) with your own X surfaces, and the PR grader. Run it by hand, then on a schedule. For the first week, read every report and every grade before you trust them.
 3. **A smoke test**, once a deploy can break a journey. It needs no model and costs nothing.
 4. **The fleet dashboard and registry**, as soon as you run more than one loop ([fleet/](../fleet/README.md), the `fleet` skill).
@@ -29,7 +29,7 @@ Every loop has a row in one registry, added in the same change that schedules it
 
 Write the outcome check before the prompt. If you can't say what proves the run did its job, the loop isn't ready. The check reads something the run didn't write: the PR exists, the post reads back from the platform, the report has every section. Success is the check passing, not Claude's exit code. [checks/report-landed.sh](https://github.com/albertnahas/agent-ops-kit/blob/main/checks/report-landed.sh) is a worked example, and the "Rules that came from running these" in the catalog say why.
 
-Every runner exports `OPS_LOOP=<registry name>`, so the ledger, the heartbeat and the dashboard all agree on which loop is which. `plan-loops` builds each new loop with the kit's `bin/new-loop`, which writes the charter, check, runner, schedule file and registry row in one go; then comes the hand run, and the schedule last.
+Every runner exports `OPS_LOOP=<registry name>`, so the ledger, the heartbeat and the dashboard all agree on which loop is which. `plan-loops` builds each new loop with the kit's `bin/new-loop`, which writes the charter, check, runner, schedule file and registry row in one go. Then the files land through a PR, you bless the charter, the loop runs once by hand, and the schedule comes last.
 
 ## Supervisors and Orders
 
