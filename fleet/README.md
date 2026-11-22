@@ -18,7 +18,7 @@ It works with nothing set up. With no registry it lists every job it finds with 
 | `checks/<loop>.py` | an outcome for loops that write no ledger line, like cloud routines | per loop |
 | `fleet/cloud.json` | Claude Code cloud routines and desktop-app tasks: schedule, next and last run | only with the claude.ai sync (`SYNC.md`) |
 | `improvements.jsonl` | the improver's history: each change it made to a loop, what it read, the metric it should move and whether it did | once an improver runs |
-| GitHub, a queue file, decision memos | what waits on you: PRs with your label, owner-you queue lines, open decisions in your repos' `docs/` | optional, `waiting` in `fleet.json` |
+| GitHub, a queue file, decision memos | what waits on you: PRs with your label, owner-you queue lines, open decisions in your repos' `docs/` and `bets/` | optional, `waiting` in `fleet.json` |
 
 Without a ledger, a launchd loop's last exit and the time its log file last changed stand in for its last run, so a fleet you haven't instrumented still shows what failed.
 

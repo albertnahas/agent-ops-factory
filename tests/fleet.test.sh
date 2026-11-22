@@ -341,6 +341,9 @@ G=$AGENT_OPS_DIR/memo; git init -q --bare "$G.git" && git clone -q "$G.git" "$G"
 printf '## Founder decisions\n\n- Price the shop By 2026-12-01\n\n**Decision:**\n\n## Next\n' > "$G/docs/BETS.md"
 git -C "$G" add -A && git -C "$G" -c user.name=t -c user.email=t@t commit -qm m && git -C "$G" push -q origin HEAD 2>/dev/null && git -C "$G" remote set-head origin -a >/dev/null
 expect "a blank Decision line leaves the memo's decisions open" "[ \"\$(python3 -c \"import sys; sys.path.insert(0, 'fleet'); from fleet import memo_items; print(len(memo_items('o', 'r', '$G', {})))\")\" = 1 ]"
+mkdir "$G/bets" && printf '## Founder decisions\n\n- Bet 1: approve? By 2026-11-24\n' > "$G/bets/shop.md"
+git -C "$G" add -A && git -C "$G" -c user.name=t -c user.email=t@t commit -qm b && git -C "$G" push -q origin HEAD 2>/dev/null
+expect "a memo in bets/ is read too" "python3 -c \"import sys; sys.path.insert(0, 'fleet'); from fleet import memo_items; print([i['where'] for i in memo_items('o', 'r', '$G', {})])\" | grep -q 'r/bets/shop.md'"
 
 mk sync; build; python3 - "$O/fleet" <<'P'
 import datetime as dt, hashlib, json, os, sys
