@@ -84,7 +84,7 @@ expect "reverted: a worse mean, an equal mean, or a lower pass rate" "[ \"\$(O r
 expect "closed: the PR closed without merging"           "[ \"\$(O x1)\" = '[\"closed\",false]' ]"
 expect "nothing yet: too few runs, an open PR, or no numeric baseline" "[ -z \"\$(O n1)\$(O o1)\$(O s1)\" ]"
 expect "outcome lines carry no date, so the change keeps its own" "jq -Rse '[split(\"\\n\")[] | fromjson? | select(.outcome)] | length == 5 and all(has(\"date\") | not)' $D/improvements.jsonl >/dev/null"
-expect "--json: reverts owed, open changes and the hit rate" "jq -e '.reverts_owed == [\"g1\",\"e1\",\"r1\"] and (.open | sort) == [\"d2\",\"n1\",\"o1\",\"s1\"] and .hit_rate == {\"hits\":1,\"read\":4,\"stopped\":false}' $D/read.json >/dev/null"
+expect "--json: reverts owed, open changes and the hit rate" "jq -e '.reverts_owed == [\"g1\",\"e1\",\"r1\"] and .open == [\"n1\",\"o1\"] and .unreadable == [\"d2\",\"s1\"] and .hit_rate == {\"hits\":1,\"read\":4,\"stopped\":false}' $D/read.json >/dev/null"
 cp "$K" "$D/kpi.before" && cp "$D/improvements.jsonl" "$D/imp.before"
 python3 fleet/improve_read.py > "$D/said"
 expect "a second run the same day appends nothing"       "cmp -s $K $D/kpi.before && cmp -s $D/improvements.jsonl $D/imp.before"

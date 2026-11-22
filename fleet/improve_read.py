@@ -81,8 +81,10 @@ def read():
     done = {(r.get("date"), r.get("loop")) for r in jsonl(C["kpi"])}
     loops = [r["Loop"] for r in tables()[0] if opted_in(r)]
     kpis = [kpi(l, by.get(l, []), first, today) for l in loops if (today, l) not in done]
-    open_ = [c for c in merged.values() if c.get("outcome") in (None, "pending") and name(c.get("pr")) and name(c.get("loop"))
-             and c.get("better") in ("higher", "lower") and num(c.get("baseline")) and num(c.get("pass_rate_before"))]
+    unread = [c for c in merged.values() if c.get("outcome") in (None, "pending")]
+    readable = lambda c: name(c.get("pr")) and name(c.get("loop")) and c.get("better") in ("higher", "lower") \
+                         and num(c.get("baseline")) and num(c.get("pass_rate_before"))
+    open_ = [c for c in unread if readable(c)]
     outcomes = [o for c in open_ for o in [outcome(c, by.get(str(c["loop"]), []))] if o]
     for f, new in ((C["kpi"], kpis), (C["improvements"], outcomes)):
         with open(f, "a") as out: out.writelines(json.dumps({k: v for k, v in r.items() if v is not None}) + "\n" for r in new)
@@ -90,7 +92,8 @@ def read():
     hits, n = hit_rate(merged)
     return {"date": today, "kpi": kpis, "outcomes": outcomes,
             "reverts_owed": [c["id"] for c in merged.values() if c.get("outcome") == "reverted" and not c.get("revert_pr")],
-            "open": [c["id"] for c in merged.values() if c.get("outcome") in (None, "pending")],
+            "open": [c["id"] for c in open_ if c["id"] not in {o["id"] for o in outcomes}],
+            "unreadable": [c["id"] for c in unread if not readable(c)],
             "hit_rate": {"hits": hits, "read": n, "stopped": n >= AFTER and hits / n < FLOOR}}
 
 if __name__ == "__main__":
@@ -99,5 +102,6 @@ if __name__ == "__main__":
     for k in r["kpi"]: print(f"kpi {k['loop']}: {k['kpi']}" + (f" ({k['value']} vs {k['bar']})" if "bar" in k else ""))
     for o in r["outcomes"]: print(f"change {o['id']}: {o['outcome']}, {o['result']}")
     h = r["hit_rate"]
+    if r["unreadable"]: print(f"never read, a field is missing: {', '.join(r['unreadable'])}")
     print(f"open changes: {len(r['open'])} · reverts owed: {', '.join(r['reverts_owed']) or 'none'} · hit rate: {h['hits']} of {h['read']}"
           + (" · stopped: below 1 in 3" if h["stopped"] else ""))
