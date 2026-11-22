@@ -362,7 +362,8 @@ def definitions(reg, kind, ref, item, roots):
     orders = next((f for f in (charter.parent / "orders" / n for n in re.findall(r"orders/([\w.-]+\.md)", text)) if exists(f)), None)
     task = C["tasks"] / ref / "SKILL.md"
     good = re.search(r"^## Good\b(.*?)(?=^## |\Z)", text, re.M | re.S)
-    floor = good and "<!-- mission -->" in good.group(1) and re.search(r"^[-*\s]*\*\*Floor:\*\*\s*(.+?)\s*$", good.group(1), re.M)
+    kept = "".join(re.findall(r"<!-- mission -->(.*?)<!-- /mission -->", good.group(1), re.S)) if good else ""
+    floor = re.search(r"^[-*\s]*\*\*Floor:\*\*\s*(.+?)\s*$", kept, re.M)
     target = orders and re.search(r"^[-*\s]*\**Target(?::\**|\**:)\s*(.+?)\s*$", read(orders), re.M | re.I)
     return {"charter": where(charter), "orders": where(orders),
             "floor": floor.group(1) if floor else None, "target": target.group(1) if target else None,

@@ -496,7 +496,7 @@ const retirePrompt = (r) => 'Retire the scheduled loop "' + r.loop + '" (' + [r.
   + 'Then run python3 ' + (metaOf('Builder') || 'fleet.py') + ' and confirm it is gone.';
 const loopActs = (r) => {
   const acts = el('div', 'fx-acts');
-  if (r.runtime === 'mac' && !NOT_LOOP.includes(r.project) && r.status !== 'paused' && r.job) acts.append(copyBtn('launchctl kickstart gui/' + metaOf('uid') + '/' + r.job, 'Copy run-now command'));
+  if (r.runtime === 'mac' && !NOT_LOOP.includes(r.project) && !['paused', 'missing'].includes(r.status) && r.job) acts.append(copyBtn('launchctl kickstart gui/' + metaOf('uid') + '/' + r.job, 'Copy run-now command'));
   if (r.project === 'Service' && r.status === 'failing') acts.append(copyBtn('launchctl bootout gui/' + metaOf('uid') + '/' + r.job, 'Copy stop command'));
   acts.append(copyBtn(retirePrompt(r), 'Copy retire prompt'));
   return acts.childElementCount ? acts : null;
