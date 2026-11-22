@@ -295,7 +295,7 @@ def build():
             row["detail"] = (c.stdout or c.stderr).strip()
         elif j and j.get("exit") is not None:  # nothing logged: launchd's last exit and its log file's time
             row.update(result="pass" if j["exit"] == 0 else "fail", last_run=iso(j["log_at"]),
-                       detail=f"last run exited {j['exit']}")
+                       detail=f"last run exited {j['exit']}" + ("" if j["log_at"] else "; it has no log file, so when it last ran is unknown"))
         elif j and j.get("log_at"):  # cron: no exit code, only the time its output file last changed
             row.update(last_run=iso(j["log_at"]), detail="cron keeps no exit codes; last run is when its output file last changed")
         elif j and j.get("has_log") is False:
