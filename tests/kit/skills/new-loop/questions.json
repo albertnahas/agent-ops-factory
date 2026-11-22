@@ -1,5 +1,5 @@
 {
-  "about": "A test copy of the kit's new-loop question spec, using every kind and every optional key, so the dashboard's prompt builder is tested without the kit.",
+  "about": "A test copy of the kit's new-loop question spec, using every kind, every optional key and a `defaults` list the form never asks, so the dashboard's prompt builder is tested without the kit.",
   "prompt": {"new": "/demo:new-loop", "edit": "/demo:new-loop edit"},
   "new": [
     {"id": "repo", "kind": "path", "required": true, "ask": "Which repo?", "help": "The local checkout."},
@@ -13,6 +13,9 @@
     {"id": "role", "kind": "choice", "required": false, "ask": "A fleet role?", "help": "Most have none.", "choices": [{"value": "manager", "label": "Manager", "help": "Takes its project's escalations."}]},
     {"id": "budget", "kind": "number", "required": false, "default": 5, "ask": "Most it may spend a run?", "help": "USD."},
     {"id": "turns", "kind": "integer", "required": false, "default": 60, "ask": "Most turns a run?", "help": "A cap."}
+  ],
+  "defaults": [
+    {"id": "limits", "kind": "longtext", "required": false, "mission": true, "default": "Never spend money.", "ask": "What must it never do?", "help": "The skill states it once; the form never asks it."}
   ],
   "edit": [
     {"id": "loop", "kind": "text", "required": true, "ask": "Which loop?", "help": "Its registry name."},
