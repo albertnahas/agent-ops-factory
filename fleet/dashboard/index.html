@@ -625,7 +625,7 @@ const changesOf = (loop) => { const c = dash.data('changes'); return c.status ==
 const OUTCOME = (c) => c.outcome === 'reverted' ? ['bad', 'Reverted'] : c.outcome === 'pending' ? ['none', 'Pending'] : c.outcome === 'closed' ? ['none', 'Closed']
   : c.moved === true ? ['ok', 'Moved'] : c.moved === false ? ['warn', 'Kept, flat'] : ['none', c.outcome];
 /* a change that adds a Good check or changes a check moves no Good, so it isn't a hit or a miss */
-const hitRate = (rows) => { const read = rows.filter((c) => ['kept', 'reverted'].includes(c.outcome) && !['measure', 'check_detection'].includes(c.metric)); return [read.filter((c) => c.outcome === 'kept' && c.moved === true).length, read.length]; };
+const hitRate = (rows) => { const read = rows.filter((c) => ['kept', 'reverted'].includes(c.outcome)); return [read.filter((c) => c.outcome === 'kept' && c.moved === true).length, read.length]; };
 const changeDetail = (c) => (more) => {
   [['Why', c.hypothesis], ['Metric', c.metric], ['Baseline', c.baseline],
     ['Replay', c.replay_before != null || c.replay_after != null ? (c.replay_before ?? '—') + ' before, ' + (c.replay_after ?? '—') + ' after' : null],
@@ -658,7 +658,7 @@ const loopChanges = (r) => {
    comes to you; a loop whose Good isn't measured has no KPI yet */
 const goodText = (r) => r.kpi === 'met' || r.kpi === 'below'
   ? [r.kpi_value + ' vs Floor ' + (r.floor || r.kpi_bar), r.kpi === 'met' ? 'met' : r.kpi_since ? 'below since ' + dayMonth(String(r.kpi_since)) : 'below',
-    r.kpi === 'below' && 'attempt ' + r.kpi_attempts + ' of ' + (r.kpi_of ?? 2), r.kpi_escalated && 'sent to you'].filter(Boolean).join(' · ')
+    r.kpi === 'below' && 'attempt ' + r.kpi_attempts + ' of ' + (r.kpi_of ?? 2), r.kpi_escalated && 'sent to you', r.kpi_as_of && 'as of ' + dayMonth(String(r.kpi_as_of))].filter(Boolean).join(' · ')
   : 'not measured · ' + (r.floor ? 'Floor ' + r.floor : 'no Floor set');
 const loopMore = (r) => (more) => {
   if (r.detail) { const p = el('p'); p.append(el('b', '', 'Last result: '), document.createTextNode(r.detail)); more.append(p); }
@@ -667,7 +667,7 @@ const loopMore = (r) => (more) => {
   if (r.status === 'no check') more.append(el('p', '', 'Nothing writes a pass or fail line for it, so a run that did nothing looks like one that worked.'));
   if (registered(r)) {
     more.append(el('p', '', [r.checked_by && 'Read by ' + r.checked_by, r.supervisor && 'supervised by ' + r.supervisor,
-      r.escalates_to && 'escalates to ' + r.escalates_to, r.role && 'role ' + r.role].filter(Boolean).join(' · ')));
+      r.escalates_to && 'escalates to ' + r.escalates_to, r.role && 'role ' + r.role, r.improver && 'Improver: on'].filter(Boolean).join(' · ')));
     if (r.break_glass) { const p = el('p'); p.append(el('b', '', 'Break-glass: '), document.createTextNode(r.break_glass)); more.append(p); }
     const p = el('p'); p.append(el('b', '', 'Good: '), document.createTextNode([goodText(r), r.target && 'Target ' + r.target,
       r.pass_rate != null && 'health: ' + Math.round(100 * r.pass_rate) + '% of checks passed'].filter(Boolean).join(' · ')));

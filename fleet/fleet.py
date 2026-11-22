@@ -30,6 +30,8 @@ def load_config():
 C = load_config()
 GH = shutil.which("gh") or next((p for p in ("/opt/homebrew/bin/gh", "/usr/local/bin/gh") if Path(p).exists()), None)
 
+clock = lambda: when(os.environ.get("FLEET_NOW")) or dt.datetime.now().replace(microsecond=0)  # FLEET_NOW replays a past time
+
 def failed(r):
     """A Claude run that failed. A crash still says subtype success; exit and is_error are the truth."""
     return bool(r.get("subtype") != "success" or r.get("exit") or r.get("is_error"))
@@ -478,7 +480,7 @@ def questions():
     if bad or not all(p["value"] for p in prompts): return [], [], f"{f}: " + "; ".join(bad or ["no prompt lines"])
     return rows, prompts, None
 KPI = {"kpi": "kpi", "value": "kpi_value", "bar": "kpi_bar", "of": "kpi_of", "attempts": "kpi_attempts", "since": "kpi_since",
-       "escalated": "kpi_escalated", "date": "kpi_date"}
+       "escalated": "kpi_escalated", "date": "kpi_date", "as_of": "kpi_as_of"}
 def kpis():
     """Each loop's latest KPI line from kpi.jsonl (the improver's weekly read of its Good against its Floor), as the
     loop row's kpi_* cells: kpi is met, below or "no KPI"; below carries since, attempts of its allowance and escalated."""
@@ -533,7 +535,10 @@ def tables():
                                                    table(md, "Break-glass"))
     ok = lambda n: re.fullmatch(r"[A-Za-z0-9_.-]+", n) and n.lower() not in ("you", "nobody")
     b1 += [f"Registry row {r['Loop'][:60]}: a loop name is letters, digits, _ . and -, and not you or nobody" for r in registry if not ok(r["Loop"])]
+    b1 += [f"Registry row {r['Loop'][:60]}: Improver is on or blank" for r in registry if r.get("Improver", "").lower() not in ("", "on")]
     return [r for r in registry if ok(r["Loop"])], services, glass, b1 + b2 + b3
+
+opted_in = lambda reg: reg.get("Improver", "").lower() == "on"  # the improver may visit this loop
 
 FAN_IN = 5  # more loops than this naming you in Checked by is a fan-in warning, which --check prints but doesn't fail on
 
@@ -634,7 +639,7 @@ def snapshot():
     return when(s.get("at")), items("routines", "name"), items("tasks", "id")
 
 def build():
-    now = when(os.environ.get("FLEET_NOW")) or dt.datetime.now().replace(microsecond=0)  # FLEET_NOW replays a past time
+    now = clock()
     registry, services, glass, bad = tables()
     jobs = fixture_jobs(C["jobs"]) if C["jobs"] else {**launchd_jobs(), **cron_jobs()}
     led, first = ledger(now)
@@ -659,7 +664,7 @@ def build():
         row = {"loop": loop, "project": reg.get("Project", ""), "runtime": reg.get("Runtime", ""), "job": job,
                "schedule": (reg.get("Schedule", "").replace(override.group(0), "") if override else reg.get("Schedule", "")).replace("`", "").strip(" ()"),
                "last_run": None, "result": None, "detail": "", "next_due": None,
-               "pass_rate": None, "checks": None, "cost": None, "status": None, **link[loop]}
+               "pass_rate": None, "checks": None, "cost": None, "status": None, "improver": opted_in(reg), **link[loop]}
         spec, live, j, item = None, True, None, None
         if kind == "local":
             j = jobs.get(ref)
@@ -766,7 +771,7 @@ def build():
     for r in rows: r.update(scope=of(r["project"])[1], **kpi.get(r["loop"], {}))
     keys = ["loop", "project", "scope", "runtime", "job", "schedule", "status", "last_run", "result", "detail",
             "next_due", "pass_rate", "checks", "cost", "history", "checked_by", "supervisor", "supervisor_issue",
-            "role", "escalates_to", "escalates_default", "break_glass", "escalation_issue",
+            "role", "escalates_to", "escalates_default", "break_glass", "escalation_issue", "improver",
             "charter", "orders", "prompt", "runner", "report", "log", "floor", "target", *KPI.values()]
     rows = [{k: r.get(k) for k in keys} for r in rows]
 
