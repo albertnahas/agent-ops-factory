@@ -69,9 +69,10 @@ def state(c):
 
 def goods(rs):
     """(what is read, each valued check as (at, number)): its value, or for a running total (its lines carry `total`, so
-    its values are overlapping 7-day gains) its gain since the loop's previous total."""
-    totals = [r for r in rs if num(r.get("total"))]
-    if totals: return "gains in total", [(b["at"], b["total"] - a["total"]) for a, b in zip(totals, totals[1:])]
+    its values are overlapping 7-day gains) its gain per check since the loop's previous total, so a check that logged
+    no total doesn't double the next gain."""
+    totals = [(i, r) for i, r in enumerate(rs) if num(r.get("total"))]
+    if totals: return "gains per check in total", [(b["at"], (b["total"] - a["total"]) / (j - i)) for (i, a), (j, b) in zip(totals, totals[1:])]
     return "values", [(r["at"], r["value"]) for r in rs if num(r.get("value"))]
 
 def outcome(c, pr, rs):
@@ -94,7 +95,7 @@ def outcome(c, pr, rs):
     moved = (mean - baseline if c["better"] == "higher" else baseline - mean) > margin and now >= was
     return {"id": c["id"], "outcome": "kept" if moved else "reverted", "moved": moved, "baseline": baseline, "after": mean,
             "margin": margin, "pass_rate_before": was,
-            "result": f"mean {mean:.4g} vs baseline {baseline:.4g} ({c['better']} is better, kept past a margin of {margin:.4g}) "
+            "result": f"mean {mean:.4g} vs baseline {baseline:.4g} ({c['better']} is better; it must move past a margin of {margin:.4g}) "
                       f"over {runs} {what}; "
                       f"checks passed {now:.0%} vs {was:.0%} before"}
 

@@ -2,7 +2,7 @@
 
 status: active
 
-<!-- Set `status: paused` and push to stop the loop. The runner checks this line before Claude starts, and the agent checks it again first thing. -->
+<!-- Set `status: paused` and push to stop the loop. The runner checks the `status:` line before Claude starts, and the agent checks it again first thing; run from a pointer file, that is the pointer's line. -->
 
 The one fleet-wide loop that changes how a loop works. A loop does its work, its check judges each run, its supervisor writes its Orders, and the improver changes how, in one place only: the loop's charter body outside its `mission` markers. One change at a time, each a graded PR. `fleet/improve_read.py`, a script, not the improver, decides keep or revert. You write the mission blocks and Floors and handle X. It runs weekly, after the supervisors' weekly review: they set what through Orders first, then it changes how within the Orders as they stand. Follow it in place from your agent-ops-factory checkout: your ops repo keeps a short pointer file that holds the `status:` line (its runner reads that one, not the line above), says to follow this file, and gives your values for the angle brackets and the schedule: `<factory>` (the checkout), `<ops-check>`, `<reports>` and the hard-stop command. Every PR you open, a change or a revert, is graded by a grader with fresh context per the merge policy of the repo it lands in, and you act on the grade.
 
