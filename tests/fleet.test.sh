@@ -41,12 +41,17 @@ cat > "$AGENT_OPS_DIR/REGISTRY.md" <<EOF
 | Service | Job | What it is |
 |---|---|---|
 | Build | com.me.build | rebuilds the page |
+| Watchman | routine:watchman | watches the watcher |
+| Sleeper | routine:sleeper | turned off on claude.ai |
+| Gone | routine:gone | deleted on claude.ai |
+| Poster | routine:poster | posts, then a check proves it |
 EOF
 {
   echo "{\"loop\":\"good\",\"date\":\"$(day 1)\",\"subtype\":\"success\",\"cost\":2}"
   echo "{\"loop\":\"good\",\"date\":\"$(day 1)\",\"check\":\"pass\",\"detail\":\"report landed\"}"
   echo "{\"loop\":\"broken\",\"date\":\"$(day 1)\",\"check\":\"fail\",\"detail\":\"report missing\"}"
   for v in fail fail fail pass; do echo "{\"loop\":\"flaky\",\"date\":\"$(day 1)\",\"check\":\"$v\"}"; done
+  echo "{\"loop\":\"Poster\",\"date\":\"$(day 1)\",\"check\":\"fail\",\"detail\":\"post not on the API\"}"
   echo "{\"loop\":\"stray\",\"date\":\"$(day 1)\",\"subtype\":\"success\"}"
   printf 'not json\n{}\n'
 } > "$AGENT_OPS_DIR/runs.jsonl"
@@ -64,7 +69,7 @@ EOF
   printf 'not json\n{"loop":"flaky","kpi":"great"}\n'
 } > "$AGENT_OPS_DIR/kpi.jsonl"
 mkdir -p "$AGENT_OPS_DIR/eval" && echo '{"window":"2026-11-08 to 2026-11-22 at 09:30","floor":{"detection":0.66},"fleet":{"incidents":12,"detected":8,"detection":0.667,"median_hours":2.65,"false_share":0.542},"attention":{"per_day":3.13}}' > "$AGENT_OPS_DIR/eval/result.json"
-echo "{\"at\":\"$(date +%FT%T%z | sed 's/\(..\)$/:\1/')\",\"routines\":[$(for r in good broken flaky fresh reader-job lonely watched; do printf '{"name":"%s","enabled":true,"cron":"0 6 * * *","next_run_at":null,"last_status":null,"last_finished_at":null},' $r; done | sed 's/,$//')],\"tasks\":[]}" > "$AGENT_OPS_DIR/fleet/cloud.json"
+echo "{\"at\":\"$(date +%FT%T%z | sed 's/\(..\)$/:\1/')\",\"routines\":[$(for r in good broken flaky fresh reader-job lonely watched watchman poster; do printf '{"name":"%s","enabled":true,"cron":"0 6 * * *","next_run_at":null,"last_status":null,"last_finished_at":null},' $r; done)$(printf %s '{"name":"sleeper","enabled":false}')],\"tasks\":[]}" > "$AGENT_OPS_DIR/fleet/cloud.json"
 
 echo "{\"launch_agents\": \"$AGENT_OPS_DIR/none\", \"general\": [\"blog\"], \"waiting\": {\"queue\": {\"path\": \"$AGENT_OPS_DIR/QUEUE.md\", \"owner\": \"You\"}}}" > "$AGENT_OPS_DIR/fleet.json"
 printf 'due | kind | item | owner | next action | done when | source\n---\n2026-12-01 | decision | Pick a price | You | decide | priced | agent\n' > "$AGENT_OPS_DIR/QUEUE.md"
@@ -76,6 +81,8 @@ expect "a failed check is failing"             "[ \"\$(status broken)\" = failin
 expect "3 of the last 7 failed is flaky"       "[ \"\$(status flaky)\" = chronic ]"
 expect "never run is not run yet"              "[ \"\$(status fresh)\" = 'no runs yet' ]"
 expect "a ledger name with no row is unregistered" "[ \"\$(status stray)\" = unregistered ]"
+expect "a routine service is read from the snapshot: there, off, gone" "[ \"\$(status Watchman)\" = service ] && [ \"\$(status Sleeper)\" = paused ] && [ \"\$(status Gone)\" = missing ] && jq -e '.rows[] | select(.loop == \"Gone\") | .runtime == \"cloud\" and (.detail | test(\"no routine named gone in the claude.ai snapshot\"))' $L >/dev/null"
+expect "a service that logs a failed check is failing, with its pass rate" "[ \"\$(status Poster)\" = failing ] && jq -e '.rows[] | select(.loop == \"Poster\") | .checks == \"0 of 1\" and .detail == \"post not on the API\"' $L >/dev/null"
 expect "checked by is a comma list"            "jq -e '.rows[] | select(.loop == \"broken\") | .checked_by == \"good, heartbeat\"' $L >/dev/null"
 expect "every cell is a scalar, as on claude.ai" "jq -se 'all(.[].rows[][]; type != \"array\" and type != \"object\")' $L $AGENT_OPS_DIR/fleet/waiting.json >/dev/null"
 expect "a loop's KPI is its latest kpi.jsonl line, as scalar cells" "jq -e '[.rows[] | select(.loop == \"broken\" or .loop == \"good\" or .loop == \"flaky\" or .loop == \"fresh\") | [.loop, .kpi, .kpi_value, .kpi_attempts, .kpi_of, .kpi_since, .kpi_better]] | sort == [[\"broken\", \"below\", 50, 1, 2, \"2026-11-22\", null], [\"flaky\", null, null, null, null, null, null], [\"fresh\", \"measured\", 5, null, null, null, \"higher\"], [\"good\", \"no KPI\", null, null, null, null, null]]' $L >/dev/null"

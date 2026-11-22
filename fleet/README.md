@@ -33,6 +33,7 @@ Without a ledger, a launchd loop's last exit and the time its log file last chan
 - **Missing:** a registered routine or task the claude.ai snapshot doesn't list, so it was deleted or renamed there.
 - A routine whose last run was cancelled or timed out is Failing; one still running isn't.
 - **Unchecked:** runs, with nothing the builder can read that proves the outcome.
+- A service (a Services row) is read like a loop, from its launchd job, routine or task, ledger lines under its name and `checks/<Service>.py`, so it can be Failing, Silent, Flaky, Missing or Paused; otherwise it shows as **Service**. A log file that stopped changing doesn't make it Silent.
 - **Not run yet**, **Paused** (registered, not loaded or enabled, or its charter says `status: paused`), **Healthy**.
 - A launchd job with a Month and Day runs every year on that date, so it reads yearly; a one-off job removes itself after it runs.
 - **No run record:** nothing says when it last ran: a crontab line that sends its output nowhere, or, with no registry, a job whose log is missing or too old to trust.
@@ -52,7 +53,7 @@ Open a loop, in the lists or by tapping it on the Factory tab, and the buttons u
 - A cloud routine's page needs its id in `cloud.json`, which the claude.ai sync (`SYNC.md`) writes.
 - A registered loop whose charter isn't found says **Charter: none**, so the gap shows. Write `none` in the Charter cell when there is none.
 - Above the buttons, the panel says who reads the loop, who supervises it, where it escalates, its role and any break-glass reason, then **Good**: the `**Floor:**` line the charter keeps in its Mission, read only inside `mission` markers, and any `Target:` line of its Orders. With no Floor it says Good: not set. A loop that is Unchecked says what that costs: nothing writes a pass or fail line for it.
-- A service whose job nothing on this machine runs is Missing, not Paused.
+- A service whose job nothing on this machine runs, or a routine or task the claude.ai snapshot doesn't list, is Missing, not Paused.
 
 ## Start or change a loop
 
