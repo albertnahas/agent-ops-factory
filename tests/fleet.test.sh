@@ -175,8 +175,9 @@ python3 fleet/fleet.py >/dev/null
 expect "a charter on GitHub links to its page"    "[ \"\$(def ops charter)\" = https://github.com/demo/shop/blob/main/docs/OPS.md ]"
 expect "its Orders and report come from the default branch" "[ \"\$(def ops orders)\" = https://github.com/demo/shop/blob/main/docs/orders/ops.md ] && [ \"\$(def ops report)\" = https://github.com/demo/shop/blob/main/docs/reports/2026-11-20.md ]"
 
-run() { python3 -c "import sys; sys.path.insert(0, 'fleet'); from fleet import runner; print(runner(sys.argv[1:]) or '')" "$@"; }
-expect "a job's script is its last argument in your home" "[ \"\$(run /bin/bash \"\$PWD/tests/fleet.test.sh\" morning)\" = \"\$(pwd -P)/tests/fleet.test.sh\" ] && [ -z \"\$(run /bin/bash -c 'echo hi')\" ]"
+touch "$AGENT_OPS_DIR/run.sh"
+run() { HOME="$AGENT_OPS_DIR" python3 -c "import sys; sys.path.insert(0, 'fleet'); from fleet import runner; print(runner(sys.argv[1:]) or '')" "$@" | sed "s|^$TMP/||"; }
+expect "a job's script is its last argument in your home" "[ \"\$(run /bin/bash \"$AGENT_OPS_DIR/run.sh\" morning)\" = run.sh ] && [ -z \"\$(run /bin/bash -c 'echo hi')\" ]"
 
 # Schedules: the next two fires after 10:00 on Sunday 22 Nov 2026 (or the day given), as crontab reads them.
 fires() { python3 -c "import sys, datetime as dt; sys.path.insert(0, 'fleet'); from fleet import cron_spec, fires, nth

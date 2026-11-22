@@ -227,7 +227,7 @@ def cron_jobs():
 def runner(args):
     """The script a job runs: the last argument naming a file in your home folder (`bash run.sh`, `node watch.mjs`)."""
     files = [Path(a).expanduser() for a in args if a.startswith(("/", "~"))]
-    return next((f.resolve() for f in reversed(files) if f.is_file() and Path.home() in f.resolve().parents), None)
+    return next((f.resolve() for f in reversed(files) if f.is_file() and Path.home().resolve() in f.resolve().parents), None)
 
 def git(cwd, *args):
     return subprocess.run(["git", "-C", str(cwd), *args], capture_output=True, text=True).stdout.strip()
@@ -236,7 +236,7 @@ def git(cwd, *args):
 def origin(top):
     """(owner/name, default branch ref) of a checkout whose origin is on GitHub, else None."""
     m = re.search(r"github\.com[:/]([^/]+/[^/]+?)(?:\.git)?$", git(top, "remote", "get-url", "origin"))
-    return (m.group(1), git(top, "rev-parse", "--abbrev-ref", "origin/HEAD") or "origin/main") if m else None
+    return (m.group(1), git(top, "symbolic-ref", "--short", "refs/remotes/origin/HEAD") or "origin/main") if m else None
 
 def on_github(path):
     """(owner/name, ref, path in the repo) when path is on its GitHub checkout's default branch, else None. The default
@@ -597,7 +597,7 @@ def memo_items(owner, repo, path, cfg):
     every `**Decision:**` line is filled), and table rows whose last cell is the `awaiting` status."""
     heading, awaiting = cfg.get("decisions", "Founder decisions"), cfg.get("awaiting", "Awaiting founder")
     subprocess.run(["git", "-C", str(path), "fetch", "-q", "origin"], capture_output=True)
-    ref = subprocess.run(["git", "-C", str(path), "rev-parse", "--abbrev-ref", "origin/HEAD"], capture_output=True, text=True).stdout.strip() or "origin/main"
+    ref = git(path, "symbolic-ref", "--short", "refs/remotes/origin/HEAD") or "origin/main"
     hits = subprocess.run(["git", "-C", str(path), "grep", "-l", "-i", "-e", heading, "-e", awaiting, ref, "--", "docs"],
                           capture_output=True, text=True).stdout.split()
     items = []
