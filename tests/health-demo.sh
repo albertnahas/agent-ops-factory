@@ -64,6 +64,7 @@ cat > "$D/crontab" <<EOF
 MAILTO=""
 LOGS=$D/logs
 0 */4 * * * cd $D && ./backup.sh >> \$LOGS/backup.log 2>&1
+0 6 * * * cd $D && OPS_LOOP=inbox-zero \$HOME/.agent-ops/kit/bin/claude-run -p "Triage the inbox" >/dev/null 2>&1
 45 * * * * $D/photo-sync.sh >> \$PHOTO_LOGS/sync.log 2>&1
 0 7 * * * cd $D && claude -p "Summarise yesterday's notes" >> logs/notes-digest.log 2>&1
 @hourly /usr/bin/python3 $D/feed-poller.py

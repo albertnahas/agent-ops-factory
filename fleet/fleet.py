@@ -180,13 +180,13 @@ def cron_output(cmd, env={}):
     doesn't set, or a name worked out as it runs ($(date)), stays in the path with its $."""
     words, outs, cwd = cron_words(cmd), {}, "."
     for i, w in enumerate(words[:-1]):
-        to, fd = words[i + 1], words[i - 1] if i and words[i - 1].isdigit() else "1"
+        to, fd = words[i + 1], words[i - 1] if i and words[i - 1].isdigit() and words[i - 1] + w in cmd else "1"  # `2>`, not `3 >`
         if w == "cd" and (not i or words[i - 1] in {"&&", ";", "("}): cwd = to
         elif w in (">", ">>", ">|") or w in ("&>", "&>>") or w == ">&" and not to.isdigit() and to != "-":
             outs.setdefault(fd, to)
         elif Path(w).name == "tee" and i and words[i - 1] == "|":
             outs.setdefault("1", next((x for x in words[i + 1:] if not x.startswith("-")), None))
-    f = outs.get("1") or outs.get("2")
+    f = next((outs[k] for k in "12" if outs.get(k, "/dev/null") != "/dev/null"), outs.get("1") or outs.get("2"))
     env = {"HOME": str(Path.home()), "LOGNAME": os.environ.get("USER", ""), "USER": os.environ.get("USER", "")} | env
     expand = lambda x: Path(re.sub(r"\$\{?(\w+)\}?", lambda m: env.get(m[1], m[0]), re.sub(r"`[^`]*`", "$", x))).expanduser()
     return f and Path.home() / expand(cwd) / expand(f)
@@ -208,7 +208,8 @@ def cron_jobs():
         log = cron_output(cmd, env)
         unset = log and re.search(r"\$\w*", str(log))
         has_log = bool(log and str(log) != "/dev/null" and not unset)
-        name = "cron:" + (log.stem if has_log and cron_name(cmd) == "claude" else cron_name(cmd))  # `claude -p .. >> digest.log`
+        loop = re.search(r"(?:^|\s)OPS_LOOP=([\w.-]+)", cmd)  # the kit's claude-run logs the loop under $OPS_LOOP
+        name = "cron:" + (loop[1] if loop else log.stem if has_log and cron_name(cmd) in {"claude", "claude-run"} else cron_name(cmd))
         while name in jobs: name += "+"
         jobs[name] = {"spec": cron_spec(expr), "schedule": expr, "loaded": True, "vendor": False, "oneoff": False,
                       "exit": None, "interval": None, "daemon": False, "has_log": has_log,

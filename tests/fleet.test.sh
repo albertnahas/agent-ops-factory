@@ -156,6 +156,7 @@ expect "health: unloaded and vendor jobs stay out" "! jq -e '.rows[] | select(.l
 expect "health: cron with an output file ran"  "[ \"\$(status cron:backup.sh)\" = ran ]"
 expect "health: an output file under a variable the crontab doesn't set has no record" "jq -e '.rows[] | select(.loop == \"cron:photo-sync.sh\") | .status == \"no record\" and (.detail | test(\"PHOTO_LOGS\"))' \$L >/dev/null"
 expect "health: a claude -p line is named after its output file, relative to its cd" "[ \"\$(status cron:notes-digest)\" = ran ]"
+expect "health: a claude-run line is named after its OPS_LOOP" "[ \"\$(status cron:inbox-zero)\" = 'no record' ]"
 expect "health: cron with no output file has no record" "[ \"\$(status cron:feed-poller.py)\" = 'no record' ]"
 expect "health: cron names skip shells, @reboot is skipped" "[ \"\$(status cron:never-ran.sh)\" = 'no runs yet' ] && ! jq -e '.rows[] | select(.loop | test(\"on-boot|bash|cd\$\"))' $L >/dev/null"
 expect "health: routines show their last status" "[ \"\$(status repo-dependency-check)\" = ran ] && [ \"\$(status release-notes-draft)\" = failing ] && [ -z \"\$(status paused-idea)\" ]"
@@ -178,7 +179,8 @@ outs = {'/a/q.sh >> "/t/sp ace/q.log" 2>&1': '/t/sp ace/q.log', 'bash -c "x > in
         'x &> /t/r.log': '/t/r.log', 'x 2> /t/err.log': '/t/err.log', 'x 2>&1 >> /t/o.log': '/t/o.log', 'x 2>&1': 'None',
         'x 2>&1 | tee -a /t/tee.log': '/t/tee.log', 'x >& /t/both.log': '/t/both.log', 'x 3> /t/fd3.log': 'None',
         'x >> $NOPE/a.log': str(Path.home() / '$NOPE/a.log'), 'cd /a && ./x.sh >> log 2>&1': '/a/log',
-        'x >> /t/p_$(date +%F).log': '/t/p_$', 'x >> /t/`date`.log': '/t/$.log'}
+        'x >> /t/p_$(date +%F).log': '/t/p_$', 'x >> /t/`date`.log': '/t/$.log', 'x >/dev/null 2>>/t/e.log': '/t/e.log',
+        'x --days 3 > /t/d.log': '/t/d.log'}
 bad = {k: cron_name(k) for k, v in names.items() if cron_name(k) != v} | {k: cron_output(k) for k, v in outs.items() if str(cron_output(k)) != v}
 assert not bad, bad
 assert str(cron_output('x >> ${L}/a.log', {'L': '/t'})) == '/t/a.log'
