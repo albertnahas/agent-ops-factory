@@ -31,6 +31,34 @@ Write the outcome check before the prompt. If you can't say what proves the run 
 
 Every runner exports `OPS_LOOP=<registry name>`, so the ledger, the heartbeat and the dashboard all agree on which loop is which. `plan-loops` builds each new loop in this order: charter, check, runner, hand run, schedule, registry row.
 
+## Supervisors and Orders
+
+A charter is fixed. It says what the loop is for and what it must never do. What the loop is working on this month is a different thing, and once a loop has a supervisor it lives in an Orders file, `docs/orders/<name>.md`, one per charter (morning and evening social share one). Orders are a table: the order, what it moves, its stop rule and its read date, plus a Changes log with one line per edit. The shape is in [examples/orders.md](https://github.com/albertnahas/agent-ops-kit/blob/main/examples/orders.md). The loop reads its Orders right after its charter, and the charter outranks every line in them.
+
+**Supervisors are optional.** A supervisor is a loop that checks how another loop is doing and writes its Orders. The registry's Supervisor column names it, or stays blank for none, and a loop with none runs as it always did, steered by you through its charter. One loop can supervise many, and a loop has at most one supervisor, so they form a tree. Plugging one in takes two edits: the cell in the registry, and a supervising duty in the supervisor's charter (the "Supervising" section of [AGENT_LOOP.md](https://github.com/albertnahas/agent-ops-kit/blob/main/docs/AGENT_LOOP.md)). The supervisor creates the Orders file on its first review. Checked by stays as it is: it lists who reads the output, and a supervisor is one of them.
+
+**Marked blocks.** The charter's mission, kill switch, hard limits, its whole merge policy and the PR sweep step that runs the guard sit inside `mission` markers: an HTML comment line saying `mission` opens a block, and one saying `/mission` closes it. Write them only on their own lines, never inside a sentence. Only you edit what's inside. The rest of the charter (queries, report format, data quirks) stays editable through graded PRs.
+
+**Who writes Orders.** The loop's named supervisor, or you, and nobody else. The loop may add a line only for a test it starts itself within its charter, and it closes its own lines on their read date. It never changes or removes a line someone else wrote. If it wants that, it says so under "Orders requests" in its report, and its supervisor answers. Nothing it learns becomes a new dated section in its charter: that's how charters grow to 700 lines.
+
+An Orders change lands as its own PR, never a direct push, and `mission-guard orders` must pass on it before it's graded: it touches only `docs/orders/` files, each with exactly one new Changes line. The line's last field names who wrote it. Once a month you read every Orders file's Changes since your last read (`git log -p docs/orders/`): that's how you supervise the supervisors. A strategy loop can list the month's lines in its memo for you.
+
+**What a supervisor does.**
+- It reviews each loop it supervises at most once a week (daily ops: Mondays), reading the loop's reports since the last review and the number each Order moves.
+- For each Order it keeps, changes or retires it. It changes one only on or after its read date, or early when its stop rule or a P0 fires, so a test gets its full window. Every change is a line in Changes with the reason.
+- It answers every Orders request.
+- An Order that loosens a hard limit or reaches an X surface is X: it goes to you.
+- A monthly loop doesn't supervise a daily one, because it reads too rarely to steer it. A strategy loop sits beside daily ops, with neither supervising the other. An approved bet becomes an Order on the loop that owns its test, written the day it's approved.
+
+**The mission guard.** The marked blocks are the one part of a charter no agent should change, so a script with no model in it watches them. After your edit lands on the default branch, run the kit's `bin/mission-guard bless <charter>`. From then on:
+- The heartbeat runs `mission-guard check` daily, and alerts with the diff when a blessed charter's blocks differ on the default branch.
+- The loop that grades PRs runs `mission-guard pr` on each PR head before grading, and any non-zero exit makes the PR X whatever the grader concluded. It flags a change inside any file's marked blocks, and any change to the paths a PR could use to grade itself: the grader and hooks in `.claude/`, CI workflows, the guard itself, and any path you list in `.mission-guard` at the repo root. It compares the checkout with the default branch and needs no state, so a cloud loop runs a copy kept in the product repo at `scripts/mission-guard`. It runs the default branch's copy, never the PR's, so a PR can't switch off its own check: `git show origin/main:scripts/mission-guard > /tmp/mission-guard && python3 /tmp/mission-guard pr` (with your default branch in place of `main`). If that copy is missing the command fails, and the PR is X.
+- To take the model out of that step, copy [examples/mission-guard.yml](https://github.com/albertnahas/agent-ops-kit/blob/main/examples/mission-guard.yml) to `.github/workflows/` and make its check required. It runs from the default branch (`pull_request_target`), so a PR can't drop it, and a red check is X. Required checks need branch protection or a ruleset, which a private repo on GitHub's free plan doesn't have. There, and anywhere the check isn't required, the guard is a step the grading loop is told to run, and a loop can still skip it.
+
+It's the same idea as path-based risk tiers, but it guards sentences as well as files. The registry's Supervisor column is checked too. A supervisor that isn't a loop, or a cycle, fails `fleet.py --check` in the fleet sync's outcome check, so the heartbeat sends its usual failed-check alert, and the dashboard flags the row.
+
+Managers that rewrite their workers' prompts aren't new. Paperclip's org chart has a prompt-evolving plugin, and Gas Town has a Mayor directing workers. What's different here is the split. The part that says what a loop is for is locked, and a script, not a model, enforces it. The part a manager may change goes through the same graded PR as code, with a read date and a reason on every line.
+
 ## Budgets
 
 Two budgets, and the second runs out first.
@@ -89,7 +117,7 @@ The test measures demand directly, with signups, replies or pre-orders, because 
 
 **Your part.** Approve, reject or defer each bet in the memo's "Founder decisions" section by its deadline. The dashboard lists open decision sections from your repos' `docs/` (`waiting.github.memo_roots` in `fleet.json`). Silence means undecided: the bet is carried to the next memo, never assumed approved. A bet that reopens a settled decision says which one and what's different this time.
 
-**After you decide.** An approved bet's test is filed the same day, as a queue line or in the owning loop's charter, and only the test gets built. On the read date, the next memo reports the number against the kill rule. A killed bet goes into [DECISIONS.md](https://github.com/albertnahas/agent-ops-kit/blob/main/docs/DECISIONS.md) so it isn't proposed again in the same form. A bet that clears comes back with its next, bigger test. Only once the evidence is strong enough does it get built, as normal graded PRs, with money, identity and data surfaces still X.
+**After you decide.** An approved bet's test is filed the same day, as an Order on the loop that owns the test ([Supervisors and Orders](#supervisors-and-orders)), or a queue line when no loop owns it, and only the test gets built. On the read date, the next memo reports the number against the kill rule. A killed bet goes into [DECISIONS.md](https://github.com/albertnahas/agent-ops-kit/blob/main/docs/DECISIONS.md) so it isn't proposed again in the same form. A bet that clears comes back with its next, bigger test. Only once the evidence is strong enough does it get built, as normal graded PRs, with money, identity and data surfaces still X.
 
 Example of one bet in a memo (an imaginary product):
 
