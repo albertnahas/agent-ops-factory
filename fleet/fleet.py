@@ -4,7 +4,8 @@ one-off job with its health), <out>/waiting.json (everything waiting on you) and
 Sources: the registry file, launchd plists, your crontab, the run ledger, <out>/cloud.json (Claude routines and
 desktop tasks, written by the claude.ai sync in fleet/SYNC.md), and optionally a queue file, GitHub PRs and decision memos.
 fleet/README.md says how each status is decided."""
-import datetime as dt, functools, json, os, plistlib, re, shlex, shutil, subprocess, sys
+import datetime as dt, functools, json, math, os, plistlib, re, shlex, shutil, subprocess, sys
+from collections import Counter
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
@@ -31,26 +32,57 @@ def failed(r):
     return bool(r.get("subtype") != "success" or r.get("exit") or r.get("is_error"))
 
 norm = lambda s: re.sub(r"[^a-z0-9]", "", (s or "").lower())
+# Every source is read once, here at its edge: text with bad bytes replaced and split on \n only (U+2028 is text), names
+# as strings, timestamps parsed, and anything else unusable left out, so one odd line never stops the build.
+lines = lambda f: f.read_text(encoding="utf-8-sig", errors="replace").split("\n") if os.path.isfile(f) else []
+name = lambda v: str(v) if isinstance(v, (str, int, float)) and str(v).strip() else None
+
+def when(s):
+    """A timestamp as naive local time to the second, or None. Takes Z, offsets and any fraction, as python 3.9 doesn't."""
+    if not isinstance(s, str): return None
+    s = re.sub(r"Z$", "+00:00", re.sub(r"\.(\d+)", lambda m: "." + m.group(1)[:6].ljust(6, "0"), s.strip()))
+    try: t = dt.datetime.fromisoformat(s); return (t.astimezone().replace(tzinfo=None) if t.tzinfo else t).replace(microsecond=0)
+    except (ValueError, OverflowError): return None  # not a time, or a "never" like 9999-12-31Z
+
+def check_of(loop):
+    """checks/<loop>.py when the name is a plain file name and the file is there (a name too long for one is no file)."""
+    f = C["checks"] / f"{loop}.py"
+    return f if loop == Path(loop).name and os.path.isfile(f) else None
 
 def scoping(registry):
     """name -> (the registry project it names, ignoring case and punctuation, or "", its scope). The scope is that
-    project, or General: no project, a project listed under `general` in fleet.json, or nothing a registry row owns."""
-    projects = {norm(r["Project"]): r["Project"] for r in registry if r.get("Project")}
-    general = {norm(g) for g in C.get("general", [])}
+    project, or General: no project, a project listed under `general` in fleet.json, or nothing a registry row owns.
+    Spellings of one project share its first row's."""
+    projects = {}
+    for r in registry:
+        if r.get("Project"): projects.setdefault(norm(r["Project"]), r["Project"])
+    general = {norm(g) for g in C.get("general", [])} | {"general"}
     def of(name):
         p = projects.get(norm(name), "")
         return p, p if p and norm(p) not in general else "General"
     return of
 
-def table(md, heading):
-    """Rows of the first markdown table under `## heading`, as dicts keyed by header; [] if there is none."""
-    if f"## {heading}" not in md: return []
+def cells(line, outer=True):
+    """A table row's cells, split on | (`\\|` is a pipe inside a cell), less the pipes at either end if `outer`."""
+    line = re.sub(r"^\||(?<!\\)\|$", "", line.strip()) if outer else line
+    return [c.strip().replace("\\|", "|") for c in re.split(r"(?<!\\)\|", line)]
+
+def table(md, heading, *keys):
+    """Rows of the first markdown table under `## heading`, as dicts keyed by header, and what's wrong with the rows
+    left out: more cells than headers (an unescaped |) or a blank key cell."""
+    if f"## {heading}" not in md: return [], []
     sec = md.split(f"## {heading}", 1)[1].split("\n## ", 1)[0]
-    lines = [l for l in sec.splitlines() if l.startswith("|")]
-    if len(lines) < 2: return []
-    cells = lambda l: [c.strip() for c in l.strip().strip("|").split("|")]
-    head = cells(lines[0])
-    return [dict(zip(head, cells(l))) for l in lines[2:]]
+    rows = [l for l in sec.split("\n") if l.startswith("|")]
+    if len(rows) < 2: return [], []
+    head, out, bad = cells(rows[0]), [], []
+    for l in rows[2:]:
+        c = cells(l)
+        r = dict(zip(head, c + [""] * len(head)))
+        wrong = any(c[len(head):]) and f"{len(c)} cells under {len(head)} headers (a | in a cell is \\|)" or \
+                next((f"no {k}" for k in keys if not r.get(k)), None)
+        if wrong: bad.append(f"{heading} row {next(filter(None, c), '')[:60]}: {wrong}")
+        else: out.append(r)
+    return out, bad
 
 # --- schedules: launchd calendar dicts and crons share one form, {Minute, Hour, Day, Month, Weekday} -> sets
 
@@ -59,7 +91,8 @@ NAMES = {n: i for i, n in enumerate(["sun", "mon", "tue", "wed", "thu", "fri", "
 
 def cron_spec(expr, both=False):
     """Cron's rule: with both day of month and weekday restricted, either one matching fires. both=True makes it
-    both, for registry overrides that describe what a runner really does ("first Monday": `0 8 1-7 * 1`)."""
+    both, for registry overrides that describe what a runner really does ("first Monday": `0 8 1-7 * 1`). None for an
+    expression cron would reject."""
     expr = re.sub(r"^CRON_TZ=\S+\s+", "", expr.strip())
     num = lambda s: NAMES[s.lower()[:3]] if s[:1].isalpha() else int(s)
     def field(f, lo, hi):
@@ -69,17 +102,26 @@ def cron_spec(expr, both=False):
             rng, _, step = part.partition("/")
             a, _, b = rng.partition("-")
             a, b = (lo, hi) if a == "*" else (num(a), num(b) if b else (hi if step else num(a)))
+            if not lo <= a <= hi or not lo <= b <= hi: raise ValueError(part)
             if b < a and hi == 7: b += 7  # weekdays wrap: sat-sun
             out |= set(range(a, b + 1, int(step or 1)))
+        if not out: raise ValueError(f)
         return out
-    m, h, d, mo, wd = expr.split()[:5]
-    return [{"Minute": field(m, 0, 59), "Hour": field(h, 0, 23), "Day": field(d, 1, 31),
-             "Month": field(mo, 1, 12), "Weekday": {w % 7 for w in field(wd, 0, 7)} if wd != "*" else None,
-             "either": not both and d != "*" and wd != "*"}]
+    try:
+        m, h, d, mo, wd = expr.split()[:5]
+        return [{"Minute": field(m, 0, 59), "Hour": field(h, 0, 23), "Day": field(d, 1, 31),
+                 "Month": field(mo, 1, 12), "Weekday": {w % 7 for w in field(wd, 0, 7)} if wd != "*" else None,
+                 "either": not both and d != "*" and wd != "*"}]
+    except (ValueError, KeyError): return None
 
-def plist_spec(cal):
-    return [{k: ({c[k] % 7} if k == "Weekday" else {c[k]}) if k in c else None
-             for k in ("Minute", "Hour", "Day", "Month", "Weekday")} for c in (cal if isinstance(cal, list) else [cal])]
+every = lambda n: f"every {n // 60} min" if n % 60 == 0 else f"every {n} s"  # a StartInterval
+RANGES = {"Minute": (0, 59), "Hour": (0, 23), "Day": (1, 31), "Month": (1, 12), "Weekday": (0, 7)}
+
+def plist_spec(cals):
+    """StartCalendarInterval dicts as specs; ValueError for one launchd wouldn't run (not a dict, a time not an int in range)."""
+    if not all(isinstance(c, dict) and all(type(c[k]) is int and lo <= c[k] <= hi for k, (lo, hi) in RANGES.items() if k in c)
+               for c in cals): raise ValueError(cals)
+    return [{k: ({c[k] % 7} if k == "Weekday" else {c[k]}) if k in c else None for k in RANGES} for c in cals]
 
 def fires(spec, start, direction, days=70):
     """Scheduled times after (direction 1) or before (-1) start, nearest first. Day and Weekday must both match,
@@ -102,31 +144,35 @@ def nth(gen, n):
 # --- what is scheduled on this machine
 
 def launchd_jobs():
+    """Each plist's job; a plist launchd wouldn't run (unreadable, wrong types, a time out of range) is left out."""
     jobs = {}
     if not shutil.which("launchctl") or not C["launch_agents"].is_dir(): return jobs
+    listed = {}  # label -> (running, last exit), from one `launchctl list`: PID, Status, Label columns
+    for l in subprocess.run(["launchctl", "list"], capture_output=True, text=True, errors="replace").stdout.split("\n"):
+        m = re.match(r"(\S+)\t(-?\d+|-)\t(.+)$", l)
+        if m: listed[m.group(3)] = (m.group(1) != "-", None if m.group(2) == "-" else int(m.group(2)))
     for p in sorted(C["launch_agents"].glob("*.plist")):
-        try: pl = plistlib.loads(p.read_bytes())
+        try:
+            pl = plistlib.loads(p.read_bytes())
+            cal = pl.get("StartCalendarInterval")
+            cals = cal if isinstance(cal, list) else [cal] if cal else []
+            spec = plist_spec(cals)
         except Exception: continue
-        label = pl.get("Label", p.stem)
-        prog = " ".join(pl.get("ProgramArguments") or [pl.get("Program", "")])
-        info = subprocess.run(["launchctl", "list", label], capture_output=True, text=True)
-        code = re.search(r'"LastExitStatus" = (-?\d+);', info.stdout)
-        pid = re.search(r'"PID" = (\d+);', info.stdout)
-        cal = pl.get("StartCalendarInterval")
-        args = pl.get("ProgramArguments") or [pl.get("Program", "")]
-        logs = [Path(pl[k]).expanduser() for k in ("StandardOutPath", "StandardErrorPath") if pl.get(k)]
-        stamps = [f.stat().st_mtime for f in logs if f.exists()]
+        label = name(pl.get("Label")) or p.stem
+        running, code = listed.get(label, (False, None))
+        interval = pl.get("StartInterval") if type(pl.get("StartInterval")) is int and pl["StartInterval"] > 0 else None
+        args = [str(a) for a in pl.get("ProgramArguments") or [pl.get("Program", "")]] if isinstance(pl.get("ProgramArguments") or [], list) else []
+        logs = [Path(pl[k]).expanduser() for k in ("StandardOutPath", "StandardErrorPath") if isinstance(pl.get(k), str)]
+        stamps = [f.stat().st_mtime for f in logs if os.path.isfile(f)]
         jobs[label] = {
-            "schedule": f"every {pl['StartInterval'] // 60} min" if pl.get("StartInterval") else
-                        ", ".join(" ".join(str(c.get(k, "*")) for k in ("Minute", "Hour", "Day", "Month", "Weekday"))
-                                  for c in (cal if isinstance(cal, list) else [cal])) if cal else "",
-            "vendor": ".app/Contents/" in prog,
-            "loaded": info.returncode == 0,
-            "exit": None if pid or not code else int(code.group(1)),  # a running job's last exit is history
-            "spec": plist_spec(cal) if cal else None,
-            "interval": pl.get("StartInterval"),
-            "oneoff": bool(cal) and all("Month" in c and "Day" in c for c in (cal if isinstance(cal, list) else [cal])),
-            "daemon": bool(pl.get("KeepAlive") or (pl.get("RunAtLoad") and not cal and not pl.get("StartInterval"))),
+            "schedule": every(interval) if interval else ", ".join(" ".join(str(c.get(k, "*")) for k in RANGES) for c in cals),
+            "vendor": ".app/Contents/" in str(args),
+            "loaded": label in listed,
+            "exit": None if running else code,  # a running job's last exit is history
+            "spec": spec or None,
+            "interval": interval,
+            "oneoff": bool(cals) and all("Month" in c and "Day" in c for c in cals),
+            "daemon": bool(pl.get("KeepAlive") or (pl.get("RunAtLoad") and not cals and not interval)),
             "keepalive": bool(pl.get("KeepAlive")),
             "log_at": dt.datetime.fromtimestamp(max(stamps)).replace(microsecond=0) if stamps else None,
             "runner": runner(args) or p, "log": logs[0] if logs else None,
@@ -199,8 +245,8 @@ def cron_jobs():
     Cron keeps no exit codes; the file a line sends its output to says when it last ran."""
     jobs, env = {}, {}
     if not shutil.which("crontab"): return jobs
-    tab = subprocess.run(["crontab", "-l"], capture_output=True, text=True).stdout
-    for line in tab.splitlines():
+    tab = subprocess.run(["crontab", "-l"], capture_output=True, text=True, errors="replace").stdout
+    for line in tab.split("\n"):
         parts, var = line.split(), re.match(r"\s*(\w+)\s*=\s*(.*)", line)
         if var: env[var[1]] = var[2].strip().strip("\"'")
         if not parts or line.lstrip().startswith("#") or var: continue
@@ -217,7 +263,7 @@ def cron_jobs():
         jobs[name] = {"spec": cron_spec(expr), "schedule": expr, "loaded": True, "vendor": False, "oneoff": False,
                       "exit": None, "interval": None, "daemon": False, "has_log": has_log,
                       "unset": unset and unset[0],
-                      "log_at": dt.datetime.fromtimestamp(log.stat().st_mtime).replace(microsecond=0) if log and log.is_file() else None,
+                      "log_at": dt.datetime.fromtimestamp(log.stat().st_mtime).replace(microsecond=0) if log and os.path.isfile(log) else None,
                       "runner": runner(cron_words(cmd)), "log": log if has_log else None}
     return jobs
 
@@ -227,7 +273,7 @@ def cron_jobs():
 def runner(args):
     """The script a job runs: the last argument naming a file in your home folder (`bash run.sh`, `node watch.mjs`)."""
     files = [Path(a).expanduser() for a in args if a.startswith(("/", "~"))]
-    return next((f.resolve() for f in reversed(files) if f.is_file() and Path.home().resolve() in f.resolve().parents), None)
+    return next((f.resolve() for f in reversed(files) if os.path.isfile(f) and Path.home().resolve() in f.resolve().parents), None)
 
 def git(cwd, *args):
     return subprocess.run(["git", "-C", str(cwd), *args], capture_output=True, text=True).stdout.strip()
@@ -314,13 +360,19 @@ def definitions(reg, kind, ref, item, roots):
 # --- the ledger claude-run and ops-check append to
 
 def ledger(now):
-    f = C["ledger"]
+    """Runs by loop. A line counts with a loop name and a date it can read; its date becomes local time, so runs sort by
+    when they happened, not by where they sit in the file."""
     runs = []
-    for l in f.read_text().splitlines() if f.exists() else []:
+    for l in lines(C["ledger"]):
         try: r = json.loads(l)
-        except ValueError: continue
-        if isinstance(r, dict) and r.get("loop") and r.get("date"): runs.append(r)
+        except (ValueError, RecursionError): continue
+        if not isinstance(r, dict) or not name(r.get("loop")) or not when(r.get("date")): continue
+        cost, detail = r.get("cost"), r.get("detail")
+        runs.append({**r, "loop": name(r["loop"]), "date": when(r["date"]).isoformat(),
+                     "cost": cost if isinstance(cost, (int, float)) and not isinstance(cost, bool) and math.isfinite(cost) else 0,
+                     "detail": "" if detail is None else str(detail)})
     if not runs: return {}, None
+    runs.sort(key=lambda r: r["date"])
     by = {}
     for r in runs: by.setdefault(r["loop"], []).append(r)
     since = (now - dt.timedelta(days=WINDOW)).isoformat()
@@ -370,17 +422,27 @@ def discovered(jobs, routines, tasks, led, week):
     return loops, services
 
 def tables():
-    md = C["registry"].read_text() if C["registry"].exists() else ""
-    return table(md, "Registry"), table(md, "Services"), table(md, "Break-glass")
+    """The registry's Registry, Services and Break-glass rows, and what's wrong with the rows left out."""
+    md = "\n".join(lines(C["registry"]))
+    (registry, b1), (services, b2), (glass, b3) = (table(md, "Registry", "Loop"), table(md, "Services", "Service"),
+                                                   table(md, "Break-glass"))
+    return registry, services, glass, b1 + b2 + b3
 
-def links(registry, services, glass):
+def links(registry, services, glass, bad=()):
     """Each registry loop's Checked by, Supervisor and Escalates to, and each break-glass entry's reason. A name is a loop's
     or service's name or its job, with or without the routine:/task: prefix, or you; any other name is kept as written, a
     checker the registry doesn't have. Supervisor, optional, is the one loop that writes this loop's Orders (or you): a
     parent that is no loop, or a chain that comes back to the row, is its supervisor_issue. Escalates to, optional, is
     where the loop sends what needs a person; blank means its project's manager, else the master, else you (always you for the master). Once a loop
-    has Role master, only it and the Break-glass table may reach you; escalation_issue says what breaks that.
-    Returns (loops, break-glass reasons by name, issues of Break-glass rows that name nothing)."""
+    has Role master, only it and the Break-glass table may reach you; escalation_issue says what breaks that. A cycle is
+    drawn once, from its first loop by name; the other loops on it, and those whose chain runs into it, name that loop.
+    A name on two rows keeps the first. Returns (loops, break-glass reasons by name, issues that belong to no one loop:
+    the `bad` rows tables() left out, names on two rows, Break-glass rows that name nothing)."""
+    twice = [f"{n}: {c} registry rows have this name; the first one counts"
+             for n, c in Counter(r["Loop"] for r in registry).items() if c > 1]
+    first = {}
+    for r in registry: first.setdefault(r["Loop"], r)
+    registry = list(first.values())
     named = [(r["Loop"], r["Job"]) for r in registry] + [(r["Service"], r["Job"]) for r in services]
     alias = {k: n for n, j in named for k in (j, j.partition(":")[2]) if k} | {n: n for n, _ in named}
     resolve = lambda c: "you" if c.lower() == "you" else alias.get(c, c)
@@ -400,13 +462,25 @@ def links(registry, services, glass):
                        "role": roles[r["Loop"]], "break_glass": reasons.get(r["Loop"]),
                        "escalates_to": resolve(cell(r, "Escalates to")) if cell(r, "Escalates to") else default(r["Loop"]),
                        "escalates_default": not cell(r, "Escalates to")} for r in registry}
-    def chain(loop, key):
-        path, up = [loop], out[loop][key]
-        while up in out and up not in path: path.append(up); up = out[up][key]
-        return " → ".join(path + [up]) if up == loop else None
+    def cycles(key, what):
+        """loop -> what is wrong with its `key` chain, or None. Each loop is walked once."""
+        fate, said = {}, {}  # loop -> (the cycle's first loop, the cycle drawn from it) or None; loop -> its issue
+        for start in out:
+            at, up = {}, start
+            while up in out and up not in fate and up not in at: at[up] = len(at); up = out[up][key]
+            path = list(at)
+            if up in at:
+                ring = path[at[up]:]; i = ring.index(min(ring)); ring = ring[i:] + ring[:i]
+                fate.update(dict.fromkeys(ring, (ring[0], " → ".join(ring + ring[:1]))))
+                said.update({n: f"{what} comes back to it: {fate[n][1]}" if n == ring[0] else f"{what} is in the cycle through {ring[0]}" for n in ring})
+                path = path[:at[up]]
+            fate.update(dict.fromkeys(path, fate.get(up)))
+            said.update(dict.fromkeys(path, fate.get(up) and f"{what} runs into the cycle through {fate[up][0]}"))
+        return said
+    sup, esc = cycles("supervisor", "supervision"), cycles("escalates_to", "escalation")
     for loop, l in out.items():
         l["supervisor_issue"] = (f"supervisor {l['supervisor']} is not a loop in the registry" if l["supervisor"] not in {**out, "you": 0, None: 0}
-                                 else chain(loop, "supervisor") and "supervision comes back to it: " + chain(loop, "supervisor"))
+                                 else sup[loop])
         project, to = projects[loop], l["escalates_to"]
         issues = [l["role"] not in (None, "master", "manager") and f"role {l['role']} is neither master nor manager",
                   l["role"] == "master" and len(masters) > 1 and f"{len(masters)} loops have Role master; the door to you is one loop",
@@ -415,26 +489,36 @@ def links(registry, services, glass):
                   to not in {**out, "you": 0} and f"escalates to {to}, which is not a loop in the registry",
                   to == "you" and masters and loop not in masters and l["break_glass"] is None
                   and "escalates straight to you; only the master and break-glass loops may",
-                  chain(loop, "escalates_to") and "escalation comes back to it: " + chain(loop, "escalates_to")]
+                  esc[loop]]
         l["escalation_issue"] = "; ".join(i for i in issues if i) or None
     known = set(out) | {s["Service"] for s in services}
-    loose = [f"{who}: break-glass names no loop or service in the registry" for who in reasons if who not in known] + \
+    loose = list(bad) + twice + [f"{who}: break-glass names no loop or service in the registry" for who in reasons if who not in known] + \
             [f"{who}: its break-glass row needs a reason" for who, why in reasons.items() if who in known - set(out) and not why]
     return out, reasons, loose
 
+def snapshot():
+    """<out>/cloud.json, written by a model from the claude.ai API, so any shape: (its time, routines by name, tasks by
+    id), each item reduced to the fields the builder reads, in the types it reads them as."""
+    try: s = json.loads((C["out"] / "cloud.json").read_text(errors="replace"))
+    except (OSError, ValueError, RecursionError): s = {}
+    s = s if isinstance(s, dict) else {}
+    items = lambda key, id: {name(r[id]): {
+        "id": name(r.get("id")), "enabled": bool(r.get("enabled")), "cron": r.get("cron") if isinstance(r.get("cron"), str) else None,
+        "next_run_at": when(r.get("next_run_at")), "last_finished_at": when(r.get("last_finished_at")),
+        "last_status": None if r.get("last_status") is None else str(r["last_status"]).lower()[:100]}
+        for r in (s.get(key) if isinstance(s.get(key), list) else []) if isinstance(r, dict) and name(r.get(id))}
+    return when(s.get("at")), items("routines", "name"), items("tasks", "id")
+
 def build():
     now = dt.datetime.now().replace(microsecond=0)
-    registry, services, glass = tables()
+    registry, services, glass, bad = tables()
     jobs = {**launchd_jobs(), **cron_jobs()}
     led, first = ledger(now)
-    snap_file = C["out"] / "cloud.json"
-    snap = json.loads(snap_file.read_text()) if snap_file.exists() else {"at": None, "routines": [], "tasks": []}
-    snap_age_h = (now.astimezone() - dt.datetime.fromisoformat(snap["at"])).total_seconds() / 3600 if snap["at"] else None
-    routines = {r["name"]: r for r in snap["routines"]}
-    tasks = {t["id"]: t for t in snap["tasks"]}
+    snap_at, routines, tasks = snapshot()
+    snap_age_h = (now - snap_at).total_seconds() / 3600 if snap_at else None
     health = not registry and not services  # no registry: show every job's own health, nothing a registry would add
     if health: (registry, services), glass = discovered(jobs, routines, tasks, led, (now - dt.timedelta(days=7)).isoformat()), []
-    link, reasons, _ = links(registry, services, glass)
+    link, reasons, loose = links(registry, services, glass, bad)
     window_from = max(first or now.date().isoformat(), (now - dt.timedelta(days=WINDOW)).date().isoformat())
     rows, claimed = [], set()
     gh = C["waiting"].get("github") or {}
@@ -457,34 +541,33 @@ def build():
             j = jobs.get(ref)
             live = (health and not ref) or bool(j and j["loaded"])  # with no registry, a ledger name is live while it logs
             spec = j and j["spec"]
-            if j and j["interval"]: row["next_due"] = f"every {j['interval'] // 60} min"
+            if j and j["interval"]: row["next_due"] = every(j["interval"])
         else:
             item = (routines if kind == "routine" else tasks).get(ref)
             live = bool(item and item.get("enabled"))
-            if item and item.get("cron"): spec = cron_spec(item["cron"])
-            if item and item.get("next_run_at"):
-                row["next_due"] = iso(dt.datetime.fromisoformat(item["next_run_at"].replace("Z", "+00:00")).astimezone().replace(tzinfo=None))
-            if item and item.get("last_finished_at") and loop not in led:
-                row["last_run"] = iso(dt.datetime.fromisoformat(item["last_finished_at"].replace("Z", "+00:00")).astimezone().replace(tzinfo=None))
-                row["result"] = "pass" if item.get("last_status") == "succeeded" else "fail"
-                row["detail"] = f"routine run {item.get('last_status')}"
+            if item and item["cron"]: spec = cron_spec(item["cron"])
+            if item: row["next_due"] = iso(item["next_run_at"])
+            if item and item["last_finished_at"] and loop not in led:
+                row["last_run"] = iso(item["last_finished_at"])
+                row["result"] = "pass" if item["last_status"] == "succeeded" else "fail"
+                row["detail"] = f"routine run {item['last_status']}"
         row.update(definitions(reg, kind, ref, item, roots), **job_links(j))
         if override: spec = cron_spec(override.group(1), both=True)
         if spec and not (row["next_due"] and kind != "local"):
             row["next_due"] = iso(nth(fires(spec, now, 1), 0))
         if not spec and not row["next_due"]:
             row["next_due"] = "on event"
-        check = C["checks"] / f"{loop}.py"
+        check = check_of(loop)
         if loop in led:
             l = led[loop]
             row.update(last_run=l["last"][:16], result="pass" if l["last_ok"] else "fail", detail=l["detail"],
                        pass_rate=round(l["passes"] / l["total"], 3) if l["total"] else None,
                        checks=f"{l['passes']} of {l['total']}", cost=l["cost"], history=l["history"])
             if l["chronic"]: row["detail"] = f"{l['fails7']} checks failed. " + row["detail"]
-        elif check.exists():  # loops that don't log (cloud routines): the builder runs their plain check
-            c = subprocess.run([sys.executable, str(check)], capture_output=True, text=True)
+        elif check:  # loops that don't log (cloud routines): the builder runs their plain check
+            c = subprocess.run([sys.executable, str(check)], capture_output=True, text=True, errors="replace")
             row["result"] = "pass" if c.returncode == 0 else "fail"
-            row["detail"] = (c.stdout or c.stderr).strip()
+            row["detail"] = " ".join((c.stdout or c.stderr).split())[:200]
         elif j and j.get("exit") is not None:  # nothing logged: launchd's last exit and its log file's time
             row.update(result="pass" if j["exit"] == 0 else "fail", last_run=iso(j["log_at"]),
                        detail=f"last run exited {j['exit']}" + ("" if j["log_at"] else "; it has no log file, so when it last ran is unknown"))
@@ -494,12 +577,14 @@ def build():
             row["detail"] = ("its output file's name is worked out as it runs, so when it last ran is unknown" if j.get("unset") == "$" else
                              f"its output file uses {j['unset']}, which the crontab doesn't set, so when it last ran is unknown" if j.get("unset") else
                              "cron keeps no record of runs: send this line's output to a file (>> file 2>&1) to see when it last ran")
-        checked = (loop in led and led[loop]["has_checks"]) or check.exists()
+        checked = (loop in led and led[loop]["has_checks"]) or bool(check)
         late = False
         if spec and row["last_run"]:
             prev1, prev2 = nth(fires(spec, now, -1), 0), nth(fires(spec, now, -1), 1)
             late = bool(prev1 and prev2) and now - dt.datetime.fromisoformat(row["last_run"]) > (prev1 - prev2) + dt.timedelta(hours=12)
-        if health and late and j and loop not in led and not check.exists():  # an old log is no proof: scripts often log elsewhere
+        elif j and j["interval"] and row["last_run"]:  # one period plus 12 hours, as for a calendar
+            late = now - dt.datetime.fromisoformat(row["last_run"]) > dt.timedelta(seconds=j["interval"], hours=12)
+        if health and late and j and loop not in led and not check:  # an old log is no proof: scripts often log elsewhere
             row.update(last_run=None, detail="; ".join(filter(None, [row["detail"], f"its log last changed {j['log_at']:%d %b}, so when it last ran is unknown"])))
             late = False
         row["status"] = ("stale" if kind != "local" and (snap_age_h is None or snap_age_h > STALE_SNAPSHOT_H)
@@ -512,6 +597,7 @@ def build():
                          else "no record" if health and j and not row["last_run"]  # an exit code with no time: not on schedule
                          else "ran" if health
                          else "no check")
+        if row["status"] == "paused": row["next_due"] = None  # it won't run
         rows.append(row)
 
     for svc in services:
@@ -557,13 +643,13 @@ def build():
     meta = [{"label": "Built", "value": now.isoformat(timespec="minutes")},
             {"label": "Mode", "value": "health" if health else "fleet"},
             {"label": "Pass rate and cost window", "value": f"{window_from} to {now.date()}" + (f" (the ledger starts {first})" if first else " (no ledger yet)")},
-            {"label": "Routine snapshot", "value": snap["at"] or "none"},
+            {"label": "Routine snapshot", "value": snap_at.isoformat() if snap_at else "none"},
             {"label": "Cost", "value": "Claude API-equivalent estimate from the ledger; loops that don't run through claude-run aren't metered"},
             {"label": "Refresh", "value": C["refresh"]},
             {"label": "Registry", "value": None if health else str(C["registry"]).replace(str(Path.home()), "~")},
             {"label": "Builder", "value": str(Path(__file__).resolve()).replace(str(Path.home()), "~")},
             {"label": "uid", "value": str(os.getuid())}]
-    items = waiting(now, of)
+    items = waiting(now, of, loose)
     write("loops", rows, meta)
     write("waiting", items, meta[:1])
     html(rows, items, meta, "Loop health" if health else "Loop fleet")
@@ -603,12 +689,12 @@ def memo_items(owner, repo, path, cfg):
     items = []
     for hit in hits:
         file = hit.split(":", 1)[1]
-        text = re.sub(r"^```.*?^```", "", subprocess.run(["git", "-C", str(path), "show", hit], capture_output=True, text=True).stdout,
+        text = re.sub(r"^```.*?^```", "", subprocess.run(["git", "-C", str(path), "show", hit], capture_output=True, text=True, errors="replace").stdout,
                       flags=re.M | re.S)  # templates in fenced blocks aren't open decisions
         link = f"https://github.com/{owner}/{repo}/blob/{ref.split('/', 1)[1]}/{file}"
         src = {"kind": "Memo decision", "tag": "Decision", "source": f"{repo} · {Path(file).stem}", "where": f"{repo}/{file}", "link": link, "repo": repo}
         sec = re.search(rf"^#+ {re.escape(heading)}\s*\n(.*?)(?=^#|\Z)", text, re.M | re.S | re.I)
-        decisions = re.findall(r"\*\*Decision:\*\*\s*(.*)", text)
+        decisions = re.findall(r"\*\*Decision:\*\*[ \t]*(.*)", text)  # a blank one is open
         answered = decisions and all(d.strip() and d.strip() != "approve / reject / defer" for d in decisions)
         for line in (sec.group(1).splitlines() if sec and not answered else []):
             if line.lstrip().startswith(("- ", "* ")):
@@ -623,16 +709,24 @@ def memo_items(owner, repo, path, cfg):
                           "action": "mark each row's decision", "due": None})
     return items
 
-def waiting(now, of):
-    cfg, items = C["waiting"], []
+def waiting(now, of, issues=()):
+    """Everything waiting on you, what's wrong in the registry too."""
+    cfg = C["waiting"]
+    items = [{"kind": "Registry", "source": "Registry", "tag": "To do", "item": i, "action": "fix the registry", "where": "registry",
+              "due": None} for i in issues]
     q = cfg.get("queue")
-    if q and Path(q["path"]).expanduser().exists():
-        for line in Path(q["path"]).expanduser().read_text().splitlines()[2:]:
-            f = [x.strip() for x in line.split("|")]
-            if len(f) == 7 and f[3] == q["owner"]:
-                items.append({"kind": "Queue", "source": "Queue", "item": f[2], "action": f[4], "where": f"queue ({f[1]})",
-                              "tag": "Decision" if f[1] == "decision" or f[4].lower().startswith(("decide", "pick")) else "To do",
-                              "link": q.get("link"), "due": f[0]})
+    for line in lines(Path(q["path"]).expanduser()) if q else []:
+        f = cells(line, outer=False)
+        f = f[1:-1] if len(f) == 9 and not f[0] and not f[-1] else f  # written as a markdown table
+        if "|" not in line or f[0].lower() == "due" or set(line) <= set("-|: \t\r"): continue  # prose, header, separator
+        if len(f) != 7:
+            items.append({"kind": "Queue", "source": "Queue", "tag": "To do", "title": "A queue line that can't be read",
+                          "item": line.strip(), "action": "give it the 7 cells (a | in a cell is \\|)", "where": "queue",
+                          "link": q.get("link"), "due": None})
+        elif f[3].lower() == q["owner"].lower():
+            items.append({"kind": "Queue", "source": "Queue", "item": f[2], "action": f[4], "where": f"queue ({f[1]})",
+                          "tag": "Decision" if f[1] == "decision" or f[4].lower().startswith(("decide", "pick")) else "To do",
+                          "link": q.get("link"), "due": f[0]})
     gh = cfg.get("github")
     if gh and GH:
         res = subprocess.run([GH, "search", "prs", "--owner", gh["owner"], "--label", gh.get("label", "founder"), "--state", "open",
@@ -661,7 +755,7 @@ def html(rows, items, meta, title):
     """The same page the claude.ai dashboard runs, with a local stand-in for its runtime and the data inlined."""
     data = json.dumps({"loops": {"rows": rows, "meta": meta}, "waiting": {"rows": items, "meta": meta[:1]},
                        "look": json.loads((ROOT / "dashboard/look.json").read_text()),
-                       "params": json.loads((ROOT / "dashboard/params.json").read_text())}, ensure_ascii=False).replace("</", "<\\/")
+                       "params": json.loads((ROOT / "dashboard/params.json").read_text())}, ensure_ascii=False).replace("<", "\\u003c")  # no </script> or <!-- can end the script
     page = (ROOT / "dashboard/index.html").read_text()
     shim = (ROOT / "dashboard/local.js").read_text()
     (C["out"] / "dashboard.html").write_text(
@@ -671,8 +765,10 @@ def html(rows, items, meta, title):
 
 if __name__ == "__main__":
     if sys.argv[1:] == ["--check"]:  # registry only, for an outcome check: every "loop: issue" on one line, exit 1 if any
-        loops, _, loose = links(*tables())
-        issues = [f"{loop}: {i}" for loop, l in loops.items() for i in (l["supervisor_issue"], l["escalation_issue"]) if i] + loose
+        registry, services, glass, bad = tables()
+        loops, _, loose = links(registry, services, glass, bad)
+        issues = [f"{loop}: {i}" for loop, l in loops.items() for i in (l["supervisor_issue"], l["escalation_issue"]) if i] + loose \
+                 or ([] if registry else [f"no Registry rows in {C['registry']}"])
         if issues: print("; ".join(issues))
         sys.exit(bool(issues))
     rows = build()
