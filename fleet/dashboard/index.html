@@ -627,9 +627,7 @@ const OUTCOME = (c) => c.outcome === 'reverted' ? ['bad', 'Reverted'] : c.outcom
 /* a change that adds a Good check or changes a check moves no Good, so it isn't a hit or a miss */
 const hitRate = (rows) => { const read = rows.filter((c) => ['kept', 'reverted'].includes(c.outcome)); return [read.filter((c) => c.outcome === 'kept' && c.moved === true).length, read.length]; };
 const changeDetail = (c) => (more) => {
-  [['Why', c.hypothesis], ['Metric', c.metric], ['Baseline', c.baseline],
-    ['Replay', c.replay_before != null || c.replay_after != null ? (c.replay_before ?? '—') + ' before, ' + (c.replay_after ?? '—') + ' after' : null],
-    ['Read on', c.read_date], ['Result', c.result]]
+  [['Why', c.hypothesis], ['Metric', c.metric], ['Read on', c.read_date], ['Result', c.result]]
     .filter(([, v]) => v != null && v !== '').forEach(([k, v]) => { const p = el('p'); p.append(el('b', '', k + ': '), document.createTextNode(String(v))); more.append(p); });
   const acts = el('div', 'fx-acts');
   [[c.pr, 'Open PR'], [c.revert_pr, 'Revert PR']].forEach(([u, t]) => { const a = linkBtn(u, t); if (a) acts.append(a); });

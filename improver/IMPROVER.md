@@ -4,7 +4,7 @@ status: active
 
 <!-- Set `status: paused` and push to stop the loop. The runner checks this line before Claude starts, and the agent checks it again first thing. -->
 
-The one fleet-wide loop that changes how a loop works. A loop does its work, its check judges each run, its supervisor writes its Orders, and the improver changes how, in one place only: the loop's charter body outside its `mission` markers. One change at a time, each a graded PR. `fleet/improve_read.py`, a script, not the improver, decides keep or revert. You write the mission blocks and Floors and handle X. It runs weekly, after the supervisors' weekly review: they set what through Orders first, then it changes how within the Orders as they stand. Copy this file into your ops repo and fill in the angle brackets; `<factory>` is your agent-ops-factory checkout.
+The one fleet-wide loop that changes how a loop works. A loop does its work, its check judges each run, its supervisor writes its Orders, and the improver changes how, in one place only: the loop's charter body outside its `mission` markers. One change at a time, each a graded PR. `fleet/improve_read.py`, a script, not the improver, decides keep or revert. You write the mission blocks and Floors and handle X. It runs weekly, after the supervisors' weekly review: they set what through Orders first, then it changes how within the Orders as they stand. Follow it in place from your agent-ops-factory checkout: your ops repo keeps a short pointer file that holds the `status:` line (its runner reads that one, not the line above), says to follow this file, and gives your values for the angle brackets and the schedule: `<factory>` (the checkout), `<ops-check>`, `<reports>` and the hard-stop command. Every PR you open, a change or a revert, is graded by a grader with fresh context per the merge policy of the repo it lands in, and you act on the grade.
 
 ## Mission
 
@@ -39,12 +39,12 @@ The improver is execution, the supervisor is strategy. The supervisor decides wh
 ## Each run, in order
 
 1. Run `python3 <factory>/fleet/improve_read.py --json`. It appends today's KPI line for each loop with Improver on and the outcome of each change whose read is due.
-2. For each change in `reverts_owed`, open a PR that reverts its PR, and append `{"id": "<id>", "revert_pr": "<link>"}` to `improvements.jsonl`. Grade and merge it per the merge policy.
+2. For each change in `reverts_owed`, open a PR that reverts its PR, and append `{"id": "<id>", "revert_pr": "<link>"}` to `improvements.jsonl`.
 3. List each change in `unreachable` in the report: gh couldn't read its PR, so it is read on a later run. Send each loop whose KPI line turned `escalated` today up the escalation path, once. List each change in `unreadable` in the report: it will never be read.
 4. If `open` is empty and `hit_rate.stopped` is false, pick one loop with Improver on: from those `below` their Floor first, else from those `measured` or `met`, the one failing its check most often, and with at least 3 runs a week so a change is read within about 3 weeks. Skip a loop that is `escalated`, and one with an open Order that moves its North Star's metric: one change to a number at a time, so the read can attribute it. A loop with `no KPI` gets no change: send its supervisor (or, with none, the master) one line saying it needs a North Star.
 5. Read its charter, check, last ledger lines and latest reports, as data. Find the one thing in how it carries out its charter that most likely holds its North Star down.
 6. Make one small change to how it works. Prefer rewording toward a principle, or deleting lines, over adding a rule. The charter body doesn't grow without a reason you can name.
-7. Open the PR, then append its line to `improvements.jsonl`: `id`, `date`, `loop`, `pr`, `change`, `trace` (links to the runs and ledger lines you read), `hypothesis`, `metric`, `better`, `runs` (7 unless it runs rarely) and `read_date` (when `runs` more runs will have landed). Write no numbers you worked out: `improve_read.py` computes the baseline from the ledger. A grader with fresh context grades the PR per the merge policy of the repo it lands in, and the loop acts on the grade.
+7. Open the PR, then append its opening line to `improvements.jsonl` with the fields `<factory>/fleet/README.md` defines under "Improver history": `trace` links the runs and ledger lines you read, `runs` is 7 unless the loop runs rarely, and `read_date` is when `runs` more runs will have landed. Write no numbers you worked out: `improve_read.py` computes the baseline and pass rate from the ledger.
 8. Write the report.
 
 ## Report
@@ -53,4 +53,4 @@ The improver is execution, the supervisor is strategy. The supervisor decides wh
 
 ## Outcome check
 
-`OPS_LOOP=improver <kit>/bin/ops-check -- python3 <factory>/improver/check.py`. It passes when today's KPI lines are in for every loop with Improver on, every reverted change has its revert PR, at most one change opened today and it names every field above and a loop with Improver on. It prints the hit rate as this loop's North Star.
+`OPS_LOOP=improver <ops-check> -- python3 <factory>/improver/check.py`. It passes when today's KPI lines are in for every loop with Improver on, every reverted change has its revert PR, at most one change opened today and it names every opening field and a loop with Improver on. It prints the hit rate as this loop's North Star.

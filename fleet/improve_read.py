@@ -3,7 +3,7 @@
 arithmetic. For each loop with Improver on it appends today's kpi.jsonl line from its latest Good in the ledger, and for each
 change with no outcome whose PR closed, or merged and has `runs` valued checks since, it appends the outcome line.
 Safe to run any time: a second run the same day appends nothing. Prints a summary, or with --json the same as data."""
-import json, subprocess, sys
+import json, statistics, subprocess, sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from fleet import C, GH, clock, lines, name, opted_in, tables, when
@@ -67,25 +67,35 @@ def state(c):
     r = GH and subprocess.run([GH, "pr", "view", c["pr"], "--json", "state,mergedAt"], capture_output=True, text=True)
     return json.loads(r.stdout) if r and r.returncode == 0 else None
 
+def goods(rs):
+    """(what is read, each valued check as (at, number)): its value, or for a running total (its lines carry `total`, so
+    its values are overlapping 7-day gains) its gain since the loop's previous total."""
+    totals = [r for r in rs if num(r.get("total"))]
+    if totals: return "gains in total", [(b["at"], b["total"] - a["total"]) for a, b in zip(totals, totals[1:])]
+    return "values", [(r["at"], r["value"]) for r in rs if num(r.get("value"))]
+
 def outcome(c, pr, rs):
-    """The outcome line for a change whose PR closed, or merged with `runs` valued checks after it; the baseline and pass
-    rate before are the `runs` valued checks before its date and every check in their span. None while it can't be read yet;
+    """The outcome line for a change whose PR closed, or merged with `runs` valued checks after it, against the `runs`
+    valued checks before its date: kept when the mean after beats the mean before by more than two standard errors and
+    the pass rate over the span after is no lower than over the span before. None while it can't be read yet;
     "unreadable" when too few checks came before it."""
     if pr["state"] == "CLOSED": return {"id": c["id"], "outcome": "closed", "moved": False, "result": "closed without merging"}
     if pr["state"] != "MERGED": return None
-    runs, merged_at, opened = c.get("runs", 7), when(pr["mergedAt"]), when(str(c.get("date")))
-    after = [r for r in rs if r["at"] > merged_at]
-    valued = [r for r in after if num(r.get("value"))][:runs]
-    if len(valued) < runs: return None
-    before = [r for r in rs if opened and r["at"] < opened]
-    base = [r for r in before if num(r.get("value"))][-runs:]
+    runs, merged_at, opened, (what, good) = c.get("runs", 7), when(pr["mergedAt"]), when(str(c.get("date"))), goods(rs)
+    after = [g for g in good if g[0] > merged_at][:runs]
+    if len(after) < runs: return None
+    base = [g for g in good if opened and g[0] < opened][-runs:]
     if len(base) < runs: return "unreadable"
-    mean = lambda vs: sum(r["value"] for r in vs) / runs
+    vs = lambda w: [v for _, v in w]
     rate = lambda span: sum(r["check"] == "pass" for r in span) / len(span)
-    baseline, now, was = mean(base), rate([r for r in after if r["at"] <= valued[-1]["at"]]), rate([r for r in before if r["at"] >= base[0]["at"]])
-    moved = ahead(mean(valued), baseline, c["better"]) and now >= was
-    return {"id": c["id"], "outcome": "kept" if moved else "reverted", "moved": moved, "baseline": baseline, "pass_rate_before": was,
-            "result": f"mean {mean(valued):.4g} vs baseline {baseline:.4g} ({c['better']} is better) over {runs} runs; "
+    baseline, mean = statistics.mean(vs(base)), statistics.mean(vs(after))
+    margin = 2 * (statistics.variance(vs(base)) / runs + statistics.variance(vs(after)) / runs) ** 0.5
+    now, was = rate([r for r in rs if merged_at < r["at"] <= after[-1][0]]), rate([r for r in rs if base[0][0] <= r["at"] < opened])
+    moved = (mean - baseline if c["better"] == "higher" else baseline - mean) > margin and now >= was
+    return {"id": c["id"], "outcome": "kept" if moved else "reverted", "moved": moved, "baseline": baseline, "after": mean,
+            "margin": margin, "pass_rate_before": was,
+            "result": f"mean {mean:.4g} vs baseline {baseline:.4g} ({c['better']} is better, kept past a margin of {margin:.4g}) "
+                      f"over {runs} {what}; "
                       f"checks passed {now:.0%} vs {was:.0%} before"}
 
 def read():
@@ -94,7 +104,7 @@ def read():
     loops = [r["Loop"] for r in tables()[0] if opted_in(r)]
     kpis = [kpi(l, by.get(l, []), first, today) for l in loops if (today, l) not in done]
     unread = [c for c in merged.values() if c.get("outcome") in (None, "pending")]
-    runs = lambda v: type(v) is int and v > 0
+    runs = lambda v: type(v) is int and v > 1
     readable = lambda c: name(c.get("pr")) and name(c.get("loop")) and c.get("better") in ("higher", "lower") and runs(c.get("runs", 7))
     outcomes, unreachable, unreadable = [], [], [c["id"] for c in unread if not readable(c)]
     for c in (c for c in unread if readable(c)):

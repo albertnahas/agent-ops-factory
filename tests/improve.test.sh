@@ -38,7 +38,8 @@ cat > "$D/REGISTRY.md" <<'EOF'
 | off | Shop | cloud | routine:off | daily | | | you | |
 EOF
 # a check line a day from 1 to 21 Nov: up rises past its bar on the 10th; down drops below it on the 15th; guard improves on
-# the 10th but its checks then fail every other day; late starts on the 13th
+# the 10th but its checks then fail every other day; late starts on the 13th. From the 10th noise moves by less than its
+# noise, clear by far more, and tally's total gains 3 a run instead of 1 while its 7-day values stay flat
 python3 - "$D/runs.jsonl" <<'EOF'
 import json, sys
 def line(loop, day, check="pass", **good): return json.dumps({"loop": loop, "date": f"2026-11-{day:02d}T12:00:00Z", "check": check, **good})
@@ -46,7 +47,9 @@ out = []
 for d in range(1, 22):
     out += [line("up", d, value=0.7 if d < 10 else 0.9, better="higher", bar=0.8), line("down", d, value=80 if d < 15 else 50, better="higher", bar=62),
             line("guard", d, "pass" if d < 10 or d % 2 else "fail", value=20 if d < 10 else 10, better="lower"), line("even", d, value=5, better="higher", bar=5),
-            line("bare", d), line("nobar", d, value=3, better="higher"), line("off", d, value=1, better="higher", bar=2)]
+            line("bare", d), line("nobar", d, value=3, better="higher"), line("off", d, value=1, better="higher", bar=2),
+            line("noise", d, value=(10, 14)[d % 2] + (d >= 10), better="higher"), line("clear", d, value=(10, 14)[d % 2] + 20 * (d >= 10), better="higher"),
+            line("tally", d, value=100, better="higher", total=d if d < 10 else 3 * d - 18)]
 out += [line("late", d, value=1, better="higher") for d in range(13, 22)] + [line("young", 21, value=9, better="higher"), "not json"]
 open(sys.argv[1], "w").write("\n".join(out) + "\n")
 EOF
@@ -110,10 +113,18 @@ expect "check fails two changes today"                   "! chk && grep -q '2 ch
 cp "$D/imp.ok" "$D/improvements.jsonl" && echo '{"id":"t3","date":"2026-11-22","loop":"up","pr":"https://github.com/o/r/pull/21"}' >> "$D/improvements.jsonl"
 expect "check fails a change that lacks a field"         "! chk && grep -q 't3 lacks change, trace, hypothesis' $D/said"
 cp "$D/imp.ok" "$D/improvements.jsonl" && echo "{\"id\":\"t5\",\"loop\":\"up\",${full/\"runs\":7/\"runs\":\"7\"}}" >> "$D/improvements.jsonl"
-expect "check fails runs that isn't a positive whole number" "! chk && grep -q \"t5 has runs '7'\" $D/said"
+expect "check fails runs that isn't a whole number of at least 2" "! chk && grep -q \"t5 has runs '7'\" $D/said"
 cp "$D/imp.ok" "$D/improvements.jsonl" && echo "{\"id\":\"t4\",\"loop\":\"off\",$full}" >> "$D/improvements.jsonl"
 expect "check fails a change on a loop without Improver on" "! chk && grep -q 't4 names off' $D/said"
 cp "$D/imp.ok" "$D/improvements.jsonl" && jq -c 'select(.loop != "bare")' "$D/kpi.before" > "$K"
 expect "check fails with a KPI line missing today"        "! chk && grep -q 'no KPI line today for bare' $D/said"
+
+# The noise margin
+{ c n2 2026-11-09 noise 1 ',"better":"higher"'; c c2 2026-11-09 clear 2 ',"better":"higher"'; c t2 2026-11-09 tally 3 ',"better":"higher"'; } > "$D/improvements.jsonl"
+python3 fleet/improve_read.py >/dev/null
+R() { jq -c --arg i "$1" 'select(.id == $i and .outcome) | [.outcome, .baseline, .after, (.margin * 1000 | round)]' "$D/improvements.jsonl"; }
+expect "reverted: a change whose mean moved by less than two standard errors" "[ \"\$(R n2)\" = '[\"reverted\",11.714285714285714,13.285714285714286,2286]' ]"
+expect "kept: a change that moved its mean by far more"  "[ \"\$(R c2)\" = '[\"kept\",11.714285714285714,32.285714285714285,2286]' ]"
+expect "a running total is read on its gain each run"     "[ \"\$(R t2)\" = '[\"kept\",1,3,0]' ] && jq -e 'select(.id == \"t2\" and .outcome) | .result | contains(\"over 7 gains in total\")' $D/improvements.jsonl >/dev/null"
 
 [ "$fail" -eq 0 ] && echo "all passed" || { echo "some failed"; exit 1; }

@@ -431,8 +431,11 @@ def ledger(now):
         }
     return out, first
 
-IMPROVEMENT = ("id", "date", "loop", "pr", "change", "trace", "hypothesis", "metric", "baseline", "replay_before",
-               "replay_after", "read_date", "outcome", "moved", "result", "revert_pr")
+# an improvements.jsonl change, as fleet/README.md "Improver history" defines it: the line the improver opens it with, the
+# line improve_read.py reads it with, and the improver's revert line
+OPENS = ("id", "date", "loop", "pr", "change", "trace", "hypothesis", "metric", "better", "runs", "read_date")
+READS = ("outcome", "moved", "baseline", "after", "margin", "pass_rate_before", "result")
+IMPROVEMENT = OPENS + READS + ("revert_pr",)
 
 def improvements(scope_of):
     """The improver's history from improvements.jsonl: a line per change when its PR opens, then lines with the same id

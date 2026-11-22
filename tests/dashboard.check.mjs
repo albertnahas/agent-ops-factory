@@ -97,7 +97,7 @@ if (process.env.SHOTS) await page.locator('#evals').screenshot({path: process.en
 const improver = {scope, hidden: await page.locator('#improver').isHidden(), rows: await page.locator('#improver .fx-row').count(), rate: await page.textContent('[data-draw="improver-rate"]')};
 if (improver.rows) {
   await page.locator('#improver .fx-row').first().click(); await frames();
-  improver.detail = await page.evaluate(() => /Why: .*Replay: /s.test(document.querySelector('#improver .fx-more:not([hidden])')?.textContent || ''));
+  improver.detail = await page.evaluate(() => /Why: .*Read on: /s.test(document.querySelector('#improver .fx-more:not([hidden])')?.textContent || ''));
   if (process.env.SHOTS) await page.locator('#improver').screenshot({path: process.env.SHOTS + '/improver.png'});
 }
 ms.overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
