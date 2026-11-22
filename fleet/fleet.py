@@ -21,6 +21,7 @@ def load_config():
             "checks": path("checks", "checks"), "out": path("out", "fleet"),
             "launch_agents": path("launch_agents", Path.home() / "Library/LaunchAgents"),
             "tasks": path("tasks", Path.home() / ".claude/scheduled-tasks"),
+            "jobs": cfg.get("jobs") and Path(cfg["jobs"]).expanduser(),
             "refresh": cfg.get("refresh", "Rebuilt by fleet.py"), "waiting": cfg.get("waiting", {})}
 
 C = load_config()
@@ -366,6 +367,18 @@ def definitions(reg, kind, ref, item, roots):
 
 # --- the ledger claude-run and ops-check append to
 
+def fixture_jobs(f):
+    """Jobs from a fixture file in place of launchd and the crontab, for a replay: {label: {"cron": "30 9 * * *"} or
+    {"interval": seconds}, optionally "loaded" (default true) and "exit"}. Nothing on this machine is read."""
+    jobs = {}
+    for label, j in json.loads(f.read_text()).items():
+        spec = cron_spec(j["cron"]) if j.get("cron") else None
+        jobs[label] = {"schedule": j.get("cron") or (every(j["interval"]) if j.get("interval") else ""),
+                       "vendor": False, "loaded": j.get("loaded", True), "exit": j.get("exit"), "spec": spec,
+                       "interval": j.get("interval"), "oneoff": False, "daemon": False, "keepalive": False,
+                       "log_at": None, "runner": None, "log": None}
+    return jobs
+
 def ledger(now):
     """Runs by loop. A line counts with a loop name and a date it can read; its date becomes local time, so runs sort by
     when they happened, not by where they sit in the file."""
@@ -374,7 +387,7 @@ def ledger(now):
         try: r = json.loads(l)
         except (ValueError, RecursionError): continue
         loop, date = (name(r.get("loop")), when(r.get("date"))) if isinstance(r, dict) else (None, None)
-        if loop and date:
+        if loop and date and date <= now:  # a replay at a past time sees only what had happened by then
             runs.append({**r, "loop": loop, "date": date.isoformat(), "cost": money(r.get("cost")),
                          "detail": "" if r.get("detail") is None else str(r["detail"])})
     if not runs: return {}, None
@@ -536,9 +549,9 @@ def snapshot():
     return when(s.get("at")), items("routines", "name"), items("tasks", "id")
 
 def build():
-    now = dt.datetime.now().replace(microsecond=0)
+    now = when(os.environ.get("FLEET_NOW")) or dt.datetime.now().replace(microsecond=0)  # FLEET_NOW replays a past time
     registry, services, glass, bad = tables()
-    jobs = {**launchd_jobs(), **cron_jobs()}
+    jobs = fixture_jobs(C["jobs"]) if C["jobs"] else {**launchd_jobs(), **cron_jobs()}
     led, first = ledger(now)
     snap_at, routines, tasks = snapshot()
     snap_age_h = (now - snap_at).total_seconds() / 3600 if snap_at else None

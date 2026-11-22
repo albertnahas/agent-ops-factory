@@ -1,0 +1,3 @@
+{"loop": "digest", "start": "2026-01-08T08:00", "end": "2026-01-08T08:00", "real": true, "cause": "no report written", "match": "report missing", "evidence": "fixture"}
+{"loop": "poster", "start": "2026-01-06T12:00", "end": "2026-01-06T12:00", "real": false, "cause": "the check misread a good post", "evidence": "fixture"}
+{"loop": "poster", "start": "2026-01-10T12:00", "end": "2026-01-12T12:00", "real": true, "cause": "the runner stopped", "match": "silent", "evidence": "fixture"}
