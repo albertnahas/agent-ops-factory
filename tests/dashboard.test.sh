@@ -39,7 +39,7 @@ waiting["rows"] = [{**item, "title": f"due {d}", "due": d} for d in ("tomorrow",
 scope = {r["loop"]: r["scope"] for r in loops["rows"]}
 change = lambda i, loop, **k: {"id": f"c{i}", "date": f"2026-11-0{i}", "loop": loop, "scope": scope[loop], "pr": f"https://github.com/o/r/pull/{i}",
                                "change": f"Change {i} to {loop}", "trace": "https://example.com/run/1\nruns.jsonl:12", "hypothesis": "the fetch times out",
-                               "metric": "pass rate", "baseline": "60%", "replay_before": 0.66, "replay_after": 0.75, "read_date": "2099-01-01",
+                               "metric": "pass rate", "better": "higher", "runs": 7, "read_date": "2099-01-01",
                                "outcome": "pending", "moved": None, "result": None, "revert_pr": None, **k}
 changes = [change(6, "shop1", outcome="closed"), change(5, "shop1", outcome="closed"), change(4, "ops-a", outcome="kept", moved=False), change(3, "shop1"), change(2, "shop1", outcome="reverted", revert_pr="https://github.com/o/r/pull/9"),
            change(1, "shop1", outcome="kept", moved=True, result="pass rate 90%")]
