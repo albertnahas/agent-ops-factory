@@ -658,16 +658,20 @@ def build():
 
     def iso(t): return t.isoformat(timespec="minutes") if t else None
 
-    for reg in registry:
+    # a service is read like a loop (its snapshot, ledger, check and launchd job), with no charter, readers or improver
+    as_loop = lambda s: {"Loop": s["Service"], "Job": s["Job"], "Project": "Service", "Schedule": s.get("What it is", ""),
+                         "Runtime": {"routine": "cloud", "task": "app", "cron": "cron"}.get(s["Job"].partition(":")[0], "mac")}
+    for reg, service in [*((r, False) for r in registry), *((as_loop(s), True) for s in services)]:
         loop, job = reg["Loop"], reg["Job"]
         claimed.add(job)
         kind, _, ref = job.partition(":") if job.startswith(("routine:", "task:")) else ("local", "", job)
         ref = ref or job
-        override = re.search(r"`([\d*,\-/ ]+)`", reg.get("Schedule", ""))
+        override = not service and re.search(r"`([\d*,\-/ ]+)`", reg.get("Schedule", ""))
         row = {"loop": loop, "project": reg.get("Project", ""), "runtime": reg.get("Runtime", ""), "job": job,
-               "schedule": (reg.get("Schedule", "").replace(override.group(0), "") if override else reg.get("Schedule", "")).replace("`", "").strip(" ()"),
+               "schedule": reg["Schedule"] if service else (reg.get("Schedule", "").replace(override.group(0), "") if override else reg.get("Schedule", "")).replace("`", "").strip(" ()"),
                "last_run": None, "result": None, "detail": "", "next_due": None,
-               "pass_rate": None, "checks": None, "cost": None, "status": None, "improver": opted_in(reg), **link[loop]}
+               "pass_rate": None, "checks": None, "cost": None, "status": None, "improver": opted_in(reg),
+               **({"break_glass": reasons.get(loop)} if service else link[loop])}
         spec, live, j, item = None, True, None, None
         if kind == "local":
             j = jobs.get(ref)
@@ -683,7 +687,7 @@ def build():
                 row["last_run"] = iso(item["last_finished_at"])
                 row["result"] = None if item["last_status"] == "running" else "pass" if item["last_status"] == "succeeded" else "fail"
                 row["detail"] = f"routine run {item['last_status']}"
-        row.update(definitions(reg, kind, ref, item, roots), **job_links(j))
+        row.update({"charter_paused": False} if service else definitions(reg, kind, ref, item, roots), **job_links(j))
         if override: spec = cron_spec(override.group(1), both=True)
         if spec and not (row["next_due"] and kind != "local"):
             row["next_due"] = iso(nth(fires(spec, now, 1), 0))
@@ -703,8 +707,9 @@ def build():
         elif j and j.get("exit") is not None:  # nothing logged: launchd's last exit and its log file's time
             row.update(result="pass" if j["exit"] == 0 else "fail", last_run=iso(j["log_at"]),
                        detail=f"last run exited {j['exit']}" + ("" if j["log_at"] else "; it has no log file, so when it last ran is unknown"))
-        elif j and j.get("log_at"):  # cron: no exit code, only the time its output file last changed
-            row.update(last_run=iso(j["log_at"]), detail="cron keeps no exit codes; last run is when its output file last changed")
+        elif j and j.get("log_at"):  # cron, or a launchd job running now: no exit code, only the time its output file last changed
+            row.update(last_run=iso(j["log_at"]), detail="cron keeps no exit codes; last run is when its output file last changed"
+                       if job.startswith("cron:") else "running now; its log last changed at the time shown")
         elif j and j.get("has_log") is False:
             row["detail"] = ("its output file's name is worked out as it runs, so when it last ran is unknown" if j.get("unset") == "$" else
                              f"its output file uses {j['unset']}, which the crontab doesn't set, so when it last ran is unknown" if j.get("unset") else
@@ -719,12 +724,12 @@ def build():
             late = now - dt.datetime.fromisoformat(row["last_run"]) > max(dt.timedelta(seconds=3 * j["interval"]), dt.timedelta(hours=1))
         if item and live and item["next_run_at"] and snap_at and item["next_run_at"] < snap_at - dt.timedelta(hours=1):
             late = True  # claude.ai still had this run due an hour before the snapshot
-        if health and late and j and loop not in led and not check:  # an old log is no proof: scripts often log elsewhere
+        if (health or service) and late and j and loop not in led and not check:  # an old log is no proof: scripts often log elsewhere
             row.update(last_run=None, detail="; ".join(filter(None, [row["detail"], f"its log last changed {j['log_at']:%d %b}, so when it last ran is unknown"])))
             late = False
         row["status"] = ("paused" if row.pop("charter_paused")
                          else "stale" if kind != "local" and (snap_age_h is None or snap_age_h > STALE_SNAPSHOT_H)
-                         else "missing" if kind != "local" and not item
+                         else "missing" if (kind != "local" or service) and not (item or j)
                          else "paused" if not live
                          else "failing" if row["result"] == "fail"
                          else "silent" if late
@@ -734,18 +739,11 @@ def build():
                          else "no record" if health and j and not row["last_run"]  # an exit code with no time: not on schedule
                          else "ran" if health
                          else "no check")
+        if service and row["status"] in ("healthy", "no check", "ran", "no runs yet", "no record"): row["status"] = "service"
         if row["status"] in ("paused", "missing"): row["next_due"] = None  # it won't run
-        if row["status"] == "missing": row["detail"] = f"no {kind} named {ref} in the claude.ai snapshot: deleted or renamed there?"
+        if row["status"] == "missing": row["detail"] = (f"nothing on this machine runs a job named '{job}'" if kind == "local" else
+                                                        f"no {kind} named {ref} in the claude.ai snapshot: deleted or renamed there?")
         rows.append(row)
-
-    for svc in services:
-        claimed.add(svc["Job"])
-        j = jobs.get(svc["Job"], {})
-        rows.append({"loop": svc["Service"], "project": "Service", "runtime": "mac", "job": svc["Job"],
-                     "schedule": svc.get("What it is", ""), "break_glass": reasons.get(svc["Service"]), **job_links(j),
-                     "status": "missing" if not j else "paused" if not j.get("loaded") else "service" if j.get("exit") in (0, None) else "failing",
-                     "detail": f"last run exited {j['exit']}" if j.get("exit") not in (0, None)
-                               else f"nothing on this machine runs a job named '{svc['Job']}'" if not j else ""})
 
     for label, j in jobs.items():
         if label in claimed or j["vendor"] or not j["loaded"]: continue

@@ -24,7 +24,7 @@ Every scheduled loop you run, one row each. `fleet/fleet.py` reads the two table
 
 ## Services
 
-Daemons, dashboards and model-free watchers: they run, but they aren't loops.
+Daemons, dashboards and model-free jobs: they run with no model, so they have no charter, readers or improver. Name one as it logs to the ledger and its checks still count.
 
 | Service | Job | What it is |
 |---|---|---|
