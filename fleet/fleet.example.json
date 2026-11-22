@@ -3,6 +3,7 @@
   "ledger": "~/.agent-ops/runs.jsonl",
   "improvements": "~/.agent-ops/improvements.jsonl",
   "kit": "~/.agent-ops/kit",
+  "kpi": "~/.agent-ops/kpi.jsonl",
   "checks": "~/.agent-ops/checks",
   "out": "~/.agent-ops/fleet",
   "refresh": "Rebuilt every 30 minutes by fleet.py",

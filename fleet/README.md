@@ -19,6 +19,7 @@ It works with nothing set up. With no registry it lists every job it finds with 
 | `fleet/cloud.json` | Claude Code cloud routines and desktop-app tasks: schedule, next and last run | only with the claude.ai sync (`SYNC.md`) |
 | `improvements.jsonl` | the improver's history: each change it made to a loop, what it read, the metric it should move and whether it did | once an improver runs |
 | GitHub, a queue file, decision memos | what waits on you: PRs with your label, owner-you queue lines, open decisions in your repos' `docs/` and `bets/` | optional, `waiting` in `fleet.json` |
+| `kpi.jsonl` | each loop's KPI, read weekly by the improver: its Good against the Floor in its charter | once an improver runs |
 
 Without a ledger, a launchd loop's last exit and the time its log file last changed stand in for its last run, so a fleet you haven't instrumented still shows what failed.
 
@@ -61,7 +62,13 @@ The questions are never written into the page. `fleet.py` reads them from the ki
 
 ## Improver history
 
-Every change an improver makes to a loop is a PR, and each also gets one line in `improvements.jsonl`, next to the run ledger and append-only. The line written when the PR opens holds `id`, `date`, `loop`, `pr` (its link), `change` (one line), `trace` (links to the runs or ledger lines it read, never copied text), `hypothesis`, `metric`, `baseline`, `replay_before` and `replay_after` when a replay proves it, and `read_date`. At the read date one more line with the same `id` adds `outcome` (`kept`, `reverted`, or `closed` for a PR that never merged), `moved` (true or false), `result` and, for a revert, `revert_pr`; later fields win. A loop's panel lists its changes, and the Factory tab's Improver card lists them all with the hit rate: of the merged changes that were read, the share kept that moved their metric. The card shows only once there is a change. The improver's own runs log a ledger line like any loop's, so the heartbeat watches it.
+Every change an improver makes to a loop is a PR, and each also gets one line in `improvements.jsonl`, next to the run ledger and append-only. The line written when the PR opens holds `id`, `date`, `loop`, `pr` (its link), `change` (one line), `trace` (links to the runs or ledger lines it read, never copied text), `hypothesis`, `metric`, `baseline`, `replay_before` and `replay_after` when a replay proves it, and `read_date`. At the read date one more line with the same `id` adds `outcome` (`kept`, `reverted`, or `closed` for a PR that never merged), `moved` (true or false), `result` and, for a revert, `revert_pr`; later fields win. A loop's panel lists its changes, and the Factory tab's Improver card lists them all with the hit rate: of the merged changes that were read, the share kept that moved their metric. A change that only adds a Good check (`metric: measure`) or changes a check (`check_detection`) moves no Good, so it isn't counted. The card shows only once there is a change. The improver's own runs log a ledger line like any loop's, so the heartbeat watches it.
+
+## KPIs and the bar
+
+Every loop's KPI is its Good against the Floor its charter sets. An improver reads it weekly and appends one line per loop to `kpi.jsonl`: `date`, `loop`, `kpi` (`met`, `below`, or `no KPI` when the Good isn't measured), `value` and `bar`, and for a loop below its Floor `since`, `attempts`, `of` (the attempts it gets before it goes to you) and `escalated`. The latest line per loop becomes its row's `kpi*` cells. A loop's panel shows "Good: 50 vs Floor at least 62% · below since 15 Nov · attempt 1 of 2" with its check pass rate as health, or "not measured" before its Good is read.
+
+The Factory tab's Evaluations card puts every evaluation in one place, for the picked project: the share of measured loops at or above their Floor, the share measured, how many have a Floor, the checks passed, the replay eval's latest scores (`eval/result.json`, config key `eval`: what the dashboard and the heartbeat catch, their false alarms and time to flag, against the eval's floor), and the improver's hit rate. Anything with no data yet says "not measured". Loops below their Floor are listed under it.
 
 ## Config
 

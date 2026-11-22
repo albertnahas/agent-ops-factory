@@ -119,7 +119,7 @@ def main():
     hh, mm = map(int, a.at.split(":"))
     days = [dt.datetime.combine(start + dt.timedelta(days=i), dt.time(hh, mm)) for i in range((end - start).days + 1)]
     labels = load(a.labels)
-    result = {"window": f"{start} to {end} at {a.at}", "fleet": score(fleet_flags(a, days), labels)}
+    result = {"window": f"{start} to {end} at {a.at}", "floor": {"detection": a.min_detection, "false_share": a.max_false}, "fleet": score(fleet_flags(a, days), labels)}
     if a.heartbeat_log:
         hb = {t: f for t, f in heartbeat_flags(a.heartbeat_log, a.ledger).items() if start <= t.date() <= end}
         began = min(hb) if hb else None  # incidents over before its log began aren't its misses

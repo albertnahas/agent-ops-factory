@@ -34,6 +34,7 @@ const withChanges = page.locator('#loop-groups .fx-row', {has: page.locator('bdi
 if (await withChanges.count()) {
   await withChanges.first().click(); await frames();
   loops.changes = await page.evaluate(() => document.querySelectorAll('#loop-groups .fx-more:not([hidden]) .fx-changes li').length);
+  loops.good = await page.evaluate(() => [...document.querySelectorAll('#loop-groups .fx-more:not([hidden]) p')].map((p) => p.textContent).find((t) => t.startsWith('Good: ')));
   if (process.env.SHOTS) await withChanges.first().locator('xpath=..').screenshot({path: process.env.SHOTS + '/loop-changes.png'});
 }
 loops.firstCardAll = await page.locator('#loop-groups .fx-card:first-child .fx-all button').click({timeout: 1000})
@@ -84,6 +85,9 @@ if (factory.picks.length) {
   await page.click('#factory-graph .fx-btn'); await frames();
   factory.picked = await page.evaluate(() => document.querySelectorAll('#factory-graph .fx-fnode[data-tone]').length);
 }
+const evals = await page.evaluate(() => ({rows: Object.fromEntries([...document.querySelectorAll('#evals .fx-eval')].map((li) => [li.firstChild.textContent, li.lastChild.textContent])),
+  below: document.querySelectorAll('#evals .fx-row').length}));
+if (process.env.SHOTS) await page.locator('#evals').screenshot({path: process.env.SHOTS + '/evaluations.png'});
 const improver = {scope, hidden: await page.locator('#improver').isHidden(), rows: await page.locator('#improver .fx-row').count(), rate: await page.textContent('[data-draw="improver-rate"]')};
 if (improver.rows) {
   await page.locator('#improver .fx-row').first().click(); await frames();
@@ -92,4 +96,4 @@ if (improver.rows) {
 }
 ms.overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
 await browser.close();
-console.log(JSON.stringify({ms, errors, attention, factory, loops, improver, form, waiting: {...waiting, invalid: /Invalid Date|NaN/.test(waiting.text), text: undefined}}));
+console.log(JSON.stringify({ms, errors, attention, factory, loops, improver, form, evals, waiting: {...waiting, invalid: /Invalid Date|NaN/.test(waiting.text), text: undefined}}));
