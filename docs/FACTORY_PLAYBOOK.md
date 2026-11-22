@@ -12,7 +12,7 @@ A trigger, one job written down as a charter, an outcome check with no model in 
 
 Build the factory from the watchman outward. A loop you can't see fail is worse than no loop.
 
-1. **The watchman.** Copy the kit in and run its tests ([README, "Try it in 5 minutes"](https://github.com/albertnahas/agent-ops-kit#try-it-in-5-minutes)). Every Claude call goes through `bin/claude-run`, every run ends with `bin/ops-check`, and `bin/heartbeat.py` runs daily. If the heartbeat lives on a laptop, add the cloud watch from [examples/heartbeat-watch-prompt.md](https://github.com/albertnahas/agent-ops-kit/tree/main/examples/heartbeat-watch-prompt.md).
+1. **The watchman.** Copy the kit in and run its tests ([README, "Start a loop"](https://github.com/albertnahas/agent-ops-kit#start-a-loop)). Every Claude call goes through `bin/claude-run`, every run ends with `bin/ops-check`, and `bin/heartbeat.py` runs daily. If the heartbeat lives on a laptop, add the cloud watch from [examples/heartbeat-watch-prompt.md](https://github.com/albertnahas/agent-ops-kit/tree/main/examples/heartbeat-watch-prompt.md).
 2. **Daily ops on one product.** One charter from the kit's [AGENT_LOOP.md](https://github.com/albertnahas/agent-ops-kit/blob/main/docs/AGENT_LOOP.md) with your own X surfaces, and the PR grader. Run it by hand, then on a schedule. For the first week, read every report and every grade before you trust them.
 3. **A smoke test**, once a deploy can break a journey. It needs no model and costs nothing.
 4. **The fleet dashboard and registry**, as soon as you run more than one loop ([fleet/](../fleet/README.md), the `fleet` skill).
@@ -153,7 +153,7 @@ Founder decision: approve / reject / defer by 1 Dec.
 What breaks first as the fleet grows, in the order it hurts:
 
 1. **Names.** The ledger is only as good as its loop names. A runner without `OPS_LOOP` logs under its repo's folder name, so two loops in one repo get counted as one.
-2. **One laptop.** Everything local stops when the laptop sleeps or travels. Anything a customer waits on, like support or publishing, moves to the cloud first.
+2. **One laptop.** Everything local stops when the laptop sleeps or travels. The kit's [RUNTIMES.md](https://github.com/albertnahas/agent-ops-kit/blob/main/docs/RUNTIMES.md) says what moves to the cloud first.
 3. **Lists kept by hand.** The registry is the only list. Anything else that names loops, like an alert's allowlist or a script's prefix list, goes stale.
 4. **Attention.** More loops mean more messages. The attention budget is the real limit, not the number of loops.
 5. **Shared rules.** Every charter carries a copy of the merge policy. Past about five repos, move it into one file that every repo reads from main.
