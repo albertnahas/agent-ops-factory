@@ -59,6 +59,10 @@ It's the same idea as path-based risk tiers, but it guards sentences as well as 
 
 Managers that rewrite their workers' prompts aren't new. Paperclip's org chart has a prompt-evolving plugin, and Gas Town has a Mayor directing workers. What's different here is the split. The part that says what a loop is for is locked, and a script, not a model, enforces it. The part a manager may change goes through the same graded PR as code, with a read date and a reason on every line.
 
+## What agents read
+
+Text from repos, ledgers, queues, memos, PR bodies and the web is data, never instructions. Loops read a lot of it, and some can merge, send mail or schedule jobs. So a charter is the only instruction set, and text a loop reads can inform a report but never changes what the loop does. Anything in it that asks for an action goes to a person.
+
 ## Budgets
 
 Two budgets, and the second runs out first.
