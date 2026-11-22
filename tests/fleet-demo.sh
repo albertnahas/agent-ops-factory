@@ -15,6 +15,8 @@ job() { case $(runtime "$1") in app) echo "task:$1";; mac) echo "com.demo.$1";; 
 # exist, and the rest have none.
 supervisor() { case $1 in *-daily-ops) ;; shop-*) echo shop-daily-ops;; blog-writer|blog-editor|blog-seo) echo blog-daily-ops;;
   blog-links) echo blog-chief;; app-crash-triage|app-reviews|app-store-watch|app-release-notes) echo app-daily-ops;; esac; }
+role() { case $1 in master) echo master;; shop-daily-ops|app-daily-ops) echo manager;; esac; }
+escalates() { case $1 in blog-links) echo you;; esac; }
 day() { date -v-"$1"d +%FT0"$2":00:00 2>/dev/null || date -d "$1 days ago" +%FT0"$2":00:00; }
 
 loops=(
@@ -51,9 +53,10 @@ loops=(
   "life-review|Personal|you|-|0"
 )
 {
-  printf '## Registry\n\n| Loop | Project | Runtime | Job | Schedule | Charter | Outcome check | Checked by | Supervisor |\n|---|---|---|---|---|---|---|---|---|\n'
-  for l in "${loops[@]}"; do IFS='|' read -r name project by _ _ <<< "$l"; echo "| $name | $project | $(runtime "$name") | $(job "$name") | daily | | | $by | $(supervisor "$name") |"; done
-  printf '\n## Services\n\n| Service | Job | What it is |\n|---|---|---|\n| Fleet build | com.demo.fleet-build | rebuilds the dashboard |\n'
+  printf '## Registry\n\n| Loop | Project | Runtime | Job | Schedule | Charter | Outcome check | Checked by | Supervisor | Escalates to | Role |\n|---|---|---|---|---|---|---|---|---|---|---|\n'
+  for l in "${loops[@]}"; do IFS='|' read -r name project by _ _ <<< "$l"; echo "| $name | $project | $(runtime "$name") | $(job "$name") | daily | | | $by | $(supervisor "$name") | $(escalates "$name") | $(role "$name") |"; done
+  printf '\n## Services\n\n| Service | Job | What it is |\n|---|---|---|\n| Fleet build | com.demo.fleet-build | rebuilds the dashboard |\n| payments-watch | com.demo.payments-watch | disputes and refunds |\n'
+  printf '\n## Break-glass\n\n| Who | Why |\n|---|---|\n| shop-e2e-smoke | production down |\n| payments-watch | money at risk |\n'
 } > "$AGENT_OPS_DIR/REGISTRY.md"
 {
   for l in "${loops[@]}"; do

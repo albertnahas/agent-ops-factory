@@ -34,6 +34,6 @@ One at a time, and run each by hand before scheduling it:
 3. **Runner:** calls `KIT/bin/claude-run` with the charter, exports `OPS_LOOP=<loop>`, and ends with `KIT/bin/ops-check -- <check>`. `KIT/scripts/run.sh` is a starting point.
 4. **Hand run.** Run it once and read the output and the check's line in the ledger. Fix the loop or the check until a good run passes and a broken one fails.
 5. **Schedule** it on the user's yes: launchd or cron for local loops, a Claude Code routine for cloud ones.
-6. **Register** it in the same change: a row in the registry, with its Checked by, and its Supervisor if it has one. Rebuild the fleet (`python3 FACTORY/fleet/fleet.py`) and confirm it shows as healthy or not run yet, not Unregistered.
+6. **Register** it in the same change: a row in the registry, with its Checked by, its Supervisor if it has one, and Escalates to only if it overrides the default. An incident or payments watcher gets a Break-glass row, on the user's yes. Rebuild the fleet (`python3 FACTORY/fleet/fleet.py`) and confirm it shows as healthy or not run yet, not Unregistered.
 
 Report what you built, what each loop costs per run from its hand run, and the first date its check will run on its own.
