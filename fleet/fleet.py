@@ -712,8 +712,9 @@ def build():
         checked = (loop in led and led[loop]["has_checks"]) or bool(check)
         late = False
         if spec and row["last_run"]:
-            prev1, prev2 = nth(fires(spec, now, -1), 0), nth(fires(spec, now, -1), 1)
-            late = bool(prev1 and prev2) and now - dt.datetime.fromisoformat(row["last_run"]) > (prev1 - prev2) + dt.timedelta(hours=12)
+            ran = dt.datetime.fromisoformat(row["last_run"])  # late: 12h past the gap after its last run's fire, so Mon, Thu waits 4 days after a Thursday
+            fire = nth(fires(spec, ran + dt.timedelta(hours=1), -1), 0); after = fire and nth(fires(spec, fire, 1), 0)
+            late = bool(after) and now - ran > (after - fire) + dt.timedelta(hours=12)
         elif j and j["interval"] and row["last_run"]:  # three periods, at least an hour
             late = now - dt.datetime.fromisoformat(row["last_run"]) > max(dt.timedelta(seconds=3 * j["interval"]), dt.timedelta(hours=1))
         if item and live and item["next_run_at"] and snap_at and item["next_run_at"] < snap_at - dt.timedelta(hours=1):
