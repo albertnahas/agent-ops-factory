@@ -29,7 +29,7 @@ Every loop has a row in one registry, added in the same change that schedules it
 
 Write the outcome check before the prompt. If you can't say what proves the run did its job, the loop isn't ready. The check reads something the run didn't write: the PR exists, the post reads back from the platform, the report has every section. Success is the check passing, not Claude's exit code. [checks/report-landed.sh](https://github.com/albertnahas/agent-ops-kit/blob/main/checks/report-landed.sh) is a worked example, and the "Rules that came from running these" in the catalog say why.
 
-Every runner exports `OPS_LOOP=<registry name>`, so the ledger, the heartbeat and the dashboard all agree on which loop is which. `plan-loops` builds each new loop in this order: charter, check, runner, hand run, schedule, registry row.
+Every runner exports `OPS_LOOP=<registry name>`, so the ledger, the heartbeat and the dashboard all agree on which loop is which. `plan-loops` builds each new loop with the kit's `bin/new-loop`, which writes the charter, check, runner, schedule file and registry row in one go; then comes the hand run, and the schedule last.
 
 ## Supervisors and Orders
 
