@@ -437,7 +437,7 @@ def tables():
     b1 += [f"Registry row {r['Loop'][:60]}: a loop name is letters, digits, _ . and -, and not you or nobody" for r in registry if not ok(r["Loop"])]
     return [r for r in registry if ok(r["Loop"])], services, glass, b1 + b2 + b3
 
-FAN_IN = 5  # more loops than this naming you in Checked by is a fan-in warning
+FAN_IN = 5  # more loops than this naming you in Checked by is a fan-in warning, which --check prints but doesn't fail on
 
 def links(registry, services, glass, bad=(), health=False):
     """Each registry loop's Checked by, Supervisor and Escalates to, and each break-glass entry's reason. A name is a loop's
@@ -449,8 +449,8 @@ def links(registry, services, glass, bad=(), health=False):
     drawn once, from its first loop by name; the other loops on it, and those whose chain runs into it, name that loop.
     Checked by is checked too (not in health mode, whose rows have none): no reader but itself, a reader that is no loop,
     service or you, readers that only lead round loops (a cycle, or one nobody reads), and you on a loop with a supervisor loop.
-    Returns (loops, break-glass reasons by name, issues that belong to no one loop: the `bad` rows tables() left out,
-    Break-glass rows that name nothing, and more than FAN_IN loops read straight by you)."""
+    Returns (loops, break-glass reasons by name, issues that belong to no one loop: the `bad` rows tables() left out
+    and Break-glass rows that name nothing, and warnings: more than FAN_IN loops read straight by you)."""
     named = [(r["Loop"], r["Job"]) for r in registry] + [(r["Service"], r["Job"]) for r in services]
     alias = {k: n for n, j in named for k in (j, j.partition(":")[2]) if k} | {n: n for n, _ in named}
     resolve = lambda c: "you" if c.lower() == "you" else alias.get(c, c)
@@ -517,9 +517,10 @@ def links(registry, services, glass, bad=(), health=False):
                   esc[loop]]
         l["escalation_issue"] = "; ".join(i for i in issues if i) or None
     fan = [] if health else [l for l, rs in readers.items() if "you" in rs]
-    loose = list(bad) + [f"you: {len(fan)} loops name you in Checked by, more than {FAN_IN}; let a supervisor loop read most of them"] * (len(fan) > FAN_IN) + [f"{who}: break-glass names no loop or service in the registry" for who in reasons if who not in known] + \
+    warn = [f"you: {len(fan)} loops name you in Checked by, more than {FAN_IN}; let a supervisor loop read most of them"] * (len(fan) > FAN_IN)
+    loose = list(bad) + [f"{who}: break-glass names no loop or service in the registry" for who in reasons if who not in known] + \
             [f"{who}: its break-glass row needs a reason" for who, why in reasons.items() if who in known - set(out) and not why]
-    return out, reasons, loose
+    return out, reasons, loose, warn
 
 def snapshot():
     """<out>/cloud.json, written by a model from the claude.ai API, so any shape: (its time, routines by name, tasks by
@@ -543,7 +544,7 @@ def build():
     snap_age_h = (now - snap_at).total_seconds() / 3600 if snap_at else None
     health = not registry and not services  # no registry: show every job's own health, nothing a registry would add
     if health: (registry, services), glass = discovered(jobs, routines, tasks, led, (now - dt.timedelta(days=7)).isoformat()), []
-    link, reasons, loose = links(registry, services, glass, bad, health)
+    link, reasons, loose, warn = links(registry, services, glass, bad, health)
     window_from = max(first or now.date().isoformat(), (now - dt.timedelta(days=WINDOW)).date().isoformat())
     rows, claimed = [], set()
     gh = C["waiting"].get("github") or {}
@@ -679,7 +680,7 @@ def build():
             {"label": "Registry", "value": None if health else str(C["registry"]).replace(str(Path.home()), "~")},
             {"label": "Builder", "value": str(Path(__file__).resolve()).replace(str(Path.home()), "~")},
             {"label": "uid", "value": str(os.getuid())}]
-    items = waiting(now, of, loose)
+    items = waiting(now, of, loose + warn)
     write("loops", rows, meta)
     write("waiting", items, meta[:1])
     html(rows, items, meta, "Loop health" if health else "Loop fleet")
@@ -794,12 +795,13 @@ def html(rows, items, meta, title):
         f'<div id="dash-root">\n{page}\n</div>\n</body></html>\n')
 
 if __name__ == "__main__":
-    if sys.argv[1:] == ["--check"]:  # registry only, for an outcome check: every "loop: issue" on one line, exit 1 if any
-        registry, services, glass, bad = tables()
-        loops, _, loose = links(registry, services, glass, bad)
+    if sys.argv[1:] == ["--check"]:  # registry only, for an outcome check: every "loop: issue" on one line, exit 1 if any;
+        registry, services, glass, bad = tables()  # then each warning on its own line, which doesn't fail
+        loops, _, loose, warn = links(registry, services, glass, bad)
         issues = [f"{loop}: {i}" for loop, l in loops.items() for i in (l["supervisor_issue"], l["escalation_issue"]) if i] + loose \
                  or ([] if registry else [f"no Registry rows in {C['registry']}"])
         if issues: print("; ".join(issues))
+        for w in warn: print(f"warning: {w}")
         sys.exit(bool(issues))
     rows = build()
     counts = {}

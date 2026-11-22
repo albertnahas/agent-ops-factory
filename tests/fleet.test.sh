@@ -133,7 +133,7 @@ expect "a target that is no loop is flagged"     "esc astray | grep -q 'escalate
 expect "one manager per project"                "esc boss | grep -q 'Shop has 2 managers' && esc boss2 | grep -q 'Shop has 2 managers'"
 expect "a role is master or manager"            "esc odd | grep -q 'role chief'"
 expect "every cell is still a scalar"           "jq -e 'all(.rows[][]; type != \"array\" and type != \"object\")' $L >/dev/null"
-expect "the registry-only check names every escalation issue" "! python3 fleet/fleet.py --check > $AGENT_OPS_DIR/issues && diff <(jq -r '[.rows[] | select(.escalation_issue) | \"\\(.loop): \\(.escalation_issue)\"] + [\"you: 10 loops name you in Checked by, more than 5; let a supervisor loop read most of them\", \"phantom: break-glass names no loop or service in the registry\"] | join(\"; \")' $L) $AGENT_OPS_DIR/issues"
+expect "the registry-only check names every escalation issue" "! python3 fleet/fleet.py --check > $AGENT_OPS_DIR/issues && diff <(jq -r '[.rows[] | select(.escalation_issue) | \"\\(.loop): \\(.escalation_issue)\"] + [\"phantom: break-glass names no loop or service in the registry\"] | join(\"; \"), \"warning: you: 10 loops name you in Checked by, more than 5; let a supervisor loop read most of them\"' $L) $AGENT_OPS_DIR/issues"
 
 # What defines a loop: its charter (from the registry's folder, or a checkout whose path ends with the cell's leading
 # folders), the Orders and dated report its charter names, a routine's page, a task's prompt, a job's script.
@@ -278,7 +278,9 @@ mk readers; { reg "$(row boss)" "| w | P | cloud | routine:w | daily | | | boss,
 expect "Checked by: a self-check, a cycle and a stranger are flagged; a service ends a chain" "build && [ \"\$(get self .supervisor_issue)\" = 'Checked by names itself; nobody reads it' ] && [ \"\$(get r1 .supervisor_issue)\" = 'its checkers never reach you' ] && [ \"\$(get ext .supervisor_issue)\" = 'checker vendor is not a loop, a service or you' ] && [ \"\$(get via .supervisor_issue)\" = null ]"
 expect "a loop with a supervisor loop doesn't also name you" "[ \"\$(get w .supervisor_issue)\" = 'Checked by names you, but boss supervises it' ] && [ \"\$(get f1 .supervisor_issue)\" = null ]"
 build --check
-expect "--check warns when more than 5 loops go straight to you" "grep -q 'you: 7 loops name you in Checked by, more than 5' $O/said"
+expect "--check warns when more than 5 loops go straight to you" "grep -q '^warning: you: 7 loops name you in Checked by, more than 5' $O/said"
+mk fan; { reg; for i in 1 2 3 4 5 6; do row "f$i"; done; } > "$O/REGISTRY.md"
+expect "the fan-in warning alone prints and exits 0" "build --check && [ \"\$(cat $O/said)\" = 'warning: you: 6 loops name you in Checked by, more than 5; let a supervisor loop read most of them' ]"
 
 mk pause; mkdir "$O/ch"; printf '# P\n\nstatus: paused\n' > "$O/ch/p.md"; printf '# A\n\nstatus: active\n' > "$O/ch/a.md"
 reg '| p | P | cloud | routine:p | daily | `ch/p.md` | | you | |' '| a | P | cloud | routine:a | daily | `ch/a.md` | | you | |' > "$O/REGISTRY.md"
