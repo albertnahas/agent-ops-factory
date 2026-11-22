@@ -24,13 +24,13 @@ Without a ledger, a launchd loop's last exit and the time its log file last chan
 ## Statuses
 
 - **Failing:** the last outcome check failed (or, with no check, the last run exited non-zero).
-- **Silent:** no run for one scheduled period plus 12 hours. A log file that stopped changing isn't enough, since many scripts log somewhere else: with nothing better, the loop shows as No run record and its detail gives the log's date.
+- **Silent:** no run for one scheduled period plus 12 hours. With no registry, a log file that stopped changing isn't enough, since many scripts log somewhere else. Such a job shows as No run record and its detail gives the log's date. With a registry it still counts, so a registered loop that stops still alerts.
 - **Flaky:** the last check passed but 3 of the last 7 failed.
 - **Unregistered:** running, with no registry row.
 - **Stale data:** the cloud snapshot is over 36 hours old.
 - **Unchecked:** runs, with nothing the builder can read that proves the outcome.
 - **Not run yet**, **Paused** (registered, not loaded or enabled), **Healthy**.
-- **No run record:** nothing says when it last ran: a crontab line that sends its output nowhere, or a log too old to trust.
+- **No run record:** nothing says when it last ran: a crontab line that sends its output nowhere, or, with no registry, a job whose log is missing or too old to trust.
 - **Ran** (no registry only): the last run exited 0, or for cron, its output file changed on schedule. Nothing proves it did its job.
 
 ## Factory

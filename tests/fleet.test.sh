@@ -5,7 +5,7 @@
 set -uo pipefail
 cd "$(dirname "$0")/.."
 export AGENT_OPS_DIR=$(mktemp -d) H=$(mktemp -d)
-trap 'rm -rf "$AGENT_OPS_DIR" "$H"' EXIT
+trap 'rm -rf "$AGENT_OPS_DIR" "$H" "$H.reg"' EXIT
 mkdir "$AGENT_OPS_DIR/bin" && printf '#!/bin/sh\n' | tee "$AGENT_OPS_DIR/bin/crontab" > "$AGENT_OPS_DIR/bin/launchctl"
 chmod +x "$AGENT_OPS_DIR/bin/"* && export PATH="$AGENT_OPS_DIR/bin:$PATH"  # this machine's own jobs stay out of the test
 fail=0
@@ -113,6 +113,15 @@ expect "health: no registry path in the data"  "jq -e '.meta[] | select(.label =
 expect "health: a job named after a ledger loop is that loop" "python3 -c \"import sys; sys.path.insert(0, 'fleet'); from fleet import discovered
 j = {'com.me.digest': {'loaded': True, 'vendor': False, 'oneoff': False, 'daemon': False, 'schedule': ''}}
 l, _ = discovered(j, {}, {}, {'digest': {'last': '2099'}}, '2000'); assert [r['Loop'] for r in l] == ['digest'], l\""
+expect "health: an exit code with no log time is no record" "[ \"\$(status com.example.cache-warm)\" = 'no record' ]"
+expect "health: sh -c, cd and timeout are skipped; &> is an output file" "[ \"\$(status cron:nightly-export.sh)\" = ran ]"
+expect "cron names: past cd, shells, numbers and redirects" "python3 -c \"import sys; sys.path.insert(0, 'fleet'); from fleet import cron_name as c
+cases = {'cd /a && ./run.sh >> l 2>&1': 'run.sh', 'PATH=/x timeout 60 python3 /o/job.py': 'job.py', 'backup.sh>>/tmp/l 2>&1': 'backup.sh',
+         '/bin/sh -lc \\\"cd /x; ./y.sh\\\"': 'y.sh', 'nice -n 5 /x/z.sh > /tmp/out': 'z.sh'}
+bad = {k: c(k) for k, v in cases.items() if c(k) != v}; assert not bad, bad\""
+cp -R "$H" "$H.reg" && printf '## Registry\n\n| Loop | Project | Runtime | Job | Schedule |\n|---|---|---|---|---|\n| weekly | Ops | mac | com.example.weekly-review | weekly |\n' > "$H.reg/REGISTRY.md"
+sed -i.bak "s|$H|$H.reg|g" "$H.reg/fleet.json" "$H.reg/bin/"* && AGENT_OPS_DIR="$H.reg" PATH="$H.reg/bin:$PATH" python3 fleet/fleet.py >/dev/null
+expect "with a registry, an old log still means silent" "jq -e '.rows[] | select(.loop == \"weekly\") | .status == \"silent\"' $H.reg/fleet/loops.json >/dev/null"
 expect "health: the page is titled Loop health" "grep -q '<title>Loop health</title>' $H/fleet/dashboard.html"
 
 [ "$fail" -eq 0 ] && echo "all passed" || { echo "some failed"; exit 1; }

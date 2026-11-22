@@ -28,6 +28,7 @@ jobs=(
   "com.example.inbox-triage|<key>StartInterval</key><integer>1800</integer>|0|0.3"
   "com.example.price-watch|<key>StartCalendarInterval</key><dict><key>Minute</key><integer>15</integer></dict>|1|0.5"
   "com.example.weekly-review|<key>StartCalendarInterval</key><dict><key>Weekday</key><integer>1</integer><key>Hour</key><integer>9</integer><key>Minute</key><integer>0</integer></dict>|0|400"
+  "com.example.cache-warm|<key>StartCalendarInterval</key><dict><key>Minute</key><integer>0</integer></dict>|0|"
   "com.example.notes-sync|<key>KeepAlive</key><true/>|run|"
   "com.example.launch-reminder|<key>StartCalendarInterval</key><dict><key>Month</key><integer>12</integer><key>Day</key><integer>24</integer><key>Hour</key><integer>9</integer></dict>|0|"
   "com.example.old-experiment|<key>StartCalendarInterval</key><dict><key>Hour</key><integer>3</integer></dict>|none|"
@@ -55,11 +56,13 @@ EOF
 printf '{\n\t"LastExitStatus" = 0;\n};\n' > "$D/launchctl/com.vendor.updater"
 
 : > "$D/logs/backup.log"; ago "$D/logs/backup.log" 2
+: > "$D/logs/nightly.log"; ago "$D/logs/nightly.log" $(( h >= 3 ? h - 3 : h + 21 ))
 cat > "$D/crontab" <<EOF
 # m h dom mon dow command
 MAILTO=""
 0 */4 * * * cd $D && ./backup.sh >> $D/logs/backup.log 2>&1
 @hourly /usr/bin/python3 $D/feed-poller.py
+0 3 * * * /bin/bash -c "cd $D && timeout 300 ./nightly-export.sh" &> $D/logs/nightly.log
 30 2 * * * /bin/bash -lc $D/never-ran.sh >> $D/logs/never-ran.log 2>&1
 @reboot $D/on-boot.sh
 EOF

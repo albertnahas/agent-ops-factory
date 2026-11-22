@@ -4,7 +4,7 @@ one-off job with its health), <out>/waiting.json (everything waiting on you) and
 Sources: the registry file, launchd plists, your crontab, the run ledger, <out>/cloud.json (Claude routines and
 desktop tasks, written by the claude.ai sync in fleet/SYNC.md), and optionally a queue file, GitHub PRs and decision memos.
 fleet/README.md says how each status is decided."""
-import datetime as dt, json, os, plistlib, re, shutil, subprocess, sys
+import datetime as dt, json, os, plistlib, re, shlex, shutil, subprocess, sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
@@ -134,12 +134,28 @@ MACROS = {"@yearly": "0 0 1 1 *", "@annually": "0 0 1 1 *", "@monthly": "0 0 1 *
 RUNNERS = {"sh", "bash", "zsh", "env", "exec", "nice", "nohup", "caffeinate", "timeout", "python", "python3", "node", "ruby", "perl"}
 
 def cron_name(cmd):
-    """The script a crontab command runs: past `cd dir &&`, shells, interpreters, flags and VAR=value."""
-    for seg in re.split(r"&&|;|\|\|?", cmd):
-        words = [w.strip("'\"") for w in seg.split() if not w.startswith(("-", ">", "<", "2>")) and "=" not in w]
-        if not words or words[0] == "cd": continue
-        return next((Path(w).name for w in words if Path(w).name not in RUNNERS), Path(words[0]).name)
-    return Path(cmd.split()[0]).name
+    """The script a crontab command runs: inside `sh -c "..."`, past `cd dir &&`, shells, interpreters, flags,
+    numbers, redirects and VAR=value."""
+    cmd = re.sub(r"\s*(&&|\|\||;|\|)\s*", r" \1 ", cmd)
+    try: words = shlex.split(cmd)
+    except ValueError: words = cmd.split()
+    seg = []
+    for i, w in enumerate(words + [";"]):
+        if w.startswith("-") and "c" in w and Path(words[i - 1]).name in RUNNERS and i + 1 < len(words):
+            return cron_name(words[i + 1])
+        if w not in ("&&", "||", ";", "|"):
+            seg.append(w); continue
+        names, target = [], False
+        for x in seg:
+            if target or x.startswith("-") or x.isdigit() or "=" in x:
+                target = False; continue
+            if re.match(r"^\d*&?[<>]", x):
+                target = not re.search(r"[<>]&?\S", x); continue  # `> file` names its file next; `>file`, `2>&1` don't
+            names.append(Path(re.split(r"\d*&?[<>]", x)[0]).name)
+        if names and names[0] != "cd":
+            return next((n for n in names if n not in RUNNERS), names[0])
+        seg = []
+    return Path(words[0]).name if words else "?"
 
 def cron_jobs():
     """Crontab lines as jobs named cron:<script name>; a later line with the same name gets a numeric suffix.
@@ -154,7 +170,7 @@ def cron_jobs():
         if not cmd or parts[0].startswith("@") and parts[0] not in MACROS: continue  # @reboot: no calendar to check
         name = "cron:" + cron_name(" ".join(cmd))
         while name in jobs: name += "+"
-        log = re.search(r"(?<![0-9&])>>?\s*([^\s&|;]+)", " ".join(cmd))
+        log = re.search(r"(?<![0-9])&?>>?\s*([^\s&|;]+)", " ".join(cmd))
         log = log and Path(os.path.expandvars(log.group(1))).expanduser()
         jobs[name] = {"spec": cron_spec(expr), "schedule": expr, "loaded": True, "vendor": False, "oneoff": False,
                       "exit": None, "interval": None, "daemon": False, "has_log": bool(log and str(log) != "/dev/null"),
@@ -204,8 +220,9 @@ def discovered(jobs, routines, tasks, led, week):
     """With no registry, everything found stands in for its own row: loops for scheduled jobs, routines, tasks and
     recent ledger names, services for jobs launchd keeps running. One-offs and vendors' jobs keep their own paths."""
     mine = {k: j for k, j in jobs.items() if j["loaded"] and not j["vendor"] and not j["oneoff"]}
-    named = {norm(n): n for n in led}  # a job whose label ends in a ledger name is that loop: com.me.digest logs as digest
-    loops = [{"Loop": named.get(norm(re.split(r"[.:]", k)[-1]), k), "Job": k, "Runtime": "cron" if k.startswith("cron:") else "mac", "Schedule": j["schedule"]}
+    named = {norm(n): n for n in led}  # a job named after a ledger loop is that loop: com.me.digest, cron:digest.sh
+    stem = lambda k: Path(k[5:]).stem if k.startswith("cron:") else k.rsplit(".", 1)[-1]
+    loops = [{"Loop": named.get(norm(stem(k)), k), "Job": k, "Runtime": "cron" if k.startswith("cron:") else "mac", "Schedule": j["schedule"]}
              for k, j in mine.items() if not j["daemon"]]
     loops += [{"Loop": n, "Job": f"routine:{n}", "Runtime": "cloud", "Schedule": r.get("cron") or "on event"}
               for n, r in routines.items() if r.get("enabled") and (r.get("cron") or r.get("last_finished_at"))]
@@ -284,21 +301,21 @@ def build():
         elif j and j.get("has_log") is False:
             row["detail"] = "cron keeps no record of runs: send this line's output to a file (>> file 2>&1) to see when it last ran"
         checked = (loop in led and led[loop]["has_checks"]) or check.exists()
-        late = unknown = False
+        late = False
         if spec and row["last_run"]:
             prev1, prev2 = nth(fires(spec, now, -1), 0), nth(fires(spec, now, -1), 1)
             late = bool(prev1 and prev2) and now - dt.datetime.fromisoformat(row["last_run"]) > (prev1 - prev2) + dt.timedelta(hours=12)
-        if late and j and loop not in led and not check.exists():  # an old log is no proof: scripts often log elsewhere
+        if health and late and j and loop not in led and not check.exists():  # an old log is no proof: scripts often log elsewhere
             row.update(last_run=None, detail="; ".join(filter(None, [row["detail"], f"its log last changed {j['log_at']:%d %b}, so when it last ran is unknown"])))
-            late, unknown = False, True
+            late = False
         row["status"] = ("stale" if kind != "local" and (snap_age_h is None or snap_age_h > STALE_SNAPSHOT_H)
                          else "paused" if not live
                          else "failing" if row["result"] == "fail"
                          else "silent" if late
-                         else "no record" if unknown
-                         else ("no record" if j and j.get("has_log") is not None and (not j["has_log"] or j["log_at"]) else "no runs yet") if not row["last_run"] and not row["result"]
+                         else ("no record" if j and j.get("has_log") is False else "no runs yet") if not row["last_run"] and not row["result"]
                          else "chronic" if loop in led and led[loop]["chronic"]
                          else "healthy" if checked
+                         else "no record" if health and j and not row["last_run"]  # an exit code with no time: not on schedule
                          else "ran" if health
                          else "no check")
         rows.append(row)
