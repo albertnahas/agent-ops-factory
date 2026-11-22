@@ -9,7 +9,6 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from fleet import C, GH, clock, lines, name, opted_in, tables, when
 
 OF = 2  # attempts a loop below its Floor gets before it goes to you
-NO_GOOD = ("measure", "check_detection")  # changes that move no Good, so the hit rate leaves them out
 FLOOR, AFTER = 1 / 3, 6  # the improver's own Floor: a hit rate of 1 in 3, once 6 changes are read
 
 def jsonl(f):
@@ -42,7 +41,7 @@ def history():
 
 def hit_rate(merged):
     """(hits, read): of the changes read as kept or reverted, those kept that moved their Good."""
-    read = [r for r in merged.values() if r.get("outcome") in ("kept", "reverted") and r.get("metric") not in NO_GOOD]
+    read = [r for r in merged.values() if r.get("outcome") in ("kept", "reverted")]
     return sum(r["outcome"] == "kept" and r.get("moved") is True for r in read), len(read)
 
 def kpi(loop, rs, first, today):

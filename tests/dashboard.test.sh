@@ -41,9 +41,9 @@ change = lambda i, loop, **k: {"id": f"c{i}", "date": f"2026-11-0{i}", "loop": l
                                "change": f"Change {i} to {loop}", "trace": "https://example.com/run/1\nruns.jsonl:12", "hypothesis": "the fetch times out",
                                "metric": "pass rate", "baseline": "60%", "replay_before": 0.66, "replay_after": 0.75, "read_date": "2099-01-01",
                                "outcome": "pending", "moved": None, "result": None, "revert_pr": None, **k}
-changes = [change(6, "shop1", outcome="kept", metric="measure"), change(5, "shop1", outcome="closed"), change(4, "ops-a", outcome="kept", moved=False), change(3, "shop1"), change(2, "shop1", outcome="reverted", revert_pr="https://github.com/o/r/pull/9"),
+changes = [change(6, "shop1", outcome="closed"), change(5, "shop1", outcome="closed"), change(4, "ops-a", outcome="kept", moved=False), change(3, "shop1"), change(2, "shop1", outcome="reverted", revert_pr="https://github.com/o/r/pull/9"),
            change(1, "shop1", outcome="kept", moved=True, result="pass rate 90%")]
-kpi = {"shop1": {"improver": True, "floor": "at least 62%", "kpi": "below", "kpi_value": 50, "kpi_of": 2, "kpi_attempts": 1, "kpi_since": "2026-11-15", "kpi_escalated": False},
+kpi = {"shop1": {"improver": True, "floor": "at least 62%", "kpi": "below", "kpi_value": 50, "kpi_of": 2, "kpi_attempts": 1, "kpi_since": "2026-11-15", "kpi_escalated": False, "kpi_as_of": "2026-11-21"},
        "ops-a": {"floor": "at most 3", "kpi": "met", "kpi_value": 2}, "lonely": {"kpi": "no KPI", "kpi_since": 7}}
 for r in loops["rows"]: r.update(kpi.get(r["loop"], {}))
 html(loops["rows"], waiting["rows"], loops["meta"], "Loop fleet", changes)
@@ -80,7 +80,7 @@ expect "the scoped count counts the loops it draws"  "q odd '.factory as \$f | \
 expect "a right-to-left name keeps its count after it" "q odd '.loops.countsAfterNames'"
 expect "every waiting item is listed, dated or not"  "q odd '.waiting.badge == 7 and .waiting.rows == 7 and (.waiting.invalid | not)'"
 expect "a loop's panel lists its changes"              "q odd '.loops.changes == 5'"
-expect "the Improver card lists the scope's changes and its hit rate, which a measure change doesn't count in" "q odd '.improver.rows == (if .improver.scope == \"Shop\" then 5 else 6 end) and (.improver.rate | startswith(\"1 of 2 moved their metric\")) and .improver.detail'"
+expect "the Improver card lists the scope's changes and its hit rate, which a closed change doesn't count in" "q odd '.improver.rows == (if .improver.scope == \"Shop\" then 5 else 6 end) and (.improver.rate | startswith(\"1 of 2 moved their metric\")) and .improver.detail'"
 expect "a fleet with no changes shows no Improver card" "q clique '.improver.rows == 0 and .improver.hidden'"
 # the form asks the spec's questions in its order and builds the prompt the skill reads, checked against the spec file itself
 want() { python3 - "$1" "$2" <<'P'
@@ -105,7 +105,7 @@ expect "Change this loop builds the edit prompt for that loop, founder route mar
 expect "the open form and its prompt fit the phone" "q clique '.form.overflow == 0'"
 expect "with no question spec there's no builder" "q odd '.form.offered == 0'"
 expect "a loop's panel says the improver may visit it" "q odd '.loops.read | endswith(\" · Improver: on\")'"
-expect "a loop's panel shows its Good against its Floor and its attempts" "q odd '.loops.good == \"Good: 50 vs Floor at least 62% · below since 15 Nov · attempt 1 of 2\"'"
+expect "a loop's panel shows its Good against its Floor and its attempts" "q odd '.loops.good == \"Good: 50 vs Floor at least 62% · below since 15 Nov · attempt 1 of 2 · as of 21 Nov\"'"
 expect "Evaluations, in the picked project, shows the fleet KPIs and lists the loops below the bar" "q odd '.evals.rows[\"Loops at or above their Floor\"] == \"0% of measured (0 of 1)\" and .evals.rows[\"Loops whose Good is measured\"] == \"17% (1 of 6)\" and .evals.rows[\"Improver hit rate\"] == \"1 of 2 read changes moved their Good\" and .evals.below == 1'"
 expect "with no data, every evaluation says not measured, none hidden" "q clique '.evals.rows[\"Loops at or above their Floor\"] == \"not measured\" and .evals.rows[\"Replay\"] == \"not measured\" and (.evals.rows[\"Improver hit rate\"] | startswith(\"not measured\")) and .evals.below == 0'"
 expect "nothing is wider than the phone"             "q odd '.ms.overflow == 0'"

@@ -480,7 +480,7 @@ def questions():
     if bad or not all(p["value"] for p in prompts): return [], [], f"{f}: " + "; ".join(bad or ["no prompt lines"])
     return rows, prompts, None
 KPI = {"kpi": "kpi", "value": "kpi_value", "bar": "kpi_bar", "of": "kpi_of", "attempts": "kpi_attempts", "since": "kpi_since",
-       "escalated": "kpi_escalated", "date": "kpi_date"}
+       "escalated": "kpi_escalated", "date": "kpi_date", "as_of": "kpi_as_of"}
 def kpis():
     """Each loop's latest KPI line from kpi.jsonl (the improver's weekly read of its Good against its Floor), as the
     loop row's kpi_* cells: kpi is met, below or "no KPI"; below carries since, attempts of its allowance and escalated."""
