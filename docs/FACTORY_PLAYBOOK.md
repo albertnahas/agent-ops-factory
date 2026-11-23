@@ -12,6 +12,10 @@ A trigger, one job written down as a charter, an outcome check with no model in 
 
 Every loop costs a schedule, a check, a ledger, a reader and a row to watch. So new work is first a step, an Order or a charter section in a loop that already exists. It becomes its own loop only when it can't share one: it needs a different trigger or cadence, a different checker, or a failure that must not take the other work down with it. Two loops with the same trigger and the same reader are one loop. Each supervisor review and each retirement pass asks which of its loops could be folded together, and a split must name the reason it can't be a step.
 
+## One brief per product
+
+Each product keeps one short brief, owned by you inside mission markers, in the file that already holds its vision and decisions rather than a new one: what it is and who it's for, its North Star by the name its metrics code gives it, and the 2 to 4 inputs that drive it, with any guardrail. Nothing in it should need editing when new data arrives, so it holds no values, targets, dates, tactics or loop names. Values come from the metrics, this month's focus is in Orders, and which loop moves which input is the registry's optional Moves cell, cheap to change as loops are added, folded or retired. A loop's own North Star stays in its charter; Moves says which input it serves, and its supervisor's weekly review cites that input's number, not just the mapping. An input no loop moves becomes an Order, not a loop.
+
 ## Start in this order
 
 Build the factory from the watchman outward. A loop you can't see fail is worse than no loop.

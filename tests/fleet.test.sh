@@ -120,12 +120,12 @@ expect "with no master, every loop escalates to you, unflagged" "jq -e '[.rows[]
 cat > "$AGENT_OPS_DIR/REGISTRY.md" <<EOF
 ## Registry
 
-| Loop | Project | Runtime | Job | Schedule | Charter | Outcome check | Checked by | Supervisor | Escalates to | Role |
-|---|---|---|---|---|---|---|---|---|---|---|
+| Loop | Project | Runtime | Job | Schedule | Charter | Outcome check | Checked by | Supervisor | Escalates to | Role | Moves |
+|---|---|---|---|---|---|---|---|---|---|---|---|
 | door | Shop | cloud | routine:door | daily | | | you | | | Master |
 | boss | Shop | cloud | routine:boss | daily | | | you | | | manager |
 | boss2 | Shop | cloud | routine:boss2 | daily | | | you | | | manager |
-| worker | Shop | cloud | routine:worker | daily | | | boss | | | |
+| worker | Shop | cloud | routine:worker | daily | | | boss | | | | new_senders |
 | lone | Blog | cloud | routine:lone | daily | | | you | | | |
 | rogue | Blog | cloud | routine:rogue | daily | | | you | | you | |
 | pager | Blog | cloud | routine:pager | daily | | | you | | You | |
@@ -149,6 +149,7 @@ cat > "$AGENT_OPS_DIR/REGISTRY.md" <<EOF
 | phantom | security |
 EOF
 python3 fleet/fleet.py >/dev/null
+expect "Moves carries the brief input a loop serves; blank is none" "jq -e '[.rows[] | select(.loop == \"worker\" or .loop == \"lone\") | .moves] == [\"new_senders\", null]' $L >/dev/null"
 esc() { jq -r --arg l "$1" '.rows[] | select(.loop == $l) | "\(.escalates_to) \(.escalates_default) | \(.escalation_issue)"' "$L"; }
 expect "a blank goes to the project's manager"  "[ \"\$(esc worker)\" = 'boss true | null' ]"
 expect "a blank with no manager goes to the master" "[ \"\$(esc lone)\" = 'door true | null' ] && [ \"\$(esc boss | cut -d' ' -f1)\" = door ]"
