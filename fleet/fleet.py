@@ -156,20 +156,27 @@ def nth(gen, n):
 MONTHS = "Jan Feb Mar Apr May Jun Jul Aug Sep Oct Nov Dec".split()
 
 def cadence(spec):
-    """How often a spec fires, in words: its distinct times in a week (every N min, hourly, N× daily, N× weekly, weekly),
-    a spec pinned to days of the month monthly or, in one month, yearly; months it is limited to are named."""
-    weekly = [x for x in spec if not x["Day"] or x.get("either")]
-    t = sorted({w * 1440 + h * 60 + m for x in weekly for w in x["Weekday"] or range(7) for h in x["Hour"] or range(24) for m in x["Minute"] or range(60)})
-    n, gaps = len(t), {b - a for a, b in zip(t, t[1:] + [t[0] + 10080])} if t else set()
-    gap = gaps.pop() if len(gaps) == 1 else None  # evenly spaced through the week
+    """How often a spec fires, in words. Weekly entries: every N min or hourly when evenly spaced, N× daily when every
+    weekday has the same times, else N× weekly. Entries pinned to days of the month: monthly, or yearly when limited to
+    some months. Months a weekly entry is limited to are named."""
+    weekly, dated = [x for x in spec if not x["Day"] or x.get("either")], [x for x in spec if x["Day"]]
+    days = {}
+    for x in weekly:
+        for w in x["Weekday"] or range(7):
+            days.setdefault(w, set()).update(h * 60 + m for h in x["Hour"] or range(24) for m in x["Minute"] or range(60))
+    every = len(days) == 7 and len({frozenset(d) for d in days.values()}) == 1
+    t = sorted(days[0]) if every else []
+    gaps = {b - a for a, b in zip(t, t[1:] + [t[0] + 1440])} if t else set()
+    gap = gaps.pop() if len(gaps) == 1 else None
+    n = sum(map(len, days.values()))
     words = (None if not n else "every minute" if gap == 1 else f"every {gap} min" if gap and gap < 60 else "hourly" if gap == 60
-             else f"{n // 7}× daily" if n >= 14 and n % 7 == 0 else "daily" if n == 7 else f"{n}× weekly" if n > 1 else "weekly")
-    dated = [x for x in spec if x["Day"]]
+             else ("daily" if len(t) == 1 else f"{len(t)}× daily") if every else f"{n}× weekly" if n > 1 else "weekly")
     if dated:
-        on = "yearly" if all(x["Month"] and len(x["Month"]) == 1 for x in dated) else "monthly"
+        months = set().union(*(x["Month"] or range(1, 13) for x in dated))
+        on = "monthly" if len(months) == 12 else "yearly" if len(months) == 1 else f"{len(months)}× yearly"
         words = f"{words} and {on}" if words else on
-    months = set().union(*(x["Month"] for x in weekly if x["Month"])) if all(x["Month"] for x in weekly) and weekly else set()
-    return words + " in " + ", ".join(MONTHS[m - 1] for m in sorted(months)) if months else words
+    limited = weekly and all(x["Month"] for x in weekly) and set().union(*(x["Month"] for x in weekly))
+    return words + " in " + ", ".join(MONTHS[m - 1] for m in sorted(limited)) if limited else words
 
 # --- what is scheduled on this machine
 
