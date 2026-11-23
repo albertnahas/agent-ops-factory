@@ -8,6 +8,10 @@ To have Claude walk you through it for a project, ask it to "start a software fa
 
 A trigger, one job written down as a charter, an outcome check with no model in it, and a ledger line per run. If one of those is missing, it isn't a loop yet. The full definition, and the line between loops and services, is at the top of [LOOP_CATALOG.md](LOOP_CATALOG.md).
 
+## As few loops as the work allows
+
+Every loop costs a schedule, a check, a ledger, a reader and a row to watch. So new work is first a step, an Order or a charter section in a loop that already exists. It becomes its own loop only when it can't share one: it needs a different trigger or cadence, a different checker, or a failure that must not take the other work down with it. Two loops with the same trigger and the same reader are one loop. Each supervisor review and each retirement pass asks which of its loops could be folded together, and a split must name the reason it can't be a step.
+
 ## Start in this order
 
 Build the factory from the watchman outward. A loop you can't see fail is worse than no loop.
