@@ -126,7 +126,7 @@ def cron_spec(expr, both=False):
                  "either": not both and d != "*" and wd != "*"}]
     except (ValueError, KeyError): return None
 
-every = lambda n: f"every {n // 60} min" if n % 60 == 0 else f"every {n} s"  # a StartInterval
+every = lambda n: "hourly" if n == 3600 else f"every {n // 60} min" if n % 60 == 0 else f"every {n} s"  # a StartInterval
 RANGES = {"Minute": (0, 59), "Hour": (0, 23), "Day": (1, 31), "Month": (1, 12), "Weekday": (0, 7)}
 
 def plist_spec(cals):
@@ -152,6 +152,13 @@ def fires(spec, start, direction, days=70):
 def nth(gen, n):
     for i, x in enumerate(gen):
         if i == n: return x
+
+def cadence(spec):
+    """How often a spec fires, in words: runs a week from its weekdays and times; a spec pinned to days of the month is monthly."""
+    week = sum(len(x["Hour"] or range(24)) * len(x["Minute"] or range(60)) * len(x["Weekday"] or range(7))
+               for x in spec if not x["Day"] or x.get("either"))
+    return ("monthly" if not week else "hourly" if week >= 7 * 24 else f"{week // 7}× daily" if week >= 14 and week % 7 == 0
+            else "daily" if week == 7 else f"{week}× weekly" if week > 1 else "weekly")
 
 # --- what is scheduled on this machine
 
@@ -693,6 +700,8 @@ def build():
             row["next_due"] = iso(nth(fires(spec, now, 1), 0))
         if not spec and not row["next_due"]:
             row["next_due"] = "on event"
+        row["cadence"] = (every(j["interval"]) if j and j["interval"] else cadence(spec) if spec
+                          else "always on" if j and (j["keepalive"] or j["daemon"]) else "on event" if j or kind != "local" else None)
         check = check_of(loop)
         if loop in led:
             l = led[loop]
@@ -749,7 +758,7 @@ def build():
         if label in claimed or j["vendor"] or not j["loaded"]: continue
         runtime = "cron" if label.startswith("cron:") else "mac"
         if j["oneoff"]:
-            rows.append({"loop": label, "project": "One-off", "runtime": runtime, "job": label, "status": "one-off", **job_links(j),
+            rows.append({"loop": label, "project": "One-off", "runtime": runtime, "job": label, "status": "one-off", "cadence": "one-off", **job_links(j),
                          "next_due": iso(nth(fires(j["spec"], now, 1, days=400), 0)), "schedule": "yearly, unless it removes itself after it runs"})
             continue
         rows.append({"loop": label, "project": "Unregistered", "runtime": runtime, "job": label, "status": "unregistered", **job_links(j),
@@ -771,7 +780,7 @@ def build():
                          "last_run": l["last"][:16], "schedule": "logs to the ledger with no registry row"})
     of, kpi = scoping(registry), kpis()
     for r in rows: r.update(scope=of(r["project"])[1], **kpi.get(r["loop"], {}))
-    keys = ["loop", "project", "scope", "runtime", "job", "schedule", "status", "last_run", "result", "detail",
+    keys = ["loop", "project", "scope", "runtime", "job", "schedule", "cadence", "status", "last_run", "result", "detail",
             "next_due", "pass_rate", "checks", "cost", "history", "checked_by", "supervisor", "supervisor_issue",
             "role", "escalates_to", "escalates_default", "break_glass", "escalation_issue", "improver",
             "charter", "orders", "prompt", "runner", "report", "log", "floor", "target", *KPI.values()]
