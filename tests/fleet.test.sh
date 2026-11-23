@@ -399,7 +399,7 @@ expect "names: jan"                            "[ \"\$(fires '0 9 1 jan *' False
 expect "day or weekday, as cron does"          "[ \"\$(fires '0 9 1 * 1' False 29)\" = '2026-11-30 09:00 2026-12-01 09:00' ]"
 expect "day and weekday for an override"       "[ \"\$(fires '0 8 1-7 * 1' True)\" = '2026-12-07 08:00 2027-01-04 08:00' ]"
 cad() { python3 -c "import sys; sys.path.insert(0, 'fleet'); from fleet import cron_spec, cadence; print(' / '.join(cadence(cron_spec(e)) for e in sys.argv[1:]))" "$@"; }
-expect "cadence names each schedule shape"     "[ \"\$(cad '*/5 * * * *' '* * * * *' '0 * * * *' '0 9,17 * * *' '0 9 * * 1-5' '0 9 1 * *' '0 9 1 1 *' '0 9 * 12 *' '0 9 15 * 1')\" = 'every 5 min / every minute / hourly / 2× daily / 5× weekly / monthly / yearly / daily in Dec / weekly and monthly' ]"
+expect "cadence names each schedule shape"     "[ \"\$(cad '*/5 * * * *' '* * * * *' '0 * * * *' '0 9,17 * * *' '0 9 * * 1-5' '0 9 1 * *' '0 9 1 1 *' '0 9 * 12 *' '0 9 15 * 1' '0,10,50 * * * *')\" = 'every 5 min / every minute / hourly / 2× daily / 5× weekly / monthly / yearly / daily in Dec / weekly and monthly / 72× daily' ]"
 expect "cadence counts a repeated time once"   "[ \"\$(python3 -c \"import sys; sys.path.insert(0, 'fleet'); from fleet import cron_spec, cadence; print(cadence(cron_spec('0 9 * * 1') * 2))\")\" = weekly ]"
 expect "a star minute is every minute"         "[ \"\$(fires '* * * * *' False)\" = '2026-11-22 10:01 2026-11-22 10:02' ]"
 expect "weekday ranges wrap"                   "[ \"\$(fires '30 6 * * sat-sun' False)\" = '2026-11-28 06:30 2026-11-29 06:30' ]"
