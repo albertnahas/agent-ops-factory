@@ -1154,6 +1154,7 @@ dash.draw('factory', (box) => {
     detail.append(el('p', '', g.outs(id).every((e) => e.to === NOBODY) ? 'Nobody reads its output.'
       : path ? 'Read by ' + by.join(', ') + (path.length > 3 ? '. Reaches you through ' + path.slice(1, -1).map((k) => fname(g.nodes.get(k))).join(' → ') : '') + '.'
       : 'Read by ' + by.join(', ') + ', but the chain never reaches you.'));
+    if (n.row.moves) detail.append(el('p', '', 'Moves ' + n.row.moves + ', an input in its project\'s brief.'));
     if (n.row.escalates_to) detail.append(el('p', '', 'Escalates to ' + g.ladder(id).slice(1).map(label).join(' → ') + (n.row.escalates_default ? ' (the default)' : '') + '.'));
     const sup = n.row.supervisor, kids = g.sups.filter((e) => e.from === id).map((e) => fname(g.nodes.get(e.to)));
     if (sup) detail.append(el('p', '', 'Orders from ' + label(sup) + '.'));

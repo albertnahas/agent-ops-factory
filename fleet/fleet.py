@@ -601,7 +601,7 @@ def links(registry, services, glass, bad=(), health=False):
                        "supervisor": resolve(cell(r, "Supervisor")) if cell(r, "Supervisor") else None,
                        "role": roles[r["Loop"]], "break_glass": reasons.get(r["Loop"]),
                        "escalates_to": resolve(cell(r, "Escalates to")) if cell(r, "Escalates to") else default(r["Loop"]),
-                       "escalates_default": not cell(r, "Escalates to")} for r in registry}
+                       "escalates_default": not cell(r, "Escalates to"), "moves": cell(r, "Moves") or None} for r in registry}
     def cycles(key, what):
         """loop -> what is wrong with its `key` chain, or None. Each loop is walked once."""
         fate, said = {}, {}  # loop -> (the cycle's first loop, the cycle drawn from it) or None; loop -> its issue
@@ -800,7 +800,7 @@ def build():
     for r in rows: r.update(scope=of(r["project"])[1], **kpi.get(r["loop"], {}))
     keys = ["loop", "project", "scope", "runtime", "job", "schedule", "cadence", "status", "last_run", "result", "detail",
             "next_due", "pass_rate", "checks", "cost", "history", "checked_by", "supervisor", "supervisor_issue",
-            "role", "escalates_to", "escalates_default", "break_glass", "escalation_issue", "improver",
+            "role", "escalates_to", "escalates_default", "break_glass", "escalation_issue", "improver", "moves",
             "charter", "orders", "prompt", "runner", "report", "log", "floor", "target", *KPI.values()]
     rows = [{k: r.get(k) for k in keys} for r in rows]
 
