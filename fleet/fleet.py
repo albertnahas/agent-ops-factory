@@ -126,7 +126,7 @@ def cron_spec(expr, both=False):
                  "either": not both and d != "*" and wd != "*"}]
     except (ValueError, KeyError): return None
 
-every = lambda n: f"every {n // 60} min" if n % 60 == 0 else f"every {n} s"  # a StartInterval
+every = lambda n: "hourly" if n == 3600 else f"every {n // 60} min" if n % 60 == 0 else f"every {n} s"  # a StartInterval
 RANGES = {"Minute": (0, 59), "Hour": (0, 23), "Day": (1, 31), "Month": (1, 12), "Weekday": (0, 7)}
 
 def plist_spec(cals):
@@ -152,6 +152,31 @@ def fires(spec, start, direction, days=70):
 def nth(gen, n):
     for i, x in enumerate(gen):
         if i == n: return x
+
+MONTHS = "Jan Feb Mar Apr May Jun Jul Aug Sep Oct Nov Dec".split()
+
+def cadence(spec):
+    """How often a spec fires, in words. Weekly entries: every N min or hourly when evenly spaced, N× daily when every
+    weekday has the same times, else N× weekly. Entries pinned to days of the month: monthly, or yearly when limited to
+    some months. Months a weekly entry is limited to are named."""
+    weekly, dated = [x for x in spec if not x["Day"] or x.get("either")], [x for x in spec if x["Day"]]
+    days = {}
+    for x in weekly:
+        for w in x["Weekday"] or range(7):
+            days.setdefault(w, set()).update(h * 60 + m for h in x["Hour"] or range(24) for m in x["Minute"] or range(60))
+    every = len(days) == 7 and len({frozenset(d) for d in days.values()}) == 1
+    t = sorted(days[0]) if every else []
+    gaps = {b - a for a, b in zip(t, t[1:] + [t[0] + 1440])} if t else set()
+    gap = gaps.pop() if len(gaps) == 1 else None
+    n = sum(map(len, days.values()))
+    words = (None if not n else "every minute" if gap == 1 else f"every {gap} min" if gap and gap < 60 else "hourly" if gap == 60
+             else ("daily" if len(t) == 1 else f"{len(t)}× daily") if every else f"{n}× weekly" if n > 1 else "weekly")
+    if dated:
+        months = set().union(*(x["Month"] or range(1, 13) for x in dated))
+        on = "monthly" if len(months) == 12 else "yearly" if len(months) == 1 else f"{len(months)}× yearly"
+        words = f"{words} and {on}" if words else on
+    limited = weekly and all(x["Month"] for x in weekly) and set().union(*(x["Month"] for x in weekly))
+    return words + " in " + ", ".join(MONTHS[m - 1] for m in sorted(limited)) if limited else words
 
 # --- what is scheduled on this machine
 
@@ -693,6 +718,8 @@ def build():
             row["next_due"] = iso(nth(fires(spec, now, 1), 0))
         if not spec and not row["next_due"]:
             row["next_due"] = "on event"
+        row["cadence"] = (every(j["interval"]) if j and j["interval"] else cadence(spec) if spec
+                          else "always on" if j and (j["keepalive"] or j["daemon"]) else "on event" if j or kind != "local" else None)
         check = check_of(loop)
         if loop in led:
             l = led[loop]
@@ -749,7 +776,7 @@ def build():
         if label in claimed or j["vendor"] or not j["loaded"]: continue
         runtime = "cron" if label.startswith("cron:") else "mac"
         if j["oneoff"]:
-            rows.append({"loop": label, "project": "One-off", "runtime": runtime, "job": label, "status": "one-off", **job_links(j),
+            rows.append({"loop": label, "project": "One-off", "runtime": runtime, "job": label, "status": "one-off", "cadence": "one-off", **job_links(j),
                          "next_due": iso(nth(fires(j["spec"], now, 1, days=400), 0)), "schedule": "yearly, unless it removes itself after it runs"})
             continue
         rows.append({"loop": label, "project": "Unregistered", "runtime": runtime, "job": label, "status": "unregistered", **job_links(j),
@@ -771,7 +798,7 @@ def build():
                          "last_run": l["last"][:16], "schedule": "logs to the ledger with no registry row"})
     of, kpi = scoping(registry), kpis()
     for r in rows: r.update(scope=of(r["project"])[1], **kpi.get(r["loop"], {}))
-    keys = ["loop", "project", "scope", "runtime", "job", "schedule", "status", "last_run", "result", "detail",
+    keys = ["loop", "project", "scope", "runtime", "job", "schedule", "cadence", "status", "last_run", "result", "detail",
             "next_due", "pass_rate", "checks", "cost", "history", "checked_by", "supervisor", "supervisor_issue",
             "role", "escalates_to", "escalates_default", "break_glass", "escalation_issue", "improver",
             "charter", "orders", "prompt", "runner", "report", "log", "floor", "target", *KPI.values()]

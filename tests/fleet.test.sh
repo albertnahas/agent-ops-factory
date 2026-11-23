@@ -344,17 +344,19 @@ printf 'PID\tStatus\tLabel\n-\t0\tcom.t.five\n-\t0\tcom.t.hourly\n-\t0\tcom.t.yr
 reg '| five | P | mac | com.t.five | 5 min | | | you | |' '| hourly | P | mac | com.t.hourly | hourly | | | you | |' > "$O/REGISTRY.md"
 printf '{"loop":"five","date":"%s","check":"pass"}\n{"loop":"hourly","date":"%s","check":"pass"}\n' "$(ago 2)" "$(ago 2)" > "$O/runs.jsonl"
 expect "an interval job is silent after 3 intervals, at least an hour" "build && [ \"\$(get five .status)\" = silent ] && [ \"\$(get hourly .status)\" = healthy ]"
-expect "a plist with Month and Day is yearly" "get com.t.yr .schedule | grep -q '^yearly'"
+expect "a plist with Month and Day is yearly" "get com.t.yr .schedule | grep -q '^yearly' && [ \"\$(get com.t.yr .cadence)\" = one-off ]"
+expect "cadence reads the interval" "[ \"\$(get five .cadence)/\$(get hourly .cadence)\" = 'every 5 min/hourly' ]"
 mk uneven; python3 - "$O/la" <<'P'
 import datetime as dt, plistlib, sys
 wd = lambda k: (dt.date.today() - dt.timedelta(days=k)).isoweekday() % 7
-for n in ("ran", "missed"): open(f"{sys.argv[1]}/{n}.plist", "wb").write(plistlib.dumps({"Label": f"com.t.{n}", "StartCalendarInterval": [{"Weekday": wd(4), "Hour": 0}, {"Weekday": wd(5), "Hour": 0}]}))
+for n in ("ran", "missed"): open(f"{sys.argv[1]}/{n}.plist", "wb").write(plistlib.dumps({"Label": f"com.t.{n}", "StartCalendarInterval": [{"Weekday": wd(4), "Hour": 0, "Minute": 0}, {"Weekday": wd(5), "Hour": 0, "Minute": 0}]}))
 P
 printf 'PID\tStatus\tLabel\n-\t0\tcom.t.ran\n-\t0\tcom.t.missed\n' > "$O/launchctl.txt"
 reg '| ran | P | mac | com.t.ran | two days a week | | | you | |' '| missed | P | mac | com.t.missed | two days a week | | | you | |' > "$O/REGISTRY.md"
 at() { date -v-"$1"d +%FT00:01:00 2>/dev/null || date -d "$1 days ago" +%FT00:01:00; }
 printf '{"loop":"ran","date":"%s","check":"pass"}\n{"loop":"missed","date":"%s","check":"pass"}\n' "$(at 4)" "$(at 5)" > "$O/runs.jsonl"
 expect "a job that ran at its latest fire isn't silent before its next, however uneven its week" "build && [ \"\$(get ran .status)\" = healthy ] && [ \"\$(get missed .status)\" = silent ]"
+expect "cadence reads the weekdays" "[ \"\$(get ran .cadence)\" = '2× weekly' ]"
 
 mk statuses; reg "$(row run)" "$(row can)" "$(row tmo)" "$(row gone)" "$(row late)" > "$O/REGISTRY.md"
 cloud "$(for r in run:running can:cancelled tmo:timed_out; do routine "\"${r%%:*}\"" true null "\"${r#*:}\"" "\"$(day 1)\""; printf ,; done)$(routine '"late"' true "\"$(day 2)\"")"
@@ -396,6 +398,9 @@ expect "names: mon"                            "[ \"\$(fires '0 9 * * mon' False
 expect "names: jan"                            "[ \"\$(fires '0 9 1 jan *' False)\" = '2027-01-01 09:00 None' ]"
 expect "day or weekday, as cron does"          "[ \"\$(fires '0 9 1 * 1' False 29)\" = '2026-11-30 09:00 2026-12-01 09:00' ]"
 expect "day and weekday for an override"       "[ \"\$(fires '0 8 1-7 * 1' True)\" = '2026-12-07 08:00 2027-01-04 08:00' ]"
+cad() { python3 -c "import sys; sys.path.insert(0, 'fleet'); from fleet import cron_spec, cadence; print(' / '.join(cadence(cron_spec(e)) for e in sys.argv[1:]))" "$@"; }
+expect "cadence names each schedule shape"     "[ \"\$(cad '*/5 * * * *' '* * * * *' '0 * * * *' '0 9,17 * * *' '0 9 * * 1-5' '0 9 1 * *' '0 9 1 1 *' '0 9 * 12 *' '0 9 15 * 1' '0,10,50 * * * *' '0 0,3,6 * * 1-5' '0 9 1 */3 *')\" = 'every 5 min / every minute / hourly / 2× daily / 5× weekly / monthly / yearly / daily in Dec / weekly and monthly / 72× daily / 15× weekly / 4× yearly' ]"
+expect "cadence counts a repeated time once"   "[ \"\$(python3 -c \"import sys; sys.path.insert(0, 'fleet'); from fleet import cron_spec, cadence; print(cadence(cron_spec('0 9 * * 1') * 2))\")\" = weekly ]"
 expect "a star minute is every minute"         "[ \"\$(fires '* * * * *' False)\" = '2026-11-22 10:01 2026-11-22 10:02' ]"
 expect "weekday ranges wrap"                   "[ \"\$(fires '30 6 * * sat-sun' False)\" = '2026-11-28 06:30 2026-11-29 06:30' ]"
 
