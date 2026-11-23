@@ -115,6 +115,11 @@ button.fx-kpi:focus-visible { outline: 2px solid var(--color-fg); outline-offset
 .fx-fnode .fx-rt { margin: 0; }
 .fx-cad { display: inline-flex; align-items: center; gap: 3px; white-space: nowrap; color: var(--color-fg-muted); font-weight: 400; }
 .fx-cad svg { flex: none; }
+.fx-tip { position: fixed; z-index: 10; max-width: 300px; padding: 8px 10px; border: 1px solid var(--color-border-line); border-radius: 8px; background: var(--color-bg);
+  box-shadow: 0 4px 16px rgb(0 0 0 / .14); display: grid; gap: 3px; font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); pointer-events: none; }
+.fx-tip b { color: var(--color-fg); font-weight: 600; overflow-wrap: anywhere; }
+.fx-tip p { margin: 0; }
+.fx-tipd { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
 .fx-fnode .fx-cad { display: flex; align-items: flex-start; width: fit-content; margin-top: 1px; font-size: 11px; white-space: normal; }
 .fx-fnode .fx-cad svg { margin-top: 2px; }
 @media (max-width: 639px) { .fx-fcol.checkers .fx-rt { display: none; } }
@@ -986,10 +991,32 @@ dash.draw('factory-door', (e) => {
       + (g.hasMaster ? (n > target ? ' ' + (n - target) + ' more ' + (n - target === 1 ? 'goes' : 'go') + ' around the master.' : ' Everything else goes through them.') : ' No loop has Role master yet, so every loop can reach you.')));
   e.append(v, text);
 });
+/* a mouse resting on a loop card shows its numbers for a moment, without a click; touch opens the detail below instead */
+const tip = document.querySelector('.fx').appendChild(el('div', 'fx-tip')); tip.hidden = true; tip.setAttribute('role', 'tooltip');
+let tipWait;
+const peek = (chip, r) => {
+  clearTimeout(tipWait); tip.hidden = true;
+  if (!chip) return;
+  tipWait = setTimeout(() => {
+    if (!chip.isConnected) return;
+    const money = r.cost != null ? '$' + r.cost.toFixed(2) + ' in 30 days' : null, next = nextText(r);
+    tip.replaceChildren(el('b', '', r.loop),
+      ...[[...new Set([r.cadence, r.schedule, next].filter(Boolean))],
+        [r.last_run ? 'last run ' + rel(r.last_run) + (r.result ? ', ' + r.result + 'ed' : '') : 'never run', r.checks && r.checks + ' checks passed', money],
+        [r.kpi && 'North Star: ' + goodText(r)]]
+        .map((xs) => xs.filter(Boolean).join(' · ')).filter(Boolean).map((t) => el('p', '', t)),
+      ...(r.detail ? [el('p', 'fx-tipd', r.detail)] : []));
+    tip.hidden = false;
+    const c = chip.getBoundingClientRect(), w = tip.offsetWidth, h = tip.offsetHeight;
+    const x = c.right + 8 + w < innerWidth ? c.right + 8 : Math.max(8, c.left - 8 - w);
+    tip.style.left = x + 'px'; tip.style.top = Math.min(Math.max(8, c.top), innerHeight - h - 8) + 'px';
+  }, 250);
+};
+addEventListener('scroll', () => peek(), {passive: true});
 const FACTORY_ALL = 60;
 dash.draw('factory', (box) => {
   const l = dash.data('loops');
-  box.replaceChildren(); box.classList.remove('trace');
+  peek(); box.replaceChildren(); box.classList.remove('trace');
   LAYERS.forEach((k) => box.classList.toggle('hide-' + k, FX.hide.has(k)));
   if (!box.clientWidth) return; /* its tab is hidden: the runtime draws it again when the tab opens and the width changes */
   if (l.status !== 'ok') return failed(box, 'loop list', l.status);
@@ -1108,7 +1135,7 @@ dash.draw('factory', (box) => {
     if (n.kind === 'loop' && (n.row.cadence || n.row.schedule)) {
       const p = el('p', 'fx-when'), c = cadenceMark(n.row), next = nextText(n.row);
       if (c) p.append(c);
-      const rest = [n.row.schedule, next !== n.row.cadence && next].filter(Boolean).join(' · ');
+      const rest = [...new Set([n.row.schedule, next])].filter((x) => x && x !== n.row.cadence).join(' · ');
       if (rest) p.append((c ? ' · ' : '') + rest);
       detail.append(p);
     }
@@ -1139,9 +1166,10 @@ dash.draw('factory', (box) => {
     if (tell) say(id);
   };
   chips.forEach((b, id) => {
-    b.onpointerenter = (e) => { if (e.pointerType === 'mouse') trace(id); };
-    b.onpointerleave = (e) => { if (e.pointerType === 'mouse') trace(FX.fsel); };
-    b.onclick = (e) => { e.stopPropagation(); FX.fsel = FX.fsel === id ? null : id; trace(FX.fsel, true); };
+    const r = g.nodes.get(id).row;
+    b.onpointerenter = (e) => { if (e.pointerType === 'mouse') { trace(id); if (r) peek(b, r); } };
+    b.onpointerleave = (e) => { if (e.pointerType === 'mouse') { trace(FX.fsel); peek(); } };
+    b.onclick = (e) => { e.stopPropagation(); peek(); FX.fsel = FX.fsel === id ? null : id; trace(FX.fsel, true); };
   });
   box.onclick = () => { FX.fsel = null; trace(null, true); };
   if (!g.nodes.has(FX.fsel)) FX.fsel = null;
