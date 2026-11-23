@@ -1026,7 +1026,7 @@ dash.draw('factory', (box) => {
     b.append(name);
     if (rt) b.append(rt);
     if (read) b.append(el('b', '', String(read)));
-    b.setAttribute('aria-label', fname(n) + (n.kind === 'loop' ? ', ' + LABEL[n.row.status] + (rt ? ', ' + runtimeOf(n.row)[1] : '') + (cad ? ', runs ' + n.row.cadence : '') : n.kind === 'ext' ? (n.service ? ', a service' : ', not in the registry') : '')
+    b.setAttribute('aria-label', fname(n) + (n.kind === 'loop' ? ', ' + LABEL[n.row.status] + (rt ? ', ' + runtimeOf(n.row)[1] : '') + (cad ? ', ' + n.row.cadence : '') : n.kind === 'ext' ? (n.service ? ', a service' : ', not in the registry') : '')
       + (role ? ', ' + role : '') + (n.glass ? ', break-glass: ' + n.glass : '') + (read ? ', reads ' + read : '') + (gap ? ', nobody reads it' : '') + (issue ? ', ' + issue : ''));
     chips.set(n.id, b);
     return b;

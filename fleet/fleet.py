@@ -153,12 +153,22 @@ def nth(gen, n):
     for i, x in enumerate(gen):
         if i == n: return x
 
+MONTHS = "Jan Feb Mar Apr May Jun Jul Aug Sep Oct Nov Dec".split()
+
 def cadence(spec):
-    """How often a spec fires, in words: runs a week from its weekdays and times; a spec pinned to days of the month is monthly."""
-    week = sum(len(x["Hour"] or range(24)) * len(x["Minute"] or range(60)) * len(x["Weekday"] or range(7))
-               for x in spec if not x["Day"] or x.get("either"))
-    return ("monthly" if not week else "hourly" if week >= 7 * 24 else f"{week // 7}× daily" if week >= 14 and week % 7 == 0
-            else "daily" if week == 7 else f"{week}× weekly" if week > 1 else "weekly")
+    """How often a spec fires, in words: its distinct times in a week (every N min, hourly, N× daily, N× weekly, weekly),
+    a spec pinned to days of the month monthly or, in one month, yearly; months it is limited to are named."""
+    weekly = [x for x in spec if not x["Day"] or x.get("either")]
+    n = len({(w, h, m) for x in weekly for w in x["Weekday"] or range(7) for h in x["Hour"] or range(24) for m in x["Minute"] or range(60)})
+    hour = n // 168 if n % 168 == 0 else 0
+    words = (None if not n else "hourly" if hour == 1 else "every minute" if hour == 60 else f"every {60 // hour} min" if hour and 60 % hour == 0
+             else f"{n // 7}× daily" if n >= 14 and n % 7 == 0 else "daily" if n == 7 else f"{n}× weekly" if n > 1 else "weekly")
+    dated = [x for x in spec if x["Day"]]
+    if dated:
+        on = "yearly" if all(x["Month"] and len(x["Month"]) == 1 for x in dated) else "monthly"
+        words = f"{words} and {on}" if words else on
+    months = set().union(*(x["Month"] for x in weekly if x["Month"])) if all(x["Month"] for x in weekly) and weekly else set()
+    return words + " in " + ", ".join(MONTHS[m - 1] for m in sorted(months)) if months else words
 
 # --- what is scheduled on this machine
 
