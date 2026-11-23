@@ -112,7 +112,8 @@ button.fx-kpi:focus-visible { outline: 2px solid var(--color-fg); outline-offset
 .fx-dot[data-tone="warn"] { background: var(--color-warn); }
 .fx-dot[data-tone="none"] { background: transparent; border: 1.5px solid var(--color-fg-muted); }
 .fx-rt { color: var(--color-fg-muted); opacity: .75; flex: none; vertical-align: -1px; margin-right: 5px; }
-.fx-fnode .fx-rt { margin: 0; }
+.fx-fnode .fx-rt { margin: 1px 0 0 auto; }
+.fx-fnode .fx-rt + b { margin-left: 0; }
 .fx-cad { display: inline-flex; align-items: center; gap: 3px; white-space: nowrap; color: var(--color-fg-muted); font-weight: 400; }
 .fx-cad svg { flex: none; }
 .fx-tip { position: fixed; z-index: 10; max-width: 300px; padding: 8px 10px; border: 1px solid var(--color-border-line); border-radius: 8px; background: var(--color-bg);
@@ -159,6 +160,9 @@ button.fx-kpi:focus-visible { outline: 2px solid var(--color-fg); outline-offset
   transition: opacity 160ms, border-color 160ms, box-shadow 160ms; }
 .fx-fnode > span:not(.fx-dot) { min-width: 0; overflow: hidden; overflow-wrap: break-word; }
 .fx-fnode .fx-dot { flex: none; width: 8px; height: 8px; }
+/* a loop's chip reads from its top line: status, name, and where it runs at the top right */
+.fx-fnode:not(.fx-fend) { align-items: flex-start; }
+.fx-fnode:not(.fx-fend) .fx-dot { margin-top: 4px; }
 .fx-fnode b { margin-left: auto; padding-left: 4px; font-weight: 600; font-size: 11px; color: var(--color-fg-muted); font-variant-numeric: tabular-nums; }
 .fx-fnode:hover, .fx-fnode:focus-visible { border-color: color-mix(in srgb, var(--color-fg) 45%, transparent); outline: none; }
 .fx-fnode[data-tone="bad"] { border-color: color-mix(in srgb, var(--color-bad) 60%, transparent); background: color-mix(in srgb, var(--color-bad) 8%, var(--color-bg)); }
@@ -192,7 +196,7 @@ button.fx-kpi:focus-visible { outline: 2px solid var(--color-fg); outline-offset
 .fx-fnode.door > span:not(.fx-dot) { overflow-wrap: normal; }
 .fx-fnode.door .fx-rt { display: none; }
 .fx-fdetail p.warn { color: var(--color-warn); }
-.fx-factory.trace .fx-fnode:not(.on), .fx-factory.trace .fx-fproj { opacity: .28; }
+.fx-factory.trace .fx-fnode:not(.on), .fx-factory.trace .fx-fproj:not(.on) { opacity: .28; }
 .fx-factory.trace .fx-fedges :is(path, text):not(.on) { opacity: .06; }
 .fx-factory.trace .fx-fedges path.on:not(.flow) { opacity: 1; }
 .fx-factory.trace .fx-fedges path.on:is(.chk, .sup, .off) { stroke-width: 2; }
@@ -923,15 +927,15 @@ const factoryGraph = (rows, problems) => {
   const at = new Map(groups.flatMap(([, ns]) => ns).map((n, k) => [n.id, k]));
   const level = (n) => { const ks = ins(n.id).filter((e) => at.has(e.from)); return ks.length ? mean(ks, (e) => at.get(e.from)) : Infinity; };
   order.splice(0, order.length, ...order.filter((n) => n.col === 'checkers').sort((a, b) => level(a) - level(b)), ...ends);
-  /* everything one node's links touch, both ways; for you, only what escalates to you */
+  /* what one node's links touch: its checks both ways (none for you), its own escalation route up, and the escalations straight into it */
   const walk = (list, id, down) => {
     const next = by(list, down ? 'from' : 'to'), on = new Set([id]), via = new Set(), todo = [id];
     while (todo.length) { const n = todo.pop(); (next.get(n) || []).forEach((e) => { const m = down ? e.to : e.from; via.add(e.i); if (!on.has(m)) { on.add(m); todo.push(m); } }); }
     return {on, via};
   };
   const chain = (id) => {
-    const c = id === YOU ? [] : [walk(edges, id, true), walk(edges, id, false)], x = id === YOU ? [walk(escs, id, false)] : [walk(escs, id, true), walk(escs, id, false)];
-    return {on: new Set([...c, ...x].flatMap((p) => [...p.on])), via: new Set(c.flatMap((p) => [...p.via])), esc: new Set(x.flatMap((p) => [...p.via]))};
+    const c = id === YOU ? [] : [walk(edges, id, true), walk(edges, id, false)], up = walk(escs, id, true);
+    return {on: new Set([...c, up].flatMap((p) => [...p.on])), via: new Set(c.flatMap((p) => [...p.via])), esc: up.via, into: escs.filter((e) => e.to === id)};
   };
   const route = (id) => {
     const prev = new Map([[id, null]]), todo = [id];
@@ -1081,7 +1085,7 @@ dash.draw('factory', (box) => {
   const lines = [];
   groupBy(g.escs, (e) => { const n = g.nodes.get(e.from); return !e.set && n.col === 'workers' ? (n.row.project || 'General') + '\n' + e.to : 'x' + e.i; })
     .forEach((es, k) => lines.push({key: 'x' + lines.length, es, from: es.length > 1 ? at(frames.get(k.split('\n')[0])) : pos.get(es[0].from),
-      fromCol: g.nodes.get(es[0].from).col, to: es[0].to, glass: es[0].glass}));
+      fromCol: g.nodes.get(es[0].from).col, to: es[0].to, glass: es[0].glass, project: es.length > 1 && k.split('\n')[0]}));
   /* lanes through the ribbon keep the loops' order; ports on a chip's left edge are spread in the order lines arrive */
   const lanesOf = [...through.map((e) => ({key: 'c' + e.i, y: pos.get(e.from).m})),
     ...lines.filter((x) => x.fromCol === 'workers' && g.nodes.get(x.to).col === 'ends').map((x) => ({key: x.key, y: x.from.m}))].sort((a, b) => a.y - b.y);
@@ -1095,7 +1099,8 @@ dash.draw('factory', (box) => {
   const band = document.createElementNS(svg.namespaceURI, 'rect');
   [['class', 'band'], ['x', rb.l], ['y', rb.t + 20], ['width', Math.max(0, rb.r - rb.l)], ['height', Math.max(0, rb.b - rb.t - 20)], ['rx', 6]].forEach(([k, v]) => band.setAttribute(k, v));
   if (lanesOf.length) svg.append(band);
-  const add = (d, cls, data) => { const p = document.createElementNS(svg.namespaceURI, 'path'); p.setAttribute('d', d); p.setAttribute('class', cls); Object.assign(p.dataset, data); svg.append(p); paths.push(p); return p; };
+  const make = (d, cls, data) => { const p = document.createElementNS(svg.namespaceURI, 'path'); p.setAttribute('d', d); p.setAttribute('class', cls); Object.assign(p.dataset, data); svg.append(p); return p; };
+  const add = (d, cls, data) => { const p = make(d, cls, data); paths.push(p); return p; };
   /* one shape for every link: down a column's spine, round its right side, through a lane, forward or back */
   const shape = (s, t, sc, tc, lane, y, bulge) => sc === tc && sc === 'ends' ? `M${(s.l + s.r) / 2},${s.b}L${(t.l + t.r) / 2},${t.t}`
     : sc === tc ? (() => { const k = Math.min(gap * .8, bulge + Math.abs(t.m - s.m) * .2); return `M${s.r},${s.m}C${s.r + k},${s.m} ${t.r + k},${t.m} ${t.r},${t.m}`; })()
@@ -1157,12 +1162,24 @@ dash.draw('factory', (box) => {
     const defs = defsRow(n.row); if (defs) detail.append(defs);
   };
   /* pointing only lights a chain; tapping also fills the card, so the page's height never moves under the pointer */
+  const lineOf = new Map(lines.flatMap((x) => x.es.map((e) => [e.i, x])));
+  let own = [];
   const trace = (id, tell) => {
-    const c = id ? g.chain(id) : {on: new Set(), via: new Set(), esc: new Set()};
+    const c = id ? g.chain(id) : {on: new Set(), via: new Set(), esc: new Set(), into: []};
     const sup = new Set(id === YOU ? [] : g.sups.filter((e) => e.from === id || e.to === id).map((e) => { c.on.add(e.from); c.on.add(e.to); return e.i; }));
+    /* an escalation into the node lights what its line starts from: the loop, or the project frame when the project shares one line */
+    const esc = new Set([...c.esc, ...c.into.map((e) => e.i)]), shared = new Set();
+    c.into.forEach((e) => { const x = lineOf.get(e.i); if (x.project) shared.add(x.project); else c.on.add(e.from); });
+    /* a shared line lights only when all of it is in play; one loop's escalation on it gets a line of its own while selected */
+    own.forEach((p) => p.remove());
+    own = lines.flatMap((x) => x.es.some((e) => !esc.has(e.i)) ? x.es.filter((e) => esc.has(e.i)).map((e) => {
+      const t = pos.get(e.to);
+      return make(shape(pos.get(e.from), t, x.fromCol, g.nodes.get(e.to).col, lanes.get(x.key), t.m, 20), 'esc on' + (x.glass ? ' glass' : ''), {x: e.i});
+    }) : []);
     box.classList.toggle('trace', !!id);
     chips.forEach((b, k) => { b.classList.toggle('on', c.on.has(k)); b.classList.toggle('sel', k === FX.fsel); b.setAttribute('aria-pressed', String(k === FX.fsel)); });
-    paths.forEach((p) => p.classList.toggle('on', 's' in p.dataset ? sup.has(+p.dataset.s) : 'x' in p.dataset ? p.dataset.x.split(' ').some((i) => c.esc.has(+i)) : c.via.has(+p.dataset.e)));
+    frames.forEach((f, k) => f.firstChild.classList.toggle('on', shared.has(k)));
+    paths.forEach((p) => p.classList.toggle('on', 's' in p.dataset ? sup.has(+p.dataset.s) : 'x' in p.dataset ? p.dataset.x.split(' ').every((i) => esc.has(+i)) : c.via.has(+p.dataset.e)));
     if (tell) say(id);
   };
   chips.forEach((b, id) => {
