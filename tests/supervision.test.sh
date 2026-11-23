@@ -16,7 +16,7 @@ cat > "$D/REGISTRY.md" <<'R'
 | boss | Shop | cloud | routine:boss | daily | | | you | |
 | posts | Shop | mac | com.t.posts | daily | | | boss | boss |
 | ads | Shop | mac | com.t.ads | weekly | | | boss | boss |
-| fixes | Shop | cloud | routine:fixes | on demand | | | boss | boss |
+| fixes | Shop | cloud | routine:fixes | on demand | | | boss | routine:boss |
 | other | Shop | mac | com.t.other | daily | | | you | |
 R
 printf '%s\n' '{"loop":"posts","date":"2026-11-22T20:00:00","check":"pass"}' '{"loop":"posts","date":"2026-11-23T07:00:00","check":"pass"}' \
@@ -24,11 +24,11 @@ printf '%s\n' '{"loop":"posts","date":"2026-11-22T20:00:00","check":"pass"}' '{"
 S() { python3 fleet/supervision.py boss "$D/$1" > "$D/said" 2>&1; }
 cat > "$D/2026-11-23.md" <<'M'
 5. **Actions taken**
-   - posts: kept · read through 2026-11-22 · its E1 order reads on 12-12
+   - **posts**: kept · read through 2026-11-22 · its E1 order reads on 12-12
    - `ads`: **changed** in #40 · read through 2026-11-18
    - fixes: Kept · read through 2026-11-16, no fix PRs this week
 M
-expect "every supervised loop with a line read through its last run passes" "S 2026-11-23.md && grep -q 'reviewed all 3: posts, ads, fixes' $D/said"
+expect "every supervised loop, one named by its job and one in bold, passes" "S 2026-11-23.md && grep -q 'reviewed all 3: posts, ads, fixes' $D/said"
 sed '/fixes/d' "$D/2026-11-23.md" > "$D/b-2026-11-23.md"
 expect "a supervised loop with no line fails"        "! S b-2026-11-23.md && grep -q 'fixes: no' $D/said"
 sed 's/read through 2026-11-22/read through 2026-11-20/' "$D/2026-11-23.md" > "$D/c-2026-11-23.md"
@@ -39,4 +39,10 @@ expect "one sentence for every loop fails, naming each" "! S d-2026-11-23.md && 
 cp "$D/2026-11-23.md" "$D/report.md"
 expect "a report with no date in its name fails"     "! S report.md && grep -q 'no YYYY-MM-DD' $D/said"
 expect "a supervisor no row names fails"             "! python3 fleet/supervision.py nobody-here $D/2026-11-23.md > $D/said && grep -q 'no registry row names nobody-here' $D/said"
+sed 's/read through 2026-11-18/read through 9999-99-99/' "$D/2026-11-23.md" > "$D/e-2026-11-23.md"
+expect "a read-through that's no date fails"         "! S e-2026-11-23.md && grep -q 'ads: read through 9999-99-99, which is no date' $D/said"
+sed 's/read through 2026-11-18/read through 2026-11-30/' "$D/2026-11-23.md" > "$D/f-2026-11-23.md"
+expect "a read-through after the report's day fails" "! S f-2026-11-23.md && grep -q 'ads: read through 2026-11-30' $D/said"
+{ cat "$D/2026-11-23.md"; echo '   - ads: retired · read through 2026-11-18'; } > "$D/g-2026-11-23.md"
+expect "a loop on two lines fails"                   "! S g-2026-11-23.md && grep -q 'ads: named on more than one line' $D/said"
 [ "$fail" -eq 0 ] && echo "all passed" || { echo "some failed"; exit 1; }
