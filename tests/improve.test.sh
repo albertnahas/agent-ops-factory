@@ -121,6 +121,10 @@ expect "check fails a change on a loop without Improver on" "! chk && grep -q 't
 cp "$D/imp.ok" "$D/improvements.jsonl" && jq -c 'select(.loop != "bare")' "$D/kpi.before" > "$K"
 expect "check fails with a KPI line missing today"        "! chk && grep -q 'no KPI line today for bare' $D/said"
 
+cp "$D/REGISTRY.md" "$D/reg" && sed -E 's/ [oO]n \|$/ |/' "$D/reg" > "$D/REGISTRY.md"
+expect "check fails when it read no loop at all"          "! chk && grep -q 'no loop has Improver on' $D/said"
+cp "$D/reg" "$D/REGISTRY.md"
+
 # The noise margin
 { c n2 2026-11-09 noise 1 ',"better":"higher"'; c c2 2026-11-09 clear 2 ',"better":"higher"'; c t2 2026-11-09 tally 3 ',"better":"higher"'; c p2 2026-11-09 gappy 4 ',"better":"higher","runs":3'; } > "$D/improvements.jsonl"
 python3 fleet/improve_read.py >/dev/null
