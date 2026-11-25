@@ -26,7 +26,7 @@ Without a ledger, a launchd loop's last exit and the time its log file last chan
 ## Statuses
 
 - **Failing:** the last outcome check failed (or, with no check, the last run exited non-zero).
-- **Silent:** no run for one scheduled period plus 12 hours, or for a launchd interval job three intervals and at least an hour; or a cloud routine whose next run claude.ai still had due an hour before the snapshot. With no registry, a log file that stopped changing isn't enough, since many scripts log somewhere else. Such a job shows as No run record and its detail gives the log's date. With a registry it still counts, so a registered loop that stops still alerts.
+- **Silent:** no run for one scheduled period plus 12 hours, or for a launchd interval job three intervals and at least an hour, or 1.5 times the median gap between its last 10 ledger lines if that is longer (a job that checks often and logs rarely); or a cloud routine whose next run claude.ai still had due an hour before the snapshot. With no registry, a log file that stopped changing isn't enough, since many scripts log somewhere else. Such a job shows as No run record and its detail gives the log's date. With a registry it still counts, so a registered loop that stops still alerts.
 - **Flaky:** the last check passed but 3 of the last 7 failed.
 - **Unregistered:** running, with no registry row.
 - **Stale data:** the cloud snapshot is over 36 hours old.

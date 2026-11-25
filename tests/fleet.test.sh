@@ -347,6 +347,17 @@ printf '{"loop":"five","date":"%s","check":"pass"}\n{"loop":"hourly","date":"%s"
 expect "an interval job is silent after 3 intervals, at least an hour" "build && [ \"\$(get five .status)\" = silent ] && [ \"\$(get hourly .status)\" = healthy ]"
 expect "a plist with Month and Day is yearly" "get com.t.yr .schedule | grep -q '^yearly' && [ \"\$(get com.t.yr .cadence)\" = one-off ]"
 expect "cadence reads the interval" "[ \"\$(get five .cadence)/\$(get hourly .cadence)\" = 'every 5 min/hourly' ]"
+mk rare; python3 - "$O/la" <<'P'
+import plistlib, sys
+for n in ("idle", "dead", "busy"): open(f"{sys.argv[1]}/{n}.plist", "wb").write(plistlib.dumps({"Label": f"com.t.{n}", "StartInterval": 1800}))
+P
+printf 'PID\tStatus\tLabel\n-\t0\tcom.t.idle\n-\t0\tcom.t.dead\n-\t0\tcom.t.busy\n' > "$O/launchctl.txt"
+reg '| idle | P | mac | com.t.idle | 30 min | | | you | |' '| dead | P | mac | com.t.dead | 30 min | | | you | |' '| busy | P | mac | com.t.busy | 30 min | | | you | |' > "$O/REGISTRY.md"
+for h in 88 64 40 16; do printf '{"loop":"idle","date":"%s","subtype":"success","exit":0}\n{"loop":"idle","date":"%s","check":"pass"}\n' "$(ago $h)" "$(ago $h)"; done > "$O/runs.jsonl"
+for h in 85 61 37; do printf '{"loop":"dead","date":"%s","check":"pass"}\n' "$(ago $h)"; done >> "$O/runs.jsonl"
+for h in 19 18 17 16; do printf '{"loop":"busy","date":"%s","check":"pass"}\n' "$(ago $h)"; done >> "$O/runs.jsonl"
+expect "an interval job that logs daily isn't silent between lines, and is past 1.5 of its gaps" "build && [ \"\$(get idle .status)\" = healthy ] && [ \"\$(get dead .status)\" = silent ]"
+expect "an interval job that logs every run is still judged on its interval" "[ \"\$(get busy .status)\" = silent ]"
 mk uneven; python3 - "$O/la" <<'P'
 import datetime as dt, plistlib, sys
 wd = lambda k: (dt.date.today() - dt.timedelta(days=k)).isoweekday() % 7

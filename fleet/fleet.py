@@ -4,7 +4,7 @@ one-off job with its health), <out>/waiting.json (everything waiting on you) and
 Sources: the registry file, launchd plists, your crontab, the run ledger, <out>/cloud.json (Claude routines and
 desktop tasks, written by the claude.ai sync in fleet/SYNC.md), and optionally a queue file, GitHub PRs and decision memos.
 fleet/README.md says how each status is decided."""
-import datetime as dt, functools, json, math, os, plistlib, re, shlex, shutil, subprocess, sys, urllib.parse
+import datetime as dt, functools, json, math, os, plistlib, re, shlex, shutil, statistics, subprocess, sys, urllib.parse
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
@@ -444,6 +444,7 @@ def ledger(now):
             last_ok = not failed(claude[-1])
             detail = f"run ended {claude[-1].get('subtype')} (exit {claude[-1].get('exit')})"
             passes, total = sum(not failed(r) for r in win_claude), len(win_claude)
+        at = [dt.datetime.fromisoformat(r["date"]) for r in (checks or claude)[-11:]]  # one kind: a run logs its own line and its check's
         last7 = [r["check"] for r in checks[-7:]]
         history = "".join("p" if r["check"] == "pass" else "f" for r in checks[-10:]) if checks else \
                   "".join("f" if failed(r) else "p" for r in claude[-10:])
@@ -453,6 +454,7 @@ def ledger(now):
             "fails7": f"{last7.count('fail')} of last {len(last7)}",
             "cost": round(sum(r["cost"] for r in win_claude), 2),
             "has_checks": bool(checks), "history": history,
+            "gap": statistics.median([b - a for a, b in zip(at, at[1:])] or [dt.timedelta()]),
         }
     return out, first
 
@@ -747,8 +749,9 @@ def build():
             ran = dt.datetime.fromisoformat(row["last_run"])  # late: 12h past the gap after its last run's fire, so Mon, Thu waits 4 days after a Thursday
             fire = nth(fires(spec, ran + dt.timedelta(hours=1), -1), 0); after = fire and nth(fires(spec, fire, 1), 0)
             late = bool(after) and now - ran > (after - fire) + dt.timedelta(hours=12)
-        elif j and j["interval"] and row["last_run"]:  # three periods, at least an hour
-            late = now - dt.datetime.fromisoformat(row["last_run"]) > max(dt.timedelta(seconds=3 * j["interval"]), dt.timedelta(hours=1))
+        elif j and j["interval"] and row["last_run"]:  # three periods, at least an hour; a job that logs less often than it runs, 1.5 times its usual gap
+            usual = led[loop]["gap"] * 1.5 if loop in led else dt.timedelta()
+            late = now - dt.datetime.fromisoformat(row["last_run"]) > max(dt.timedelta(seconds=3 * j["interval"]), dt.timedelta(hours=1), usual)
         if item and live and item["next_run_at"] and snap_at and item["next_run_at"] < snap_at - dt.timedelta(hours=1):
             late = True  # claude.ai still had this run due an hour before the snapshot
         if (health or service) and late and j and loop not in led and not check:  # an old log is no proof: scripts often log elsewhere
