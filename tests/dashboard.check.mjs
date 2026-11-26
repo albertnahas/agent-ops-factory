@@ -13,7 +13,9 @@ const page = await browser.newPage({viewport: phone});
 const errors = [];
 page.on('pageerror', (e) => errors.push(String(e)));
 page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
-const frames = () => page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
+/* two frames, then any finite animation done (the drawer slides in), so a measure sees where things land */
+const frames = () => page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)))
+  .then(() => Promise.all(document.getAnimations().filter((a) => a.effect.getTiming().iterations !== Infinity).map((a) => a.finished.catch(() => {})))));
 const timed = async (f) => { const t = Date.now(); await f(); await frames(); return Date.now() - t; };
 const close = async () => { await page.keyboard.press('Escape'); await frames(); };
 const sheetText = () => page.evaluate(() => [...document.querySelectorAll('.fx-sheet p')].map((p) => p.textContent));

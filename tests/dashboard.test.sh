@@ -9,7 +9,7 @@ set -uo pipefail
 cd "$(dirname "$0")/.."
 export AGENT_OPS_DIR=$(mktemp -d)
 export AGENT_OPS_KIT="$PWD/tests/kit"  # the test copy of the kit's question spec, never the real kit
-trap 'rm -rf "$AGENT_OPS_DIR"' EXIT
+trap '[ -n "${KEEP:-}" ] || rm -rf "$AGENT_OPS_DIR"' EXIT
 fail=0
 expect() { if eval "$2"; then echo "ok    $1"; else echo "FAIL  $1"; fail=1; fi; }
 echo "{\"launch_agents\": \"$AGENT_OPS_DIR/none\"}" > "$AGENT_OPS_DIR/fleet.json"
