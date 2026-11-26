@@ -122,12 +122,64 @@ if (factory.loops) {
   await close();
 }
 
+/* the graph is a canvas inside its card: scrolling over it moves the graph, not the page; Ctrl-scroll zooms at the pointer;
+   lines stay on their chips at any zoom, a redraw included; a drag doesn't click; Fit shows it all; Expand fills the view
+   and a loop's drawer opens over it; Escape closes the drawer, then the expanded view */
+const canvas = {};
+if (await page.locator('#factory-canvas.on').count()) {
+  const cv = await page.locator('#factory-canvas').boundingBox(), view = () => page.evaluate(() => ({
+    t: document.querySelector('.fx-stage').style.transform, page: document.body.scrollTop, pct: document.querySelector('.fx-cv-pct').textContent,
+    sheet: !!document.querySelector('.fx-sheet')}));
+  const before = await view();
+  await page.mouse.move(cv.x + cv.width / 2, cv.y + cv.height / 2); await page.mouse.wheel(0, 200); await frames();
+  const wheeled = await view(); canvas.wheel = wheeled.t !== before.t && wheeled.page === before.page;
+  await page.keyboard.down('Control'); await page.mouse.wheel(0, -40); await page.keyboard.up('Control'); await frames();
+  canvas.zoom = (await view()).pct;
+  await page.evaluate(() => dash.draw('factory')); await frames();
+  canvas.onChips = await page.evaluate(() => {
+    const chips = [...document.querySelectorAll('#factory-graph .fx-fnode')].map((c) => c.getBoundingClientRect());
+    const starts = [...document.querySelectorAll('#factory-graph .fx-fedges path[data-e]')].map((p) => {
+      const m = p.getScreenCTM(), q = p.getPointAtLength(0); return {x: m.a * q.x + m.c * q.y + m.e, y: m.b * q.x + m.d * q.y + m.f};
+    });
+    return starts.length > 0 && starts.every((s) => chips.some((r) => s.x >= r.left - 2 && s.x <= r.right + 2 && s.y >= r.top - 2 && s.y <= r.bottom + 2));
+  });
+  const chip = await page.locator('#factory-graph .fx-fnode[data-tone]').first().boundingBox();
+  await page.mouse.move(chip.x + 10, chip.y + chip.height / 2); await page.mouse.down();
+  await page.mouse.move(chip.x + 70, chip.y + 60, {steps: 5}); await page.mouse.up(); await frames();
+  const dragged = await view();
+  canvas.drag = !dragged.sheet && dragged.t !== before.t;
+  /* another tab and back keeps the view; a double click on a loop opens its drawer once */
+  const kept = (await view()).t;
+  await page.click('#tab-feeds'); await frames(); await page.click('#tab-factory'); await frames();
+  canvas.tabKeeps = (await view()).t === kept;
+  await page.click('[data-cv="fit"]'); await frames();
+  await page.locator('#factory-graph .fx-fnode[data-tone]').first().dblclick(); await frames();
+  canvas.once = await page.evaluate(() => !!document.querySelector('.fx-sheet') && !document.querySelector('.fx-sheet .fx-back'));
+  await close();
+  const fits = () => page.evaluate(() => { const s = document.querySelector('.fx-stage').getBoundingClientRect(), c = document.querySelector('#factory-canvas').getBoundingClientRect();
+    return s.left >= c.left - 1 && s.right <= c.right + 1 && s.top >= c.top - 1 && s.bottom <= c.bottom + 1; });
+  canvas.fit = await fits();
+  await page.mouse.move(cv.x + cv.width / 2, cv.y + cv.height / 2); await page.mouse.wheel(0, 120); await frames();
+  const was = (await view()).t;
+  await page.click('[data-cv="big"]'); await frames(); await frames();
+  canvas.bigFits = await fits();
+  const big = await page.locator('#factory-canvas').boundingBox(), size = page.viewportSize();
+  canvas.big = big.width >= size.width - 60 && big.height >= size.height - 60;
+  /* expanded is modal: what's behind it is inert */
+  canvas.bigModal = await page.evaluate(() => document.querySelector('#tabs').closest('[inert]') !== null && !document.querySelector('#factory-canvas').closest('[inert]'));
+  await page.locator('#factory-graph .fx-fnode[data-tone]').first().click(); await frames();
+  canvas.drawerOver = await page.evaluate(() => { const r = document.querySelector('.fx-sheet')?.getBoundingClientRect();
+    return !!r && !!document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2)?.closest('.fx-sheet'); });
+  await close(); await close();
+  canvas.back = (await page.locator('#factory-canvas').boundingBox()).width < size.width - 60 && (await view()).t === was;
+}
+
 /* the same Factory on a phone: a list by route, each loop once, under who reads it */
 await page.setViewportSize(phone); await frames();
 const loops = await page.evaluate(() => ({
   sections: document.querySelectorAll('#factory-graph .fx-route').length,
   rows: document.querySelectorAll('#factory-graph .fx-lrow').length,
-  graph: document.querySelectorAll('#factory-graph .fx-fnode').length,
+  graph: document.querySelectorAll('#factory-graph .fx-fnode').length, canvas: !!document.querySelector('#factory-canvas.on'),
   firstCard: document.querySelectorAll('#factory-graph .fx-route:first-child .fx-lrow').length,
   /* a header's count stays inside the header, however long the name */
   countsVisible: [...document.querySelectorAll('#factory-graph .fx-group small')].every((s) => {
@@ -166,4 +218,4 @@ if (improver.rows) {
 }
 ms.overflow = await page.evaluate(() => document.body.scrollWidth - document.body.clientWidth);
 await browser.close();
-console.log(JSON.stringify({ms, errors, attention, back, factory, loops, improver, form, talk, evals, waiting}));
+console.log(JSON.stringify({ms, errors, attention, back, factory, canvas, loops, improver, form, talk, evals, waiting}));
