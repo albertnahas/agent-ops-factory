@@ -80,8 +80,14 @@ for f in clique ladder; do
   expect "$f: no page errors" "q $f '.errors == []'"
 done
 expect "odd rows: no page errors on either tab"      "q odd '.errors == []'"
-expect "odd rows: the phone lists loops by who reads them, no graph" "q odd '.loops.sections >= 3 and .loops.rows > 0 and .loops.graph == 0'"
+expect "odd rows: the phone lists loops by who reads them, no graph, no canvas" "q odd '.loops.sections >= 3 and .loops.rows > 0 and .loops.graph == 0 and (.loops.canvas | not)'"
 expect "a desktop node opens its loop's drawer"     "q odd '.factory.drawer'"
+for f in clique odd; do
+  expect "$f: scrolling over the graph moves it, not the page; Ctrl-scroll zooms" "q $f '.canvas.wheel and .canvas.zoom != \"100%\"'"
+  expect "$f: zoomed and redrawn, every line starts on its chip" "q $f '.canvas.onChips'"
+  expect "$f: a drag moves the graph and opens nothing; Fit shows all of it" "q $f '.canvas.drag and .canvas.fit'"
+  expect "$f: Expand fills the view, a drawer opens over it, Escape twice comes back" "q $f '.canvas.big and .canvas.drawerOver and .canvas.back'"
+done
 expect "a loop named you or nobody leaves one You and one Nobody" "q odd '.factory.you == 1 and .factory.nobody == 1'"
 expect "the scoped count counts the loops it draws"  "q odd '.factory as \$f | \$f.count | startswith(\"\(\$f.loops) loops\")'"
 expect "a right-to-left name keeps its count after it" "q odd '.loops.countsAfterNames'"

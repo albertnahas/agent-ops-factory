@@ -156,7 +156,7 @@
 .fx-sheet header small { display: block; color: var(--color-fg-muted); font-size: var(--cds-font-size-caption); }
 .fx-sheet .fx-more { flex: 1; padding: 14px 16px 24px; gap: 12px; align-content: start; }
 .fx-sheet .fx-form-body { padding: 0; }
-.fx-tip { position: fixed; z-index: 10; max-width: 300px; padding: 8px 10px; border: 1px solid var(--color-border-line); border-radius: 8px; background: var(--fx-card);
+.fx-tip { position: fixed; z-index: 18; max-width: 300px; padding: 8px 10px; border: 1px solid var(--color-border-line); border-radius: 8px; background: var(--fx-card);
   box-shadow: 0 4px 16px rgb(0 0 0 / .14); display: grid; gap: 3px; font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); pointer-events: none; }
 .fx-tip b { color: var(--color-fg); font-weight: 600; overflow-wrap: anywhere; }
 .fx-tip p { margin: 0; }
@@ -238,7 +238,23 @@
 .fx-seg .fx-ltog { border: 0; border-radius: 6px; }
 .fx-seg .fx-ltog[aria-pressed="true"] { background: var(--fx-card); box-shadow: 0 1px 2px rgb(0 0 0 / .12); }
 .fx-plain { padding: 0; }
-#factory-card { padding: 12px; overflow: clip; }
+#factory-card { padding: 0; overflow: clip; position: relative; }
+/* the graph is a canvas inside its card: scrolling over it moves it, pinch or Ctrl-scroll zooms, Expand fills the view */
+.fx-stage { padding: 12px; }
+.fx-canvas { position: relative; outline: none; }
+.fx-canvas.on { height: clamp(420px, 72vh, 820px); overflow: hidden; cursor: grab; touch-action: none; overscroll-behavior: contain; }
+.fx-canvas.on .fx-stage { transform-origin: 0 0; }
+.fx-canvas.drag { cursor: grabbing; user-select: none; }
+.fx-canvas:focus-visible { box-shadow: inset 0 0 0 2px var(--color-fg); }
+#factory-card.cv-big { overflow: visible; }
+.fx-canvas.big { position: absolute; z-index: 15; height: auto; border-radius: var(--cds-radius); background: var(--fx-card); border: 1px solid var(--color-border-line); box-shadow: 0 12px 40px rgb(0 0 0 / .18); }
+.fx-cv-tools { position: absolute; right: 10px; bottom: 10px; z-index: 3; display: flex; align-items: center; gap: 2px; padding: 3px; border-radius: 10px; background: var(--fx-card); border: 1px solid var(--color-border-line); box-shadow: 0 2px 8px rgb(0 0 0 / .08); cursor: default; }
+.fx-canvas:not(.on) .fx-cv-tools { display: none; }
+.fx-cv-tools button { all: unset; box-sizing: border-box; height: 28px; min-width: 28px; padding: 0 6px; border-radius: 7px; display: inline-grid; place-items: center; color: var(--color-fg-muted); cursor: pointer; transition: opacity 120ms; }
+.fx-cv-tools button:hover { background: var(--fx-tint); color: var(--color-fg); }
+.fx-cv-tools button:focus-visible { outline: 2px solid var(--color-fg); outline-offset: -2px; }
+.fx-cv-tools button[aria-pressed="true"] { color: var(--color-fg); background: var(--fx-tint); }
+.fx-cv-pct { min-width: 46px !important; font-size: var(--cds-font-size-caption); font-variant-numeric: tabular-nums; }
 .fx-center { text-align: center; }
 .fx-disc details + details { border-top: 1px solid var(--color-border-line); }
 .fx-disc summary { list-style: none; display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding: 13px 14px; cursor: pointer; font-weight: var(--cds-font-weight-medium); }
@@ -248,7 +264,7 @@
 .fx-disc summary small { margin-left: auto; color: var(--color-fg-muted); font-weight: 400; font-size: var(--cds-font-size-caption); text-align: right; }
 .fx-disc summary:focus-visible { outline: 2px solid var(--color-fg); outline-offset: -2px; }
 .fx-disc details > :not(summary) { border-top: 1px solid var(--color-border-line); }
-@media (max-width: 639px) { .fx-seg, .fx-flayers { display: none; } #factory-card { padding: 0; } }
+@media (max-width: 639px) { .fx-seg, .fx-flayers { display: none; } .fx-stage { padding: 0; } }
 .fx-ltog { all: unset; box-sizing: border-box; flex: 0 0 auto; justify-content: center; white-space: nowrap; display: inline-flex; align-items: center; gap: 5px; padding: 5px 8px; border-radius: 999px; border: 1px solid var(--color-border-line); cursor: pointer; font-size: var(--cds-font-size-caption); font-weight: var(--cds-font-weight-medium); color: var(--color-fg-muted); }
 .fx-ltog[aria-pressed="true"] { color: var(--color-fg); background: color-mix(in srgb, var(--color-fg) 8%, var(--fx-card)); border-color: color-mix(in srgb, var(--color-fg) 35%, transparent); }
 .fx-ltog[data-problems][aria-pressed="true"] { color: var(--color-bad); border-color: color-mix(in srgb, var(--color-bad) 50%, transparent); background: color-mix(in srgb, var(--color-bad) 8%, var(--fx-card)); }
@@ -337,8 +353,19 @@ textarea.fx-input { resize: vertical; }
     </div>
     <p class="fx-muted" id="factory-note" hidden><span data-draw="fleet-size" data-source="loops">—</span> loops are too many to draw at once. Pick a project:</p>
     <div class="fx-card fx-plain" id="factory-card">
-      <div class="fx-flayers" aria-hidden="true"><span>Loops</span><span>Checked by</span><span>To you</span></div>
-      <div class="fx-factory" id="factory-graph" data-draw="factory" data-source="loops"></div>
+      <div class="fx-canvas" id="factory-canvas" tabindex="0" aria-label="Factory graph: scroll to move around, pinch or hold Ctrl and scroll to zoom">
+        <div class="fx-stage">
+          <div class="fx-flayers" aria-hidden="true"><span>Loops</span><span>Checked by</span><span>To you</span></div>
+          <div class="fx-factory" id="factory-graph" data-draw="factory" data-source="loops"></div>
+        </div>
+        <div class="fx-cv-tools" role="toolbar" aria-label="Zoom">
+          <button type="button" data-cv="out" aria-label="Zoom out"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/></svg></button>
+          <button type="button" data-cv="one" aria-label="Zoom to 100%" class="fx-cv-pct">100%</button>
+          <button type="button" data-cv="in" aria-label="Zoom in"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="M12 5v14"/></svg></button>
+          <button type="button" data-cv="fit" aria-label="Fit the whole graph"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7V5a2 2 0 0 1 2-2h2"/><path d="M17 3h2a2 2 0 0 1 2 2v2"/><path d="M21 17v2a2 2 0 0 1-2 2h-2"/><path d="M7 21H5a2 2 0 0 1-2-2v-2"/><rect width="10" height="8" x="7" y="8" rx="1"/></svg></button>
+          <button type="button" data-cv="big" aria-label="Expand" aria-pressed="false"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 3h6v6"/><path d="M9 21H3v-6"/><path d="M21 3l-7 7"/><path d="M3 21l7-7"/></svg></button>
+        </div>
+      </div>
     </div>
     <p class="fx-muted fx-center" data-draw="factory-count" data-source="loops">—</p>
     <div class="fx-card fx-plain" id="loop-groups" data-draw="loop-list" data-source="loops changes talk" hidden></div>
@@ -751,7 +778,15 @@ const closeSheet = () => {
   const back = FX.back; FX.stack = []; FX.back = null; modal(false); dash.draw('sheet');
   if (back && back.isConnected) back.focus({preventScroll: true});
 };
-addEventListener('keydown', (e) => { if (e.key === 'Escape' && FX.stack.length) closeSheet(); });
+addEventListener('keydown', (e) => { if (e.key === 'Escape' && FX.stack.length) closeSheet(); else if (e.key === 'Escape' && CV.big) expand(false); });
+/* on claude.ai the page scrolls inside an element of the runtime's, and "fixed" doesn't hold there: what fills the view is
+   placed over that scroller's visible area (inside its scrollbar). The area, in screen pixels: */
+const seen = (node) => {
+  let s = node.parentElement;
+  while (s.parentElement && !(s.scrollHeight > s.clientHeight && /auto|scroll/.test(getComputedStyle(s).overflowY))) s = s.parentElement;
+  const v = s.parentElement ? s.getBoundingClientRect() : {left: 0, top: 0};
+  return {x: v.left + s.clientLeft, y: v.top + s.clientTop, w: s.clientWidth, h: s.clientHeight};
+};
 addEventListener('resize', () => { if (FX.stack.length) dash.draw('sheet'); });
 const loopChanges = (r) => {
   const rows = changesOf(r.loop);
@@ -1148,8 +1183,9 @@ dash.draw('factory', (box) => {
   box.append(cols);
 
   const paths = [];
-  const base = box.getBoundingClientRect();
-  const at = (e) => { const r = e.getBoundingClientRect(); return {l: r.left - base.left, r: r.right - base.left, t: r.top - base.top, b: r.bottom - base.top, m: (r.top + r.bottom) / 2 - base.top}; };
+  /* measured in the graph's own units, whatever the canvas zoom */
+  const base = box.getBoundingClientRect(), k = base.width / box.offsetWidth || 1;
+  const at = (e) => { const r = e.getBoundingClientRect(); return {l: (r.left - base.left) / k, r: (r.right - base.left) / k, t: (r.top - base.top) / k, b: (r.bottom - base.top) / k, m: ((r.top + r.bottom) / 2 - base.top) / k}; };
   const pos = new Map([...chips].map(([id, c]) => [id, at(c)])), rb = at(ribbon), gap = at(col.checkers).l - at(col.workers).r;
   /* a project's loops that escalate to the same place by default share one line from their frame; overrides and
      break-glass get their own, so what differs from the rule stands out */
@@ -1230,6 +1266,95 @@ dash.draw('factory', (box) => {
   box.onclick = () => { FX.fsel = null; trace(null); };
   if (!g.nodes.has(FX.fsel)) FX.fsel = null;
   trace(FX.fsel);
+});
+
+/* the canvas: a view of the graph, panned and zoomed. Only listeners and what they set; the graph itself is the drawing */
+const CV = {s: 1, x: 0, y: 0, big: false, drag: null, moved: false, touch: new Map()};
+const canvas = document.getElementById('factory-canvas'), stage = canvas.querySelector('.fx-stage'), graph = document.getElementById('factory-graph');
+const cvOn = () => canvas.classList.contains('on');
+const view = () => {
+  /* keep a corner of the graph in view, however far it is moved */
+  const W = canvas.clientWidth, H = canvas.clientHeight, w = stage.offsetWidth * CV.s, h = stage.offsetHeight * CV.s, keep = 80;
+  CV.x = Math.min(W - keep, Math.max(keep - w, CV.x)); CV.y = Math.min(H - keep, Math.max(keep - h, CV.y));
+  stage.style.transform = cvOn() ? `translate(${CV.x}px, ${CV.y}px) scale(${CV.s})` : '';
+  canvas.querySelector('.fx-cv-pct').textContent = Math.round(CV.s * 100) + '%';
+  peek();
+};
+const zoomTo = (s, px = canvas.clientWidth / 2, py = canvas.clientHeight / 2) => {
+  s = Math.min(2.5, Math.max(.2, s)); CV.x = px - (px - CV.x) * s / CV.s; CV.y = py - (py - CV.y) * s / CV.s; CV.s = s; view();
+};
+const fit = () => {
+  const W = canvas.clientWidth, H = canvas.clientHeight, w = stage.offsetWidth, h = stage.offsetHeight;
+  CV.s = Math.min(2.5, Math.max(.2, Math.min(1, W / w, H / h))); CV.x = (W - w * CV.s) / 2; CV.y = Math.max(0, (H - h * CV.s) / 2); view();
+};
+/* Expand lays the canvas over the visible area; the card keeps its place */
+const place = () => {
+  const v = seen(canvas.parentElement), c = canvas.parentElement.getBoundingClientRect(), m = 12;
+  Object.assign(canvas.style, {left: v.x - c.left + m + 'px', top: v.y - c.top + m + 'px', width: v.w - 2 * m + 'px', height: v.h - 2 * m + 'px'});
+};
+const expand = (on) => {
+  const card = canvas.parentElement;
+  CV.big = on; card.style.height = on ? card.offsetHeight + 'px' : ''; card.classList.toggle('cv-big', on); canvas.classList.toggle('big', on);
+  if (on) place(); else ['left', 'top', 'width', 'height'].forEach((k) => { canvas.style[k] = ''; });
+  canvas.querySelector('[data-cv="big"]').setAttribute('aria-pressed', String(on));
+  canvas.querySelector('[data-cv="big"]').setAttribute('aria-label', on ? 'Leave expanded view' : 'Expand');
+  requestAnimationFrame(fit); canvas.focus({preventScroll: true});
+};
+addEventListener('resize', () => { if (CV.big) place(); });
+addEventListener('scroll', () => { if (CV.big) place(); }, {capture: true, passive: true});
+/* the graph's size changes when it's drawn: the canvas turns on for a graph (not on a phone, a project list or an empty
+   fleet) and keeps the view; the first graph starts at full size, top left */
+new ResizeObserver(() => {
+  const on = !PHONE.matches && !!graph.querySelector('.fx-fcols');
+  if (on !== cvOn()) { canvas.classList.toggle('on', on); CV.s = 1; CV.x = 0; CV.y = 0; if (!on && CV.big) expand(false); }
+  view();
+}).observe(graph);
+canvas.addEventListener('wheel', (e) => {
+  if (!cvOn()) return;
+  e.preventDefault();
+  const r = canvas.getBoundingClientRect(), unit = e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? canvas.clientHeight : 1;
+  /* a trackpad pinch arrives as Ctrl-scroll */
+  if (e.ctrlKey || e.metaKey) zoomTo(CV.s * Math.exp(-Math.max(-50, Math.min(50, e.deltaY * unit)) * .01), e.clientX - r.left, e.clientY - r.top);
+  else { CV.x -= (e.shiftKey ? e.deltaY : e.deltaX) * unit; CV.y -= (e.shiftKey ? 0 : e.deltaY) * unit; view(); }
+}, {passive: false});
+/* drag to move, two fingers to pinch; a drag that moved isn't a click */
+canvas.addEventListener('pointerdown', (e) => {
+  if (!cvOn() || e.button !== 0 || e.target.closest('.fx-cv-tools')) return;
+  CV.touch.set(e.pointerId, {x: e.clientX, y: e.clientY});
+  CV.drag = {x: e.clientX, y: e.clientY, cx: CV.x, cy: CV.y}; CV.moved = false;
+});
+canvas.addEventListener('pointermove', (e) => {
+  if (!CV.drag || !CV.touch.has(e.pointerId)) return;
+  const was = [...CV.touch.values()]; CV.touch.set(e.pointerId, {x: e.clientX, y: e.clientY});
+  if (CV.touch.size === 2) {
+    const now = [...CV.touch.values()], d = (p) => Math.hypot(p[0].x - p[1].x, p[0].y - p[1].y), r = canvas.getBoundingClientRect();
+    const mx = (now[0].x + now[1].x) / 2 - r.left, my = (now[0].y + now[1].y) / 2 - r.top, ox = (was[0].x + was[1].x) / 2 - r.left, oy = (was[0].y + was[1].y) / 2 - r.top;
+    CV.x += mx - ox; CV.y += my - oy; zoomTo(CV.s * d(now) / (d(was) || 1), mx, my); CV.moved = true; return;
+  }
+  if (!CV.moved && Math.hypot(e.clientX - CV.drag.x, e.clientY - CV.drag.y) < 4) return;
+  if (!CV.moved) { CV.moved = true; canvas.setPointerCapture(e.pointerId); canvas.classList.add('drag'); }
+  CV.x = CV.drag.cx + e.clientX - CV.drag.x; CV.y = CV.drag.cy + e.clientY - CV.drag.y; view();
+});
+const lift = (e) => { CV.touch.delete(e.pointerId); if (!CV.touch.size) { CV.drag = null; canvas.classList.remove('drag'); } };
+canvas.addEventListener('pointerup', lift); canvas.addEventListener('pointercancel', lift);
+canvas.addEventListener('click', (e) => { if (CV.moved) { CV.moved = false; e.stopPropagation(); e.preventDefault(); } }, true);
+canvas.addEventListener('dblclick', (e) => {
+  if (!cvOn() || e.target.closest('button')) return;
+  const r = canvas.getBoundingClientRect(); zoomTo(CV.s * 2, e.clientX - r.left, e.clientY - r.top);
+});
+canvas.addEventListener('keydown', (e) => {
+  if (!cvOn() || e.target !== canvas) return;
+  const step = {ArrowLeft: [60, 0], ArrowRight: [-60, 0], ArrowUp: [0, 60], ArrowDown: [0, -60]}[e.key];
+  if (step) { CV.x += step[0]; CV.y += step[1]; view(); }
+  else if (e.key === '+' || e.key === '=') zoomTo(CV.s * 1.25);
+  else if (e.key === '-') zoomTo(CV.s / 1.25);
+  else if (e.key === '0') fit();
+  else return;
+  e.preventDefault();
+});
+canvas.querySelector('.fx-cv-tools').addEventListener('click', (e) => {
+  const b = e.target.closest('[data-cv]'); if (!b) return;
+  ({in: () => zoomTo(CV.s * 1.25), out: () => zoomTo(CV.s / 1.25), one: () => zoomTo(1), fit, big: () => expand(!CV.big)})[b.dataset.cv]();
 });
 
 /* the improver's history: every change, newest first, and its hit rate, the share of read changes that moved their metric */
@@ -1373,14 +1498,11 @@ dash.draw('sheet', (box) => {
   const more = el('div', 'fx-more'); page.fill(more);
   sheet.append(head, more); bg.append(sheet); box.append(bg);
   bg.onclick = (e) => { if (e.target === bg) closeSheet(); };
-  /* on claude.ai the page scrolls inside an element of the runtime's, not the document, and "fixed" doesn't hold there. So
-     the backdrop is placed over that scroller's visible area (inside its scrollbar) and scrolling through it is stopped;
-     the drawer fills the backdrop's height and scrolls on its own. The container is never hidden: the runtime doesn't
+  /* the backdrop covers the visible area (see seen) and scrolling through it is stopped; the drawer fills the backdrop's
+     height and scrolls on its own. The container is never hidden: the runtime doesn't
      draw under a hidden attribute. */
-  let s = box.parentElement;
-  while (s.parentElement && !(s.scrollHeight > s.clientHeight && /auto|scroll/.test(getComputedStyle(s).overflowY))) s = s.parentElement;
-  const v = s.parentElement ? s.getBoundingClientRect() : {left: 0, top: 0}, b = box.getBoundingClientRect();
-  Object.assign(bg.style, {left: v.left + s.clientLeft - b.left + 'px', top: v.top + s.clientTop - b.top + 'px', width: s.clientWidth + 'px', height: s.clientHeight + 'px'});
+  const v = seen(box), b = box.getBoundingClientRect();
+  Object.assign(bg.style, {left: v.x - b.left + 'px', top: v.y - b.top + 'px', width: v.w + 'px', height: v.h + 'px'});
   for (const ev of ['wheel', 'touchmove']) bg.addEventListener(ev, (e) => { if (!sheet.contains(e.target)) e.preventDefault(); }, {passive: false});
   sheet.scrollTop = cur.top || 0;
   if (fresh || held) x.focus({preventScroll: true});
