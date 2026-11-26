@@ -295,7 +295,7 @@ textarea.fx-input { resize: vertical; }
 
 <div class="fx">
   <header class="fx-top" id="top">
-    <div class="fx-title"><h1><span id="title-fleet">Loop fleet</span><span id="title-health" hidden>Loop health</span><span data-draw="mode" data-source="loops waiting"></span></h1><p class="fx-muted">Updated <span data-draw="synced">—</span></p></div>
+    <div class="fx-title"><h1><span id="title-fleet">Loop fleet</span><span id="title-health" hidden>Loop health</span></h1><p class="fx-muted">Updated <span data-draw="synced">—</span></p></div>
     <div class="fx-tools">
       <select class="dash-select" id="scope" data-draw="scope" aria-label="Project" data-source="loops waiting"></select>
       <button type="button" class="fx-icon" id="about-btn" aria-label="About this page" aria-expanded="false" aria-controls="about">i</button>
@@ -827,23 +827,10 @@ const about = document.getElementById('about-btn');
 about.onclick = () => { const a = document.getElementById('about'); a.hidden = !a.hidden; about.setAttribute('aria-expanded', String(!a.hidden)); };
 
 /* header. With no registry (health mode) there's no graph and no talk: one page, the loops by where they run */
-dash.draw('mode', (h) => {
-  const hide = {'title-fleet': health(), 'title-health': !health(), tabs: health(), 'factory-card': health(), 'loop-groups': !health(), 'health-sec': health(),
-    'foot-window': !ledger(), 'foot-registry': health()};
-  Object.entries(hide).forEach(([id, off]) => { document.getElementById(id).hidden = off; });
-  document.querySelectorAll('.fx-fbar, [data-draw="factory-count"]').forEach((e) => { e.hidden = health(); });
-  if (health()) go('factory');
-});
 dash.draw('synced', (e) => { const v = metaOf('Built'); e.textContent = v ? rel(v) : '—'; });
 dash.draw('window', (e) => { e.textContent = metaOf('Pass rate and cost window') || '—'; });
 dash.draw('refresh', (e) => { e.textContent = metaOf('Refresh') || 'Rebuilt by fleet.py'; });
 dash.draw('registry', (e) => { e.textContent = metaOf('Registry') || '—'; });
-/* what shows at all is decided here, before the drawings: an element a drawing hid would never be drawn again */
-dash.onData(() => {
-  const rows = (id) => { const d = dash.data(id); return d.status === 'ok' ? d.data : null; }, l = rows('loops'), w = rows('waiting'), c = rows('changes');
-  document.querySelectorAll('#scope').forEach((e) => { e.hidden = !!l && !!w && new Set([...l, ...w].map((r) => r.scope).filter(Boolean)).size < 2 && !dash.params().project; });
-  document.querySelectorAll('#improver').forEach((e) => { e.hidden = !c || !scoped(c).length; });
-});
 dash.draw('scope', (sel) => {
   const l = dash.data('loops'), w = dash.data('waiting'), {project = ''} = dash.params();
   const rows = (d) => d.status === 'ok' ? d.data : [];
@@ -1109,15 +1096,13 @@ const routeList = (box, g) => {
 };
 dash.draw('factory', (box) => {
   const l = dash.data('loops');
-  peek(); box.replaceChildren(); box.classList.remove('trace');
+  box.replaceChildren(); box.classList.remove('trace');
   LAYERS.forEach((k) => box.classList.toggle('hide-' + k, k !== FX.layer));
   if (!box.clientWidth) return; /* its tab is hidden: the runtime draws it again when the tab opens and the width changes */
   if (l.status !== 'ok') return failed(box, 'loop list', l.status);
   /* a big fleet on All projects is too many chips for one page: it offers its projects, the most problems first, and a
      picked project draws with every loop its chains reach */
   const real = l.data.filter((r) => !NOT_LOOP.includes(r.project)), big = !dash.params().project && real.length > FACTORY_ALL;
-  document.querySelectorAll('#factory-note').forEach((e) => { e.hidden = !big; });
-  document.querySelectorAll('.fx-flayers').forEach((e) => { e.hidden = big; });
   if (big) {
     const picks = el('div', 'fx-acts'), bad = (rs) => rs.filter(problem).length;
     [...groupBy(real, (r) => r.scope)].sort(([a, ra], [b, rb]) => bad(rb) - bad(ra) || a.localeCompare(b)).forEach(([p, rs]) => {
@@ -1160,8 +1145,6 @@ dash.draw('factory', (box) => {
   col.checkers.append(ribbon);
   cols.append(col.workers, col.checkers, col.ends);
   box.append(cols);
-  document.querySelectorAll('[data-sups]').forEach((e) => { e.hidden = !g.sups.length; });
-  document.querySelectorAll('#legend-glass').forEach((e) => { e.hidden = !g.glass.length; });
 
   const paths = [];
   const base = box.getBoundingClientRect();
@@ -1400,5 +1383,24 @@ dash.draw('sheet', (box) => {
   for (const ev of ['wheel', 'touchmove']) bg.addEventListener(ev, (e) => { if (!sheet.contains(e.target)) e.preventDefault(); }, {passive: false});
   sheet.scrollTop = cur.top || 0;
   if (fresh || held) x.focus({preventScroll: true});
+});
+/* what shows at all is decided here, before the drawings: an element a drawing hid would never be drawn again */
+dash.onData(() => {
+  const rows = (id) => { const d = dash.data(id); return d.status === 'ok' ? d.data : null; }, l = rows('loops'), w = rows('waiting'), c = rows('changes');
+  document.querySelectorAll('#scope').forEach((e) => { e.hidden = !!l && !!w && new Set([...l, ...w].map((r) => r.scope).filter(Boolean)).size < 2 && !dash.params().project; });
+  document.querySelectorAll('#improver').forEach((e) => { e.hidden = !c || !scoped(c).length; });
+  /* with no registry, health mode: no tabs, no graph */
+  const hide = {'title-fleet': health(), 'title-health': !health(), tabs: health(), 'factory-card': health(), 'loop-groups': !health(), 'health-sec': health(),
+    'foot-window': !ledger(), 'foot-registry': health()};
+  Object.entries(hide).forEach(([id, off]) => { document.getElementById(id).hidden = off; });
+  document.querySelectorAll('.fx-fbar, [data-draw="factory-count"]').forEach((e) => { e.hidden = health(); });
+  if (health()) go('factory');
+  /* the graph's own furniture: a big fleet on All projects asks for one, and the legend names only lines it can draw */
+  const real = (l || []).filter((r) => !NOT_LOOP.includes(r.project)), big = !dash.params().project && real.length > FACTORY_ALL, g = l && factoryGraph(l);
+  document.querySelectorAll('#factory-note').forEach((e) => { e.hidden = !big; });
+  document.querySelectorAll('.fx-flayers').forEach((e) => { e.hidden = big; });
+  document.querySelectorAll('[data-sups]').forEach((e) => { e.hidden = !g || !g.sups.length; });
+  document.querySelectorAll('#legend-glass').forEach((e) => { e.hidden = !g || !g.glass.length; });
+  peek();
 });
 </script>

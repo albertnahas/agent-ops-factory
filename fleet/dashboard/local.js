@@ -34,13 +34,12 @@
   /* as on claude.ai, the first drawings run before the data has come: every dataset says loading, then the data lands */
   let loaded = false;
   setTimeout(() => { loaded = true; rerun(); }, 50);
-  /* as claude.ai's check, a drawing writes only inside its own element, past the attributes any script may set */
-  const free = /^(class|style|hidden|open|disabled|checked|selected|value|tabindex|aria-.*)$/;
+  /* as claude.ai's check, a drawing writes only inside its own element; what shows elsewhere is set in onData */
   const run = (name, e) => {
     const seen = new MutationObserver(() => {});
     seen.observe(document.documentElement, {subtree: true, childList: true, attributes: true, characterData: true});
     try { draws[name](e); } finally {
-      for (const r of seen.takeRecords()) if (!e.contains(r.target) && !free.test(r.attributeName || '')) console.error(`drawing "${name}" wrote outside itself: ${r.type} ${r.attributeName || ''} on ${r.target.id || r.target.nodeName}`);
+      for (const r of seen.takeRecords()) if (!e.contains(r.target)) console.error(`drawing "${name}" wrote outside itself: ${r.type} ${r.attributeName || ''} on ${r.target.id || r.target.nodeName}`);
       seen.disconnect();
     }
   };
