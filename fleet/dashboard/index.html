@@ -284,106 +284,70 @@ textarea.fx-input { resize: vertical; }
 </style>
 
 <div class="fx">
-  <div class="fx-top" id="top">
-    <div><h1><span id="title-fleet">Loop fleet</span><span id="title-health" hidden>Loop health</span><span data-draw="mode" data-source="loops waiting"></span></h1><p class="fx-muted">Updated <span data-draw="synced">—</span></p></div>
-    <select class="dash-select" id="scope" data-draw="scope" aria-label="Project" data-source="loops waiting"></select>
+  <header class="fx-top" id="top">
+    <div class="fx-title"><h1><span id="title-fleet">Loop fleet</span><span id="title-health" hidden>Loop health</span><span data-draw="mode" data-source="loops waiting"></span></h1><p class="fx-muted">Updated <span data-draw="synced">—</span></p></div>
+    <div class="fx-tools">
+      <select class="dash-select" id="scope" data-draw="scope" aria-label="Project" data-source="loops waiting"></select>
+      <button type="button" class="fx-icon" id="about-btn" aria-label="About this page" aria-expanded="false" aria-controls="about">i</button>
+    </div>
+  </header>
+  <div class="fx-about" id="about" hidden>
+    <p>Loops check each other's output, supervisors set their Orders, and anything that needs a person climbs to the master before it reaches you. Point at a loop to trace its chain; tap it for everything about it.</p>
+    <div class="fx-legend">
+      <span><span class="fx-dot" data-tone="ok"></span>Healthy</span>
+      <span><span class="fx-dot" data-tone="warn"></span>Needs a look</span>
+      <span><span class="fx-dot" data-tone="bad"></span>Failing or silent</span>
+      <span><span class="fx-dot" data-tone="none"></span>Not run yet or paused</span>
+      <span><i></i>Checks</span>
+      <span data-sups hidden><i class="sup"></i>Supervises</span>
+      <span><i class="esc"></i>Escalates</span>
+      <span id="legend-glass" hidden><i class="glass"></i>Break-glass</span>
+      <span><i class="gap"></i>Nobody reads it</span>
+    </div>
+    <p class="fx-muted" id="foot"><span data-draw="refresh">—</span>.<span id="foot-window"> Pass rate and cost cover <span data-draw="window">—</span>.</span><span id="foot-registry"> Registry: <code data-draw="registry">—</code>.</span></p>
   </div>
 
-  <div class="fx-tabs" role="tablist" aria-label="Views">
-    <button type="button" class="fx-tab" role="tab" id="tab-overview" data-pane="overview" aria-selected="true">Overview</button>
-    <button type="button" class="fx-tab" role="tab" id="tab-loops" data-pane="loops" aria-selected="false">Loops <span class="fx-badge" data-draw="badge-loops"></span></button>
-    <button type="button" class="fx-tab" role="tab" id="tab-factory" data-pane="factory" aria-selected="false">Factory</button>
-    <button type="button" class="fx-tab" role="tab" id="tab-talk" data-pane="talk" aria-selected="false">Talk</button>
-    <button type="button" class="fx-tab" role="tab" id="tab-waiting" data-pane="waiting" aria-selected="false">Waiting <span class="fx-badge" data-draw="badge-waiting"></span></button>
+  <div class="fx-status" data-draw="status" data-source="counts loops waiting"></div>
+
+  <div class="fx-tabs" role="tablist" aria-label="Views" id="tabs">
+    <button type="button" class="fx-tab" role="tab" id="tab-factory" data-pane="factory" aria-selected="true">Factory</button>
+    <button type="button" class="fx-tab" role="tab" id="tab-feeds" data-pane="feeds" aria-selected="false">Feeds</button>
   </div>
 
-  <section class="fx-pane" id="overview" role="tabpanel" aria-labelledby="tab-overview">
-    <div class="fx-banner" id="status" data-draw="banner" data-source="counts">—</div>
-
-    <div class="fx-kpis" id="kpis">
-      <button type="button" class="fx-kpi" data-go="loops"><span class="k">Loops running</span><span class="v" data-draw="k-loops" data-source="counts" data-field="n" data-where="status=loops">—</span><div class="fx-sub" data-draw="k-loops-sub"></div></button>
-      <button type="button" class="fx-kpi" data-go="loops" data-filter="attention"><span class="k">Need a look</span><span class="v" data-draw="k-attn" data-source="counts" data-field="n" data-where="status=attention">—</span><span class="s" data-draw="k-attn-sub">—</span></button>
-      <button type="button" class="fx-kpi" data-go="waiting"><span class="k">Waiting on you</span><span class="v" data-draw="k-wait" data-source="counts" data-field="n" data-where="status=waiting">—</span><span class="s" data-draw="k-wait-sub">—</span></button>
-      <div class="fx-kpi" id="k-cost"><span class="k">Claude cost, 30 days</span><span class="v" data-draw="k-cost" data-source="cost">—</span><span class="s">estimate, not billed</span></div>
-    </div>
-
-    <div class="fx-cols">
-      <section class="fx-card" id="attention">
-        <header><h2>Needs a look</h2></header>
-        <div data-draw="attn-list" data-source="loops changes talk"></div>
-      </section>
-      <section class="fx-card" id="next-up">
-        <header><h2>Next up for you</h2><button type="button" class="fx-link" data-go="waiting">See all</button></header>
-        <ul class="fx-list" data-draw="next-list" data-source="waiting"></ul>
-      </section>
-    </div>
-  </section>
-
-  <section class="fx-pane" id="loops" role="tabpanel" aria-labelledby="tab-loops" hidden>
-    <div class="fx-bar fx-toolbar">
-      <span class="fx-muted" data-draw="loop-count">—</span>
-      <select class="dash-select" id="loop-filter" data-draw="loop-filter" aria-label="Show loops" data-source="loops"></select>
-    </div>
-    <div id="loop-form" data-draw="loop-form" data-source="questions loops"></div>
-    <div class="fx-grid" id="loop-groups" data-draw="loop-list" data-source="loops changes talk"></div>
-    <section class="fx-card" id="services">
-      <header><h2>Services and one-off jobs</h2><span class="fx-muted" data-draw="svc-count">—</span></header>
-      <ul class="fx-list fx-two" data-draw="svc-list" data-source="loops"></ul>
-    </section>
-  </section>
-
-  <section class="fx-pane" id="factory" role="tabpanel" aria-labelledby="tab-factory" hidden>
-    <section class="fx-card" id="factory-card">
-      <header><h2>Who checks what</h2><span class="fx-muted" data-draw="factory-count" data-source="loops">—</span></header>
-      <div class="fx-fbody">
-        <p class="fx-fdoor" data-draw="factory-door" data-source="loops">—</p>
-        <p class="fx-muted">Loops check each other's output, supervisors set their Orders, and anything that needs a person climbs to the master before it reaches you. Tap a loop to trace it, or You to see every path in.</p>
-        <div class="fx-fview" role="group" aria-label="Show">
-          <button type="button" class="fx-ltog" data-layer="check"><i></i>Checks</button>
-          <button type="button" class="fx-ltog" data-layer="sup" data-sups hidden><i class="sup"></i>Supervises</button>
-          <button type="button" class="fx-ltog" data-layer="esc"><i class="esc"></i>Escalates</button>
-          <button type="button" class="fx-ltog" data-problems>Problems</button>
-        </div>
-        <div class="fx-flayers" aria-hidden="true"><span>Loops</span><span>Checked by</span><span>To you</span></div>
-        <p class="fx-muted" id="factory-note" hidden></p>
-        <div class="fx-factory" id="factory-graph" data-draw="factory" data-source="loops"></div>
+  <section class="fx-pane" id="factory" role="tabpanel" aria-labelledby="tab-factory">
+    <div class="fx-fbar">
+      <p class="fx-fdoor" data-draw="factory-door" data-source="loops"></p>
+      <div class="fx-seg" role="group" aria-label="Lines">
+        <button type="button" class="fx-ltog" data-layer="esc">Escalates</button>
+        <button type="button" class="fx-ltog" data-layer="check">Checks</button>
+        <button type="button" class="fx-ltog" data-layer="sup" data-sups hidden>Orders</button>
       </div>
-      <div class="fx-legend">
-        <span><span class="fx-dot" data-tone="ok"></span>Healthy</span>
-        <span><span class="fx-dot" data-tone="warn"></span>Needs a look</span>
-        <span><span class="fx-dot" data-tone="bad"></span>Failing or silent</span>
-        <span><span class="fx-dot" data-tone="none"></span>Not run yet or paused</span>
-        <span><i></i>Checks</span>
-        <span data-sups hidden><i class="sup"></i>Supervises</span>
-        <span><i class="esc"></i>Escalates</span>
-        <span id="legend-glass" hidden><i class="glass"></i>Break-glass</span>
-        <span><i class="gap"></i>Nobody reads it</span>
-      </div>
-    </section>
-    <section class="fx-card" id="evals" data-sec="c2">
-      <header><h2>Evaluations</h2></header>
-      <div data-draw="evals" data-source="loops changes talk"></div>
-    </section>
-    <section class="fx-card" id="improver" data-sec="c1">
-      <header><h2>Improver</h2><span class="fx-muted" data-draw="improver-rate" data-source="changes">—</span></header>
-      <ul class="fx-list" data-draw="improver-list" data-source="changes"></ul>
-    </section>
+      <button type="button" class="fx-ltog fx-solo" data-problems>Problems</button>
+      <span data-draw="new-loop" data-source="questions"></span>
+    </div>
+    <p class="fx-muted" id="factory-note" hidden></p>
+    <div class="fx-card fx-plain" id="factory-card">
+      <div class="fx-flayers" aria-hidden="true"><span>Loops</span><span>Checked by</span><span>To you</span></div>
+      <div class="fx-factory" id="factory-graph" data-draw="factory" data-source="loops"></div>
+    </div>
+    <p class="fx-muted fx-center" data-draw="factory-count" data-source="loops">—</p>
+    <div class="fx-card fx-plain" id="loop-groups" data-draw="loop-list" data-source="loops changes talk" hidden></div>
+    <div class="fx-card fx-plain fx-disc">
+      <details id="health-sec"><summary><span>Fleet health</span><small data-draw="health-sum" data-source="loops changes"></small></summary>
+        <div data-draw="evals" data-source="loops changes talk"></div>
+        <div id="improver"><h3 class="fx-group"><span>Improver</span><span data-draw="improver-rate" data-source="changes">—</span></h3><ul class="fx-list" data-draw="improver-list" data-source="changes"></ul></div>
+      </details>
+      <details id="services"><summary><span>Services and one-off jobs</span><small data-draw="svc-count" data-source="loops">—</small></summary>
+        <ul class="fx-list" data-draw="svc-list" data-source="loops"></ul>
+      </details>
+    </div>
   </section>
 
-  <section class="fx-pane" id="talk" role="tabpanel" aria-labelledby="tab-talk" hidden>
-    <section class="fx-card" id="talkers" data-sec="c3">
-      <header><h2>Who's talking</h2><span class="fx-muted" data-draw="talk-count" data-source="talk">—</span></header>
-      <div class="fx-who" data-draw="talk-who" data-source="talk loops"></div>
-    </section>
-    <div class="fx-grid" data-draw="talk-list" data-source="talk loops"></div>
+  <section class="fx-pane" id="feeds" role="tabpanel" aria-labelledby="tab-feeds" hidden>
+    <div class="fx-card fx-plain fx-feed" data-draw="feed" data-source="talk loops"></div>
   </section>
 
-  <section class="fx-pane" id="waiting" role="tabpanel" aria-labelledby="tab-waiting" hidden>
-    <div class="fx-grid" data-draw="wait-list" data-source="waiting"></div>
-  </section>
-
-  <div data-draw="loop-sheet" data-source="loops talk changes"></div>
-  <p class="fx-muted" id="foot"><span data-draw="refresh">—</span>.<span id="foot-window"> Pass rate and cost cover <span data-draw="window">—</span>.</span><span id="foot-registry"> Registry: <code data-draw="registry">—</code>.</span></p>
+  <div data-draw="sheet" data-source="loops talk changes waiting questions"></div>
 </div>
 
 <script>
