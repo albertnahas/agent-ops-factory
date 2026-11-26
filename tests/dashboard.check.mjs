@@ -20,7 +20,7 @@ const timed = async (f) => { const t = Date.now(); await f(); await frames(); re
 const close = async () => { await page.keyboard.press('Escape'); await frames(); };
 const sheetText = () => page.evaluate(() => [...document.querySelectorAll('.fx-sheet p')].map((p) => p.textContent));
 const ms = {};
-ms.load = await timed(() => page.goto('file://' + file));
+ms.load = await timed(async () => { await page.goto('file://' + file); await page.waitForFunction(() => dash.data('loops').status === 'ok'); });
 
 /* Needs you, from the status line: what needs a look, capped, then every waiting item, dated or not */
 await page.click('.fx-pill'); await frames();
