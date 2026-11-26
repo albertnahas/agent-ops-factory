@@ -1,15 +1,15 @@
 #!/usr/bin/env bash
-# Checks the dashboard page itself in headless Chromium at phone width: the Factory tab stays fast on dense check graphs,
-# long lists show their first rows and a See all, a big fleet's Factory tab asks for a project, and rows the
+# Checks the dashboard page itself in headless Chromium: the Factory graph stays fast on dense check graphs, the phone's
+# route list shows its first rows and a See all, a big fleet's Factory asks for a project, one drawer serves every loop, and rows the
 # builder may let through (a name that isn't a string, a loop named you or nobody, a due that isn't a date, a right-to-left
-# or very long project) still draw every tab.
+# or very long project) still draw both tabs.
 # Usage: tests/dashboard.test.sh   Needs bash, python3, node and Playwright (PLAYWRIGHT=<path to its index.mjs> if node
 # can't find it). Without Playwright it fails, unless DASHBOARD_TEST=skip. Writes only to a temp folder.
 set -uo pipefail
 cd "$(dirname "$0")/.."
 export AGENT_OPS_DIR=$(mktemp -d)
 export AGENT_OPS_KIT="$PWD/tests/kit"  # the test copy of the kit's question spec, never the real kit
-trap 'rm -rf "$AGENT_OPS_DIR"' EXIT
+trap '[ -n "${KEEP:-}" ] || rm -rf "$AGENT_OPS_DIR"' EXIT
 fail=0
 expect() { if eval "$2"; then echo "ok    $1"; else echo "FAIL  $1"; fail=1; fi; }
 echo "{\"launch_agents\": \"$AGENT_OPS_DIR/none\"}" > "$AGENT_OPS_DIR/fleet.json"
@@ -79,13 +79,14 @@ for f in clique ladder; do
   expect "$f: the Factory tab draws, scopes and shows its lines in under 3 s" "q $f '.ms.factory + .ms.checks + .ms.scope < 3000 and .factory.lines > 0'"
   expect "$f: no page errors" "q $f '.errors == []'"
 done
-expect "odd rows: no page errors on any tab"         "q odd '.errors == []'"
-expect "odd rows: the Loops tab draws its cards"     "q odd '.loops.cards >= 3'"
+expect "odd rows: no page errors on either tab"      "q odd '.errors == []'"
+expect "odd rows: the phone lists loops by who reads them, no graph" "q odd '.loops.sections >= 3 and .loops.rows > 0 and .loops.graph == 0'"
+expect "a desktop node opens its loop's drawer"     "q odd '.factory.drawer'"
 expect "a loop named you or nobody leaves one You and one Nobody" "q odd '.factory.you == 1 and .factory.nobody == 1'"
 expect "the scoped count counts the loops it draws"  "q odd '.factory as \$f | \$f.count | startswith(\"\(\$f.loops) loops\")'"
 expect "a right-to-left name keeps its count after it" "q odd '.loops.countsAfterNames'"
 expect "every waiting item is listed, dated or not"  "q odd '.waiting.badge == 7 and .waiting.rows == 7 and (.waiting.invalid | not)'"
-expect "a loop's panel lists its changes"              "q odd '.loops.changes == 5'"
+expect "a loop's drawer lists its changes"              "q odd '.loops.changes == 5'"
 expect "the Improver card lists the scope's changes and its hit rate, which a closed change doesn't count in" "q odd '.improver.rows == (if .improver.scope == \"Shop\" then 5 else 6 end) and (.improver.rate | startswith(\"1 of 2 moved their metric\")) and .improver.detail'"
 expect "a fleet with no changes shows no Improver card" "q clique '.improver.rows == 0 and .improver.hidden'"
 # the form asks the spec's questions in its order and builds the prompt the skill reads, checked against the spec file itself
@@ -110,22 +111,24 @@ expect "New loop builds the skill's prompt, with a Copy button" "want $AGENT_OPS
 expect "Change this loop builds the edit prompt for that loop, founder route marked" "want $AGENT_OPS_DIR/clique.json edit && q clique '.form.edit.founder == 1 and .form.loop != \"\"'"
 expect "the open form and its prompt fit the phone" "q clique '.form.overflow == 0'"
 expect "with no question spec there's no builder" "q odd '.form.offered == 0'"
-expect "a loop's panel says the improver may visit it" "q odd '.loops.read | endswith(\" · Improver: on\")'"
+expect "a loop's drawer says the improver may visit it" "q odd '.loops.read | endswith(\" · Improver: on\")'"
 expect "a Good with no bar shows as measured, with which way is better" "q odd '.loops.measured == \"Good: 5 · higher is better · as of 22 Nov · no Floor set\"'"
-expect "a loop's panel shows its Good against its Floor and its attempts" "q odd '.loops.good == \"Good: 50 vs Floor at least 62% · below since 15 Nov · attempt 1 of 2 · as of 21 Nov\"'"
+expect "a loop's drawer shows its Good against its Floor and its attempts" "q odd '.loops.good == \"Good: 50 vs Floor at least 62% · below since 15 Nov · attempt 1 of 2 · as of 21 Nov\"'"
 expect "Evaluations, in the picked project, shows the fleet KPIs and lists the loops below the bar" "q odd '.evals.rows[\"Loops at or above their Floor\"] == \"0% of measured (0 of 1)\" and .evals.rows[\"Loops whose Good is measured\"] == \"33% (2 of 6)\" and .evals.rows[\"Improver hit rate\"] == \"1 of 2 read changes moved their Good\" and .evals.below == 1'"
 expect "with no data, every evaluation says not measured, none hidden" "q clique '.evals.rows[\"Loops at or above their Floor\"] == \"not measured\" and .evals.rows[\"Replay\"] == \"not measured\" and (.evals.rows[\"Improver hit rate\"] | startswith(\"not measured\")) and .evals.below == 0'"
 expect "nothing is wider than the phone"             "q odd '.ms.overflow == 0'"
-expect "Talk: who's talking, then each dated line, an unknown sender named so" "q odd '.talk.who == 2 and .talk.rows == 3 and .talk.unknown'"
-expect "Talk: a name opens the loop's sheet, its Orders now then Latest, focus on Close, as wide as the phone" "q odd '.talk.sheet == \"shop1\" and .talk.sections == [\"Orders now\", \"Latest\"] and .talk.focus == \"Close\" and .talk.overflow <= 0 and .talk.inView'"
-expect "Talk: the sheet is modal: the page behind it is inert, Tab stays inside, a redraw keeps focus and scroll" "q odd '.talk.inert and .talk.trapped and .talk.redraw.focus and .talk.redraw.top > 0'"
-expect "Talk: Escape closes the sheet, frees the page and returns to the name clicked" "q odd '.talk.closed'"
-expect "Talk: a name deep in the feed opens the whole sheet in view, the page no wider" "q odd '.talk.deep.scrolled and .talk.deep.fits and .talk.deep.page <= 0'"
-expect "Talk: a fleet that said nothing says so" "q clique '.talk.who == 0 and .talk.rows == 0'"
-expect "a long project name keeps its loop count in view" "q odd '.loops.countsVisible'"
-expect "a project card shows 25 loops, then See all opens the rest in place" "q big '.loops.firstCard == 25 and .loops.firstCardAll == 30'"
-expect "Needs a look shows 20, then See all"         "q big '.attention == 20'"
-expect "a big fleet's Factory tab on All projects offers its projects, most problems first, and draws the one picked" \
+expect "Feeds: each dated line once, no unknown sender" "q odd '.talk.rows == 3 and (.talk.unknown | not)'"
+expect "Feeds: a name opens the loop's drawer, its Orders now then the Conversation, focus on Close, as wide as the phone" "q odd '.talk.sheet == \"shop1\" and .talk.sections == [\"Orders now\", \"Conversation\"] and .talk.bubbles > 0 and .talk.focus == \"Close\" and .talk.overflow <= 0 and .talk.inView'"
+expect "Feeds: the drawer is modal: the page behind it is inert, Tab stays inside, a redraw keeps focus and scroll" "q odd '.talk.inert and .talk.trapped and .talk.redraw.focus and .talk.redraw.top > 0'"
+expect "Feeds: Escape closes the drawer, frees the page and returns to the name clicked" "q odd '.talk.closed'"
+expect "Feeds: a name deep in the feed opens the whole drawer in view, the page no wider" "q odd '.talk.deep.scrolled and .talk.deep.fits and .talk.deep.page <= 0'"
+expect "Feeds: the composer turns a message into a prompt to copy" "q odd '.talk.compose != null'"
+expect "Feeds: a fleet that said nothing says so" "q clique '.talk.rows == 0'"
+expect "a long name keeps its loop count in view" "q odd '.loops.countsVisible'"
+expect "a route shows 25 loops, then See all opens the rest in place" "q big '.loops.firstCard == 25 and .loops.firstCardAll == 30'"
+expect "Needs you shows 20 to look at"              "q big '.attention == 20'"
+expect "a loop opened from Needs you goes back to it" "q big '.back.loop != null and .back.title != .back.loop'"
+expect "a big fleet's Factory on All projects offers its projects, most problems first, and draws the one picked" \
   "q big '.factory.loops == 0 and .factory.note and .factory.picks == [\"Shop · 22 with a problem\", \"Blog · 40 loops\"] and .factory.picked == 30 and .errors == []'"
 
 [ "$fail" -eq 0 ] && echo "all passed" || { echo "some failed"; exit 1; }

@@ -1,46 +1,46 @@
 <meta name="dash-one-writer">
 <style>
-/* Control panel, narrow-first: tabs (Overview, Loops, Waiting), one status line, four numbers, short lists that open for detail. */
+/* Narrow-first and quiet: a status line, two tabs (the Factory, the Feeds), and one drawer for everything about a thing. */
 .fx [hidden] { display: none !important; }
+/* the runtime's surfaces: cards and the drawer on --color-panel, the page itself on its ground; a tint for insets */
+.fx { --fx-card: var(--color-panel); --fx-tint: color-mix(in srgb, var(--color-fg) 4%, var(--color-panel)); }
+/* one centred column, as wide as the graph needs and no wider */
+.fx { max-width: 1080px; margin-inline: auto; }
 .fx { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--cds-gap-md); font-family: var(--font-anthropic-sans); color: var(--color-fg); font-size: var(--cds-font-size-body); }
 .fx-top { display: flex; align-items: center; justify-content: space-between; gap: var(--cds-gap-sm); }
-.fx-top .dash-select { min-width: 0; max-width: 50%; }
-.fx-top h1 { margin: 0; font-family: var(--font-anthropic-serif); font-weight: 600; letter-spacing: -.01em; font-size: var(--cds-font-size-title); }
+.fx-tools { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.fx-tools .dash-select { width: auto; min-width: 0; max-width: 46vw; border-radius: 8px; }
+.fx-title { min-width: 0; }
+.fx-icon { all: unset; box-sizing: border-box; flex: none; width: 30px; height: 30px; border-radius: 50%; display: inline-grid; place-items: center; cursor: pointer;
+  color: var(--color-fg-muted); background: color-mix(in srgb, var(--color-fg) 6%, transparent); font-size: 13px; font-weight: 700; font-style: italic; font-family: Georgia, serif; transition: opacity 120ms; }
+.fx-icon:hover { opacity: .75; }
+.fx-icon:focus-visible { outline: 2px solid var(--color-fg); outline-offset: 2px; }
+.fx-icon[aria-expanded="true"] { color: var(--fx-card); background: var(--color-fg); }
+.fx-about { display: grid; gap: 10px; padding: 12px 14px; border-radius: 12px; background: var(--fx-card); border: 1px solid var(--color-border-line); font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); }
+.fx-about p { margin: 0; }
+.fx-about .fx-legend { padding: 0; border: 0; }
+.fx-status { display: flex; flex-wrap: wrap; gap: 8px; }
+.fx-status:empty { display: none; }
+.fx-pill { all: unset; box-sizing: border-box; display: inline-flex; align-items: center; gap: 6px; max-width: 100%; padding: 8px 14px; border-radius: 999px; cursor: pointer;
+  background: var(--fx-card); border: 1px solid var(--color-border-line); font-size: var(--cds-font-size-caption); font-weight: var(--cds-font-weight-medium); transition: opacity 120ms; }
+.fx-pill:hover { opacity: .8; }
+.fx-pill:focus-visible { outline: 2px solid var(--color-fg); outline-offset: 2px; }
+.fx-pill[data-tone="bad"] { color: var(--color-bad); border-color: color-mix(in srgb, var(--color-bad) 40%, transparent); background: color-mix(in srgb, var(--color-bad) 7%, var(--fx-card)); }
+.fx-pill[data-tone="warn"] { border-color: color-mix(in srgb, var(--color-warn) 45%, transparent); background: color-mix(in srgb, var(--color-warn) 8%, var(--fx-card)); }
+.fx-pill b { font-variant-numeric: tabular-nums; }
+.fx-pill span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.fx-top h1 { margin: 0; font-weight: 700; letter-spacing: -.02em; font-size: var(--cds-font-size-title); }
 .fx-muted { color: var(--color-fg-muted); font-size: var(--cds-font-size-caption); margin: 0; }
 
-.fx-tabs { display: flex; gap: 2px; padding: 4px; border-radius: 10px; background: color-mix(in srgb, var(--color-fg) 7%, transparent); }
+.fx-tabs { display: flex; gap: 2px; padding: 3px; border-radius: 10px; width: 100%; max-width: 340px; background: color-mix(in srgb, var(--color-fg) 7%, transparent); }
 .fx-tab { flex: 1; font: inherit; font-size: var(--cds-font-size-caption); font-weight: var(--cds-font-weight-medium); color: var(--color-fg-muted); background: none; border: 0; border-radius: 7px; padding: 7px 8px; cursor: pointer; display: inline-flex; justify-content: center; align-items: center; gap: 6px; transition: opacity 120ms; }
-.fx-tab[aria-selected="true"] { background: var(--color-bg); color: var(--color-fg); font-weight: 600; box-shadow: 0 1px 3px rgb(0 0 0 / .12), 0 0 0 1px var(--color-border-line); }
+.fx-tab[aria-selected="true"] { background: var(--fx-card); color: var(--color-fg); font-weight: 600; box-shadow: 0 1px 3px rgb(0 0 0 / .12), 0 0 0 1px var(--color-border-line); }
 .fx-tab:focus-visible { outline: 2px solid var(--color-fg); outline-offset: 1px; }
-@media (max-width: 399px) { .fx-tab { padding: 7px 3px; gap: 4px; } }
-.fx-badge { min-width: 18px; padding: 0 6px; border-radius: 999px; font-size: 11px; font-weight: 600; line-height: 18px; text-align: center; background: var(--color-fg); color: var(--color-bg); font-variant-numeric: tabular-nums; }
+.fx-badge { min-width: 18px; padding: 0 6px; border-radius: 999px; font-size: 11px; font-weight: 600; line-height: 18px; text-align: center; background: var(--color-fg); color: var(--fx-card); font-variant-numeric: tabular-nums; }
 .fx-badge:empty { display: none; }
 .fx-pane { display: grid; gap: var(--cds-gap-md); min-width: 0; }
 
-.fx-banner { --tone: var(--color-fg-muted); display: flex; align-items: flex-start; gap: 10px; padding: 14px 16px; border-radius: var(--cds-radius); border: 1px solid color-mix(in srgb, var(--tone) 35%, transparent); border-left: 4px solid var(--tone); background: color-mix(in srgb, var(--tone) 9%, var(--color-bg)); }
-.fx-banner svg { flex: none; margin-top: 1px; }
-.fx-banner b { display: block; font-weight: 600; }
-.fx-banner span { color: var(--color-fg-muted); font-size: var(--cds-font-size-caption); }
-.fx-banner svg { color: var(--tone); }
-.fx-banner[data-tone="ok"] { --tone: var(--color-ok); }
-.fx-banner[data-tone="warn"] { --tone: var(--color-warn); }
-.fx-banner[data-tone="bad"] { --tone: var(--color-bad); }
-
-.fx-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: var(--cds-gap-sm); }
-.fx-kpi { all: unset; box-sizing: border-box; background: var(--color-bg); padding: 14px 16px; display: grid; gap: 2px; align-content: start; min-width: 0; border: 1px solid var(--color-border-line); border-radius: var(--cds-radius); box-shadow: 0 1px 3px rgb(0 0 0 / .08); }
-button.fx-kpi { cursor: pointer; }
-button.fx-kpi:hover { border-color: color-mix(in srgb, var(--color-fg) 35%, transparent); }
-button.fx-kpi:focus-visible { outline: 2px solid var(--color-fg); outline-offset: -2px; }
-.fx-kpi .k { font-size: var(--cds-font-size-caption); font-weight: var(--cds-font-weight-medium); color: var(--color-fg-muted); }
-.fx-kpi .v { font-family: var(--font-anthropic-serif); font-weight: 600; letter-spacing: -.02em; font-size: 1.75rem; line-height: 1.2; font-variant-numeric: tabular-nums; }
-.fx-kpi .s { font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); font-variant-numeric: tabular-nums; }
-.fx-kpi .v[data-tone="bad"] { color: var(--color-bad); }
-.fx-kpi .v[data-tone="warn"] { color: var(--color-warn); }
-.fx-sub { display: grid; gap: 5px; margin-top: 2px; }
-.fx-meter { height: 4px; border-radius: 2px; background: var(--cds-chart-grid); overflow: hidden; display: flex; }
-.fx-meter span { display: block; height: 100%; }
-
-.fx-card { border: 1px solid var(--color-border-line); border-radius: var(--cds-radius); background: var(--color-bg); min-width: 0; overflow: hidden; box-shadow: 0 1px 3px rgb(0 0 0 / .08); }
+.fx-card { border: 1px solid var(--color-border-line); border-radius: 12px; background: var(--fx-card); min-width: 0; overflow: hidden; }
 .fx-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(360px, 100%), 1fr)); gap: var(--cds-gap-md); align-items: start; }
 .fx-span { grid-column: 1 / -1; }
 @media (min-width: 820px) {
@@ -49,24 +49,18 @@ button.fx-kpi:focus-visible { outline: 2px solid var(--color-fg); outline-offset
   .fx-list.fx-two > li:nth-child(odd) { border-right: 1px solid var(--color-border-line); }
   .fx-list.fx-two > li:nth-child(-n+2) { border-top: 0; }
 }
-.fx-card { --sec: var(--fx-c0, var(--color-fg-muted)); border-top: 3px solid var(--sec); }
-.fx-card > header, .fx-group, .fx-bar { background: color-mix(in srgb, var(--sec) 10%, var(--color-bg)); }
-.fx-card h2, .fx-group > span:first-child { color: color-mix(in srgb, var(--sec) 70%, var(--color-fg)); }
-.fx-foot { background: color-mix(in srgb, var(--sec) 6%, var(--color-bg)); }
-#attention { --sec: var(--color-warn); }
-#services { --sec: var(--fx-c5, var(--color-fg-muted)); }
-.fx-card[data-sec="bad"] { --sec: var(--color-bad); }
-.fx-card[data-sec="warn"] { --sec: var(--color-warn); }
-.fx-card[data-sec="c1"] { --sec: var(--fx-c1); }
-.fx-card[data-sec="c2"] { --sec: var(--fx-c2); }
-.fx-card[data-sec="c4"] { --sec: var(--fx-c4); }
 .fx-card > header { display: flex; align-items: center; justify-content: space-between; gap: var(--cds-gap-sm); padding: 11px 14px; border-bottom: 1px solid var(--color-border-line); }
-.fx-card h2, .fx-group { margin: 0; font-size: var(--cds-font-size-caption); font-weight: 600; color: var(--color-fg); text-transform: uppercase; letter-spacing: .05em; }
-.fx-group { padding: 10px 14px; border-bottom: 1px solid var(--color-border-line); display: flex; justify-content: space-between; gap: 12px; }
+.fx-card h2, .fx-group { margin: 0; font-size: var(--cds-font-size-caption); font-weight: 600; color: var(--color-fg-muted); }
+.fx-group { padding: 14px 14px 6px; display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
+.fx-group .via { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 400; }
+.fx-group.tap { cursor: pointer; }
+.fx-group.tap:hover bdi { text-decoration: underline; }
+.fx-group.tap:focus-visible { outline: 2px solid var(--color-fg); outline-offset: -2px; }
+.fx-route + .fx-route { border-top: 1px solid var(--color-border-line); }
+.fx-route.gap .fx-group bdi { color: var(--color-bad); }
 .fx-link { all: unset; cursor: pointer; font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); }
 .fx-link:hover { color: var(--color-fg); }
 .fx-link:focus-visible { outline: 2px solid var(--color-fg); outline-offset: 2px; border-radius: 2px; }
-.fx-cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: var(--cds-gap-md); align-items: start; }
 
 .fx-list { list-style: none; margin: 0; padding: 0; }
 .fx-eval { display: grid; gap: 2px; padding: 9px 14px; }
@@ -75,7 +69,7 @@ button.fx-kpi:focus-visible { outline: 2px solid var(--color-fg); outline-offset
 .fx-list > li + li { border-top: 1px solid var(--color-border-line); }
 .fx-row { all: unset; box-sizing: border-box; width: 100%; display: grid; grid-template-columns: 8px minmax(0, 1fr) auto 14px; align-items: center; column-gap: 10px; padding: 10px 14px; cursor: pointer; }
 .fx-row { border-left: 3px solid transparent; }
-.fx-row:hover { background: color-mix(in srgb, var(--color-fg) 5%, var(--color-bg)); }
+.fx-row:hover { background: color-mix(in srgb, var(--color-fg) 5%, var(--fx-card)); }
 .fx-row[data-tone="bad"] { border-left-color: var(--color-bad); }
 .fx-row[data-tone="warn"] { border-left-color: var(--color-warn); }
 .fx-row:focus-visible { outline: 2px solid var(--color-fg); outline-offset: -2px; }
@@ -95,15 +89,16 @@ button.fx-kpi:focus-visible { outline: 2px solid var(--color-fg); outline-offset
 .fx-changes { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
 .fx-changes li { display: grid; grid-template-columns: 8px minmax(0, 1fr) auto; align-items: center; column-gap: 8px; }
 .fx-changes a { color: var(--color-fg); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.fx-btn { display: inline-flex; align-items: center; gap: 6px; font: inherit; font-size: var(--cds-font-size-caption); color: var(--color-fg); background: var(--color-panel); border: 1px solid var(--color-border-line); border-radius: 6px; padding: 5px 10px; cursor: pointer; text-decoration: none; transition: opacity 120ms; }
+.fx-btn { display: inline-flex; align-items: center; gap: 6px; font: inherit; font-size: var(--cds-font-size-caption); color: var(--color-fg); background: var(--fx-tint); border: 1px solid var(--color-border-line); border-radius: 6px; padding: 5px 10px; cursor: pointer; text-decoration: none; transition: opacity 120ms; }
 .fx-btn:hover { opacity: .8; }
 .fx-btn:focus-visible { outline: 2px solid var(--color-fg); outline-offset: 1px; }
 .fx-btn code { font-size: inherit; }
 .fx-empty { padding: 14px; color: var(--color-fg-muted); font-size: var(--cds-font-size-caption); display: flex; gap: 8px; align-items: center; }
 .fx-empty svg { color: var(--color-ok); flex: none; }
 #foot code { overflow-wrap: anywhere; }
+.fx-lrow { grid-template-columns: 8px minmax(0, 1fr) 14px; }
 .fx-foot { all: unset; box-sizing: border-box; width: 100%; display: flex; justify-content: center; align-items: center; gap: 4px; padding: 10px 14px; border-top: 1px solid var(--color-border-line); font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); cursor: pointer; }
-.fx-foot:hover { color: var(--color-fg); background: var(--color-panel); }
+.fx-foot:hover { color: var(--color-fg); background: var(--fx-tint); }
 .fx-foot:focus-visible { outline: 2px solid var(--color-fg); outline-offset: -2px; }
 
 .fx-dot { width: 9px; height: 9px; border-radius: 50%; box-sizing: border-box; background: var(--color-fg-muted); }
@@ -116,31 +111,52 @@ button.fx-kpi:focus-visible { outline: 2px solid var(--color-fg); outline-offset
 .fx-fnode .fx-rt + b { margin-left: 0; }
 .fx-cad { display: inline-flex; align-items: center; gap: 3px; white-space: nowrap; color: var(--color-fg-muted); font-weight: 400; }
 .fx-cad svg { flex: none; }
-.fx-card[data-sec="c3"] { --sec: var(--fx-c3); }
-.fx-talk { display: grid; grid-template-columns: 8px minmax(0, 1fr) auto; column-gap: 10px; align-items: baseline; padding: 9px 14px; }
-.fx-talk .fx-dot { align-self: center; }
-.fx-talk p { margin: 0; overflow-wrap: anywhere; }
-.fx-talk small { display: block; margin-top: 2px; color: var(--color-fg-muted); font-size: var(--cds-font-size-caption); overflow-wrap: anywhere; }
-.fx-talk .r { display: grid; justify-items: end; gap: 4px; font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
-.fx-talk .r a { color: inherit; display: inline-flex; }
+.fx-post { display: grid; grid-template-columns: 8px minmax(0, 1fr) auto; column-gap: 12px; align-items: start; padding: 11px 14px; }
+.fx-post .fx-dot { margin-top: 6px; }
+.fx-post .h { font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); overflow-wrap: anywhere; }
+.fx-post .h .fx-name, .fx-post .h > span:first-child:not(.to):not(.k) { color: var(--color-fg); }
+.fx-post p { margin: 2px 0 0; overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.fx-post .r { display: grid; justify-items: end; gap: 6px; font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.fx-ext { color: var(--color-fg-muted); display: inline-flex; }
+.fx-ext:hover { color: var(--color-fg); }
+.fx-list > li.fx-day { position: sticky; top: 0; z-index: 1; padding: 14px 14px 4px; border-top: 0; font-size: var(--cds-font-size-caption); font-weight: 600; color: var(--color-fg-muted); background: var(--fx-card); }
+.fx-list > li.fx-day + li { border-top: 0; }
 .fx-name { all: unset; cursor: pointer; color: var(--color-fg); font-weight: var(--cds-font-weight-medium); text-decoration: underline; text-decoration-color: color-mix(in srgb, var(--color-fg) 30%, transparent); text-underline-offset: 2px; }
 .fx-name:hover { text-decoration-color: currentColor; }
 .fx-name:focus-visible { outline: 2px solid var(--color-fg); outline-offset: 2px; border-radius: 2px; }
-.fx-who { display: flex; flex-wrap: wrap; gap: 6px; padding: 12px 14px; }
-.fx-who .fx-btn small { color: var(--color-fg-muted); font-variant-numeric: tabular-nums; }
-.fx-said { display: grid; gap: 6px; }
-.fx-said > .fx-list { border: 1px solid var(--color-border-line); border-radius: 8px; }
-.fx-said .fx-talk { padding: 7px 10px; }
-[data-draw="loop-sheet"] { position: relative; }
-.fx-sheet-bg { position: absolute; z-index: 20; background: rgb(0 0 0 / .35); }
-.fx-sheet { position: absolute; top: 0; right: 0; bottom: 0; width: min(560px, 100%); overflow-y: auto; padding-bottom: env(safe-area-inset-bottom, 0px); overscroll-behavior: contain; background: var(--color-bg); border-left: 1px solid var(--color-border-line);
-  box-shadow: -8px 0 32px rgb(0 0 0 / .18); display: grid; align-content: start; }
-.fx-sheet > header { position: sticky; top: 0; z-index: 1; display: grid; grid-template-columns: 9px minmax(0, 1fr) auto; align-items: center; column-gap: 10px;
-  padding: 14px 16px; background: var(--color-bg); border-bottom: 1px solid var(--color-border-line); }
-.fx-sheet h2 { margin: 0; font-family: var(--font-anthropic-serif); font-size: var(--cds-font-size-heading); font-weight: 600; overflow-wrap: anywhere; }
+.fx-sec { margin: 8px 0 0; font-size: var(--cds-font-size-caption); font-weight: 600; color: var(--color-fg-muted); }
+.fx-sub-h { margin: 4px 0 -4px; font-size: 11px; color: var(--color-fg-muted); }
+.fx-inset { border: 1px solid var(--color-border-line); border-radius: 10px; overflow: hidden; }
+.fx-inset .fx-more { padding-left: 35px; }
+.fx-more-link { display: inline-flex; align-items: center; gap: 4px; }
+.fx-path { display: grid; gap: 6px; padding: 10px 12px; border-radius: 10px; background: var(--fx-tint); }
+.fx-path p.warn, .fx-more p.warn { color: var(--color-warn); }
+.fx-orders { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.fx-orders li { padding: 8px 10px; border-left: 3px solid var(--fx-c0, var(--color-fg)); border-radius: 0 8px 8px 0; background: var(--fx-tint); }
+.fx-orders p { margin: 0; color: var(--color-fg); }
+.fx-orders small:not(:empty) { display: block; margin-top: 2px; }
+.fx-chat { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.fx-bubble { justify-self: start; max-width: 85%; padding: 8px 12px; border-radius: 16px 16px 16px 4px; background: color-mix(in srgb, var(--color-fg) 7%, var(--fx-card)); }
+.fx-bubble.in { justify-self: end; border-radius: 16px 16px 4px 16px; background: color-mix(in srgb, var(--fx-c0, var(--color-fg)) 14%, var(--fx-card)); }
+.fx-bubble p { margin: 0; color: var(--color-fg); overflow-wrap: anywhere; }
+.fx-bubble small { display: flex; flex-wrap: wrap; align-items: center; gap: 0 3px; margin-top: 3px; font-size: 11px; color: var(--color-fg-muted); }
+.fx-bubble .fx-name { font-weight: 500; }
+.fx-compose { position: sticky; bottom: 0; display: grid; gap: 6px; margin: 0 -16px -24px; padding: 10px 16px calc(12px + env(safe-area-inset-bottom, 0px)); background: var(--fx-card); border-top: 1px solid var(--color-border-line); }
+.fx-compose textarea { border-radius: 18px; padding: 9px 14px; resize: none; }
+.fx-compose .fx-built:empty { display: none; }
+.fx-primary { background: var(--color-fg); color: var(--fx-card); border-color: var(--color-fg); }
+[data-draw="sheet"] { position: relative; }
+.fx-sheet-bg { position: absolute; z-index: 20; background: rgb(0 0 0 / .3); }
+.fx-sheet { position: absolute; top: 0; right: 0; bottom: 0; width: min(560px, 100%); overflow-y: auto; padding-bottom: env(safe-area-inset-bottom, 0px); overscroll-behavior: contain; background: var(--fx-card); border-left: 1px solid var(--color-border-line);
+  box-shadow: -8px 0 32px rgb(0 0 0 / .18); display: flex; flex-direction: column; }
+@media (prefers-reduced-motion: no-preference) { .fx-sheet { animation: fx-in 220ms cubic-bezier(.2, .8, .2, 1); } @keyframes fx-in { from { transform: translateX(24px); opacity: 0; } } }
+.fx-sheet > header { position: sticky; top: 0; z-index: 2; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; column-gap: 10px;
+  padding: 12px 16px; background: color-mix(in srgb, var(--fx-card) 88%, transparent); backdrop-filter: blur(12px); border-bottom: 1px solid var(--color-border-line); }
+.fx-sheet h2 { margin: 0; font-size: var(--cds-font-size-heading); font-weight: 700; letter-spacing: -.01em; overflow-wrap: anywhere; }
 .fx-sheet header small { display: block; color: var(--color-fg-muted); font-size: var(--cds-font-size-caption); }
-.fx-sheet .fx-more { padding: 14px 16px 24px; gap: 12px; }
-.fx-tip { position: fixed; z-index: 10; max-width: 300px; padding: 8px 10px; border: 1px solid var(--color-border-line); border-radius: 8px; background: var(--color-bg);
+.fx-sheet .fx-more { flex: 1; padding: 14px 16px 24px; gap: 12px; align-content: start; }
+.fx-sheet .fx-form-body { padding: 0; }
+.fx-tip { position: fixed; z-index: 10; max-width: 300px; padding: 8px 10px; border: 1px solid var(--color-border-line); border-radius: 8px; background: var(--fx-card);
   box-shadow: 0 4px 16px rgb(0 0 0 / .14); display: grid; gap: 3px; font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); pointer-events: none; }
 .fx-tip b { color: var(--color-fg); font-weight: 600; overflow-wrap: anywhere; }
 .fx-tip p { margin: 0; }
@@ -154,9 +170,6 @@ button.fx-kpi:focus-visible { outline: 2px solid var(--color-fg); outline-offset
 .fx-hist i { width: 4px; border-radius: 1px; background: var(--color-ok); opacity: .85; }
 .fx-hist i.f { background: var(--color-bad); opacity: 1; }
 
-.fx-bar { display: flex; align-items: center; justify-content: space-between; gap: var(--cds-gap-sm); padding: 10px 14px; border-bottom: 1px solid var(--color-border-line); }
-.fx-bar .dash-select { min-width: 0; max-width: 60%; }
-.fx-toolbar { border: 1px solid var(--color-border-line); border-radius: var(--cds-radius); background: var(--color-bg); }
 .fx-group > span:first-child { display: flex; align-items: baseline; min-width: 0; }
 .fx-group > span:first-child > bdi { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .fx-group small { flex: none; }
@@ -180,16 +193,14 @@ button.fx-kpi:focus-visible { outline: 2px solid var(--color-fg); outline-offset
 .fx-fclus { display: flex; flex-direction: column; gap: 5px; padding: 5px; border: 1px solid var(--color-border-line); border-radius: 9px; background: color-mix(in srgb, var(--color-fg) 3%, transparent); }
 .fx-fproj { font-size: 11px; font-weight: 600; color: var(--color-fg-muted); margin: 0 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .fx-fnode { all: unset; box-sizing: border-box; display: flex; align-items: center; gap: 5px; min-width: 0; padding: 5px 6px; border-radius: 7px; cursor: pointer;
-  font-size: var(--cds-font-size-caption); line-height: 1.25; background: var(--color-bg); border: 1px solid var(--color-border-line); box-shadow: 0 1px 2px rgb(0 0 0 / .06);
+  font-size: var(--cds-font-size-caption); line-height: 1.25; background: var(--fx-card); border: 1px solid var(--color-border-line); box-shadow: 0 1px 2px rgb(0 0 0 / .06);
   transition: opacity 160ms, border-color 160ms, box-shadow 160ms; }
 .fx-fnode > span:not(.fx-dot) { min-width: 0; overflow: hidden; overflow-wrap: break-word; }
 .fx-fnode .fx-dot { flex: none; width: 8px; height: 8px; }
 /* a loop's chip reads from its top line: status, name, and where it runs at the top right */
-.fx-fnode:not(.fx-fend) { align-items: flex-start; }
-.fx-fnode:not(.fx-fend) .fx-dot { margin-top: 4px; }
 .fx-fnode b { margin-left: auto; padding-left: 4px; font-weight: 600; font-size: 11px; color: var(--color-fg-muted); font-variant-numeric: tabular-nums; }
 .fx-fnode:hover, .fx-fnode:focus-visible { border-color: color-mix(in srgb, var(--color-fg) 45%, transparent); outline: none; }
-.fx-fnode[data-tone="bad"] { border-color: color-mix(in srgb, var(--color-bad) 60%, transparent); background: color-mix(in srgb, var(--color-bad) 8%, var(--color-bg)); }
+.fx-fnode[data-tone="bad"] { border-color: color-mix(in srgb, var(--color-bad) 60%, transparent); background: color-mix(in srgb, var(--color-bad) 8%, var(--fx-card)); }
 .fx-fnode[data-tone="warn"] { border-color: color-mix(in srgb, var(--color-warn) 55%, transparent); }
 .fx-fnode[data-tone="none"] { color: var(--color-fg-muted); }
 .fx-fnode.gap { border: 1.5px dashed var(--color-bad); }
@@ -198,8 +209,8 @@ button.fx-kpi:focus-visible { outline: 2px solid var(--color-fg); outline-offset
 .fx-fcol.checkers .fx-fnode.ext { border-left-style: dashed; }
 .fx-fend { justify-content: center; flex-direction: column; gap: 2px; padding: 10px 2px; font-size: 11px; text-align: center; font-weight: 600; }
 .fx-fend b { margin: 0; padding: 0; }
-.fx-fend.you { background: color-mix(in srgb, var(--fx-c0, var(--color-fg)) 12%, var(--color-bg)); border-color: color-mix(in srgb, var(--fx-c0, var(--color-fg)) 45%, transparent); }
-.fx-fend.nobody { color: var(--color-bad); border: 1.5px dashed var(--color-bad); background: color-mix(in srgb, var(--color-bad) 6%, var(--color-bg)); }
+.fx-fend.you { background: color-mix(in srgb, var(--fx-c0, var(--color-fg)) 12%, var(--fx-card)); border-color: color-mix(in srgb, var(--fx-c0, var(--color-fg)) 45%, transparent); }
+.fx-fend.nobody { color: var(--color-bad); border: 1.5px dashed var(--color-bad); background: color-mix(in srgb, var(--color-bad) 6%, var(--fx-card)); }
 .fx-fribbon { flex: 1; min-height: 40px; display: flex; align-items: flex-start; justify-content: center; padding-top: 6px; font-size: 11px; color: var(--color-fg-muted); }
 .fx-fedges { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; }
 .fx-fedges .band { fill: color-mix(in srgb, var(--color-fg) 4%, transparent); }
@@ -211,51 +222,50 @@ button.fx-kpi:focus-visible { outline: 2px solid var(--color-fg); outline-offset
 .fx-fedges path.esc { stroke: var(--color-warn); stroke-width: 2.5; stroke-linecap: round; opacity: .65; }
 .fx-fedges path.esc.glass { stroke: var(--color-bad); opacity: .8; }
 .fx-fedges text.esc { fill: var(--color-warn); font-size: 10px; font-weight: 700; transition: opacity 160ms; }
-.fx-fedges path.flow { display: none; stroke: var(--color-bg); stroke-width: 1.5; stroke-linecap: round; stroke-dasharray: 0 14; opacity: .9; }
+.fx-fedges path.flow { display: none; stroke: var(--fx-card); stroke-width: 1.5; stroke-linecap: round; stroke-dasharray: 0 14; opacity: .9; }
 .fx-factory.hide-check .fx-fedges [data-e], .fx-factory.hide-sup .fx-fedges [data-s], .fx-factory.hide-esc .fx-fedges [data-x] { display: none; }
 .fx-fnode.issue { outline: 1.5px dotted var(--color-warn); outline-offset: 2px; }
 .fx-fcol .fx-fnode.mgr { border-left: 3px solid var(--color-warn); }
 .fx-fcol .fx-fnode.glass { border-left: 3px solid var(--color-bad); }
-.fx-fnode.door { background: color-mix(in srgb, var(--color-warn) 14%, var(--color-bg)); border: 1.5px solid color-mix(in srgb, var(--color-warn) 60%, transparent); align-items: center; }
+.fx-fnode.door { background: color-mix(in srgb, var(--color-warn) 14%, var(--fx-card)); border: 1.5px solid color-mix(in srgb, var(--color-warn) 60%, transparent); align-items: center; }
 .fx-fnode.door > span:not(.fx-dot) { overflow-wrap: normal; }
 .fx-fnode.door .fx-rt { display: none; }
-.fx-fdetail p.warn { color: var(--color-warn); }
-.fx-factory.trace .fx-fnode:not(.on), .fx-factory.trace .fx-fproj:not(.on) { opacity: .28; }
-.fx-factory.trace .fx-fedges :is(path, text):not(.on) { opacity: .06; }
-.fx-factory.trace .fx-fedges path.on:not(.flow) { opacity: 1; }
-.fx-factory.trace .fx-fedges path.on:is(.chk, .sup, .off) { stroke-width: 2; }
-.fx-fdoor { --tone: var(--color-warn); display: flex; align-items: center; gap: 12px; margin: 0; padding: 10px 12px; border-radius: 8px; border-left: 4px solid var(--tone); background: color-mix(in srgb, var(--tone) 9%, var(--color-bg)); }
-.fx-fdoor[data-tone="ok"] { --tone: var(--color-ok); }
-.fx-fdoor > b { font-family: var(--font-anthropic-serif); font-size: 1.75rem; line-height: 1; font-weight: 600; color: var(--tone); font-variant-numeric: tabular-nums; }
-.fx-fdoor > span { display: grid; gap: 1px; font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); }
-.fx-fdoor strong { color: var(--color-fg); font-size: var(--cds-font-size-body); font-weight: 600; }
-.fx-fview { display: flex; gap: 4px; overflow-x: auto; scrollbar-width: none; }
-.fx-ltog { all: unset; box-sizing: border-box; flex: 1 1 auto; justify-content: center; white-space: nowrap; display: inline-flex; align-items: center; gap: 5px; padding: 5px 8px; border-radius: 999px; border: 1px solid var(--color-border-line); cursor: pointer; font-size: var(--cds-font-size-caption); font-weight: var(--cds-font-weight-medium); color: var(--color-fg-muted); }
-.fx-ltog i { display: inline-block; width: 14px; border-top: 1.5px solid var(--color-fg-muted); }
-.fx-ltog i.sup { border-top: 2px dashed var(--fx-c4, var(--color-fg)); }
-.fx-ltog i.esc { border-top: 3px solid var(--color-warn); }
-.fx-ltog[aria-pressed="true"] { color: var(--color-fg); background: color-mix(in srgb, var(--color-fg) 8%, var(--color-bg)); border-color: color-mix(in srgb, var(--color-fg) 35%, transparent); }
-.fx-ltog[data-problems][aria-pressed="true"] { color: var(--color-bad); border-color: color-mix(in srgb, var(--color-bad) 50%, transparent); background: color-mix(in srgb, var(--color-bad) 8%, var(--color-bg)); }
+.fx-fbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.fx-fdoor { display: inline-flex; align-items: center; gap: 6px; margin: 0 auto 0 0; font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); }
+.fx-fdoor:empty { display: none; }
+.fx-fdoor b { font-size: var(--cds-font-size-body); color: var(--color-fg); font-variant-numeric: tabular-nums; }
+.fx-seg { display: inline-flex; gap: 2px; padding: 2px; border-radius: 8px; background: color-mix(in srgb, var(--color-fg) 7%, transparent); }
+.fx-seg .fx-ltog { border: 0; border-radius: 6px; }
+.fx-seg .fx-ltog[aria-pressed="true"] { background: var(--fx-card); box-shadow: 0 1px 2px rgb(0 0 0 / .12); }
+.fx-plain { padding: 0; }
+#factory-card { padding: 12px; overflow: clip; }
+.fx-center { text-align: center; }
+.fx-disc details + details { border-top: 1px solid var(--color-border-line); }
+.fx-disc summary { list-style: none; display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding: 13px 14px; cursor: pointer; font-weight: var(--cds-font-weight-medium); }
+.fx-disc summary::-webkit-details-marker { display: none; }
+.fx-disc summary::after { content: '›'; color: var(--color-fg-muted); transition: transform 150ms; }
+.fx-disc details[open] > summary::after { transform: rotate(90deg); }
+.fx-disc summary small { margin-left: auto; color: var(--color-fg-muted); font-weight: 400; font-size: var(--cds-font-size-caption); text-align: right; }
+.fx-disc summary:focus-visible { outline: 2px solid var(--color-fg); outline-offset: -2px; }
+.fx-disc details > :not(summary) { border-top: 1px solid var(--color-border-line); }
+@media (max-width: 639px) { .fx-seg, .fx-flayers { display: none; } #factory-card { padding: 0; } }
+.fx-ltog { all: unset; box-sizing: border-box; flex: 0 0 auto; justify-content: center; white-space: nowrap; display: inline-flex; align-items: center; gap: 5px; padding: 5px 8px; border-radius: 999px; border: 1px solid var(--color-border-line); cursor: pointer; font-size: var(--cds-font-size-caption); font-weight: var(--cds-font-weight-medium); color: var(--color-fg-muted); }
+.fx-ltog[aria-pressed="true"] { color: var(--color-fg); background: color-mix(in srgb, var(--color-fg) 8%, var(--fx-card)); border-color: color-mix(in srgb, var(--color-fg) 35%, transparent); }
+.fx-ltog[data-problems][aria-pressed="true"] { color: var(--color-bad); border-color: color-mix(in srgb, var(--color-bad) 50%, transparent); background: color-mix(in srgb, var(--color-bad) 8%, var(--fx-card)); }
 .fx-ltog:hover { color: var(--color-fg); }
-@media (max-width: 419px) { .fx-ltog i { display: none; } }
 @media (max-width: 359px) { .fx-ltog { padding: 5px 4px; font-size: 11px; } }
 .fx-ltog:focus-visible { outline: 2px solid var(--color-fg); outline-offset: 1px; }
 .fx-fnode.sel { box-shadow: 0 0 0 2px var(--color-fg); }
-.fx-fdetail { position: sticky; bottom: 0; z-index: 2; pointer-events: none; margin-top: 12px; padding: 10px 12px; border: 1px solid var(--color-border-line); border-radius: 8px; background: var(--color-bg); box-shadow: 0 -2px 12px rgb(0 0 0 / .12); display: grid; gap: 4px; font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); min-height: 3.2em; }
-.fx-fdetail b { color: var(--color-fg); font-weight: 600; font-size: var(--cds-font-size-body); }
-.fx-fdetail p { margin: 0; overflow-wrap: anywhere; }
-.fx-fdetail .fx-defs { pointer-events: auto; margin-top: 4px; }
 .fx-defs { align-items: center; }
-#loop-form:not(:empty) { margin-bottom: var(--cds-gap-md); }
 .fx-form-body { display: grid; gap: 14px; padding: 14px; }
 .fx-form-body p { margin: 0; }
 .fx-q { display: grid; gap: 6px; min-width: 0; }
 .fx-q > .fx-btn, .fx-form-body > .fx-btn { justify-self: start; }
 .fx-ask { font-weight: var(--cds-font-weight-medium); }
 .fx-founder { margin-left: 6px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; color: var(--color-warn); }
-.fx-input { font: inherit; font-size: 16px; color: var(--color-fg); background: var(--color-bg); border: 1px solid var(--color-border-line); border-radius: 6px; padding: 8px 10px; width: 100%; box-sizing: border-box; min-width: 0; }
+.fx-input { font: inherit; font-size: 16px; color: var(--color-fg); background: var(--fx-card); border: 1px solid var(--color-border-line); border-radius: 6px; padding: 8px 10px; width: 100%; box-sizing: border-box; min-width: 0; }
 textarea.fx-input { resize: vertical; }
-.fx-input[readonly] { background: var(--color-panel); color: var(--color-fg-muted); }
+.fx-input[readonly] { background: var(--fx-tint); color: var(--color-fg-muted); }
 .fx-q[data-missing] .fx-input, .fx-q[data-missing] .fx-choices { border-color: var(--color-bad); }
 .fx-miss { color: var(--color-bad); font-size: var(--cds-font-size-caption); }
 .fx-choices { display: grid; gap: 6px; border: 1px solid transparent; border-radius: 6px; }
@@ -263,11 +273,11 @@ textarea.fx-input { resize: vertical; }
 .fx-choice input { margin: 3px 0 0; }
 .fx-choice small { display: block; }
 .fx-built:not(:empty) { display: grid; gap: 8px; }
-.fx-prompt { margin: 0; padding: 10px; font-size: 13px; white-space: pre-wrap; overflow-wrap: anywhere; background: var(--color-panel); border: 1px solid var(--color-border-line); border-radius: 6px; }
+.fx-prompt { margin: 0; padding: 10px; font-size: 13px; white-space: pre-wrap; overflow-wrap: anywhere; background: var(--fx-tint); border: 1px solid var(--color-border-line); border-radius: 6px; }
 .fx-built .fx-btn { justify-self: start; }
 .fx-defs .none { font-size: 13px; color: var(--color-fg-muted); }
 .fx-defs .k { width: 100%; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; color: var(--color-fg-muted); }
-.fx-legend { display: flex; flex-wrap: wrap; gap: 6px 14px; padding: 10px 14px; border-top: 1px solid var(--color-border-line); font-size: 11px; color: var(--color-fg-muted); }
+.fx-legend { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 11px; color: var(--color-fg-muted); }
 .fx-legend span { display: inline-flex; align-items: center; gap: 5px; }
 .fx-legend i { display: inline-block; width: 16px; border-top: 1.5px solid var(--color-fg-muted); }
 .fx-legend i.gap { border-top: 2px dashed var(--color-bad); }
@@ -284,110 +294,75 @@ textarea.fx-input { resize: vertical; }
 </style>
 
 <div class="fx">
-  <div class="fx-top" id="top">
-    <div><h1><span id="title-fleet">Loop fleet</span><span id="title-health" hidden>Loop health</span><span data-draw="mode" data-source="loops waiting"></span></h1><p class="fx-muted">Updated <span data-draw="synced">—</span></p></div>
-    <select class="dash-select" id="scope" data-draw="scope" aria-label="Project" data-source="loops waiting"></select>
+  <header class="fx-top" id="top">
+    <div class="fx-title"><h1><span id="title-fleet">Loop fleet</span><span id="title-health" hidden>Loop health</span></h1><p class="fx-muted">Updated <span data-draw="synced">—</span></p></div>
+    <div class="fx-tools">
+      <select class="dash-select" id="scope" data-draw="scope" aria-label="Project" data-source="loops waiting"></select>
+      <button type="button" class="fx-icon" id="about-btn" aria-label="About this page" aria-expanded="false" aria-controls="about">i</button>
+    </div>
+  </header>
+  <div class="fx-about" id="about" hidden>
+    <p>Loops check each other's output, supervisors set their Orders, and anything that needs a person climbs to the master before it reaches you. Point at a loop to trace its chain; tap it for everything about it.</p>
+    <div class="fx-legend">
+      <span><span class="fx-dot" data-tone="ok"></span>Healthy</span>
+      <span><span class="fx-dot" data-tone="warn"></span>Needs a look</span>
+      <span><span class="fx-dot" data-tone="bad"></span>Failing or silent</span>
+      <span><span class="fx-dot" data-tone="none"></span>Not run yet or paused</span>
+      <span><i></i>Checks</span>
+      <span data-sups hidden><i class="sup"></i>Supervises</span>
+      <span><i class="esc"></i>Escalates</span>
+      <span id="legend-glass" hidden><i class="glass"></i>Break-glass</span>
+      <span><i class="gap"></i>Nobody reads it</span>
+    </div>
+    <p class="fx-muted" id="foot"><span data-draw="refresh">—</span>.<span id="foot-window"> Pass rate and cost cover <span data-draw="window">—</span>.</span><span id="foot-registry"> Registry: <code data-draw="registry">—</code>.</span></p>
   </div>
 
-  <div class="fx-tabs" role="tablist" aria-label="Views">
-    <button type="button" class="fx-tab" role="tab" id="tab-overview" data-pane="overview" aria-selected="true">Overview</button>
-    <button type="button" class="fx-tab" role="tab" id="tab-loops" data-pane="loops" aria-selected="false">Loops <span class="fx-badge" data-draw="badge-loops"></span></button>
-    <button type="button" class="fx-tab" role="tab" id="tab-factory" data-pane="factory" aria-selected="false">Factory</button>
-    <button type="button" class="fx-tab" role="tab" id="tab-talk" data-pane="talk" aria-selected="false">Talk</button>
-    <button type="button" class="fx-tab" role="tab" id="tab-waiting" data-pane="waiting" aria-selected="false">Waiting <span class="fx-badge" data-draw="badge-waiting"></span></button>
+  <div class="fx-status" data-draw="status" data-source="counts loops waiting"></div>
+
+  <div class="fx-tabs" role="tablist" aria-label="Views" id="tabs">
+    <button type="button" class="fx-tab" role="tab" id="tab-factory" data-pane="factory" aria-selected="true">Factory</button>
+    <button type="button" class="fx-tab" role="tab" id="tab-feeds" data-pane="feeds" aria-selected="false">Feeds</button>
   </div>
 
-  <section class="fx-pane" id="overview" role="tabpanel" aria-labelledby="tab-overview">
-    <div class="fx-banner" id="status" data-draw="banner" data-source="counts">—</div>
-
-    <div class="fx-kpis" id="kpis">
-      <button type="button" class="fx-kpi" data-go="loops"><span class="k">Loops running</span><span class="v" data-draw="k-loops" data-source="counts" data-field="n" data-where="status=loops">—</span><div class="fx-sub" data-draw="k-loops-sub"></div></button>
-      <button type="button" class="fx-kpi" data-go="loops" data-filter="attention"><span class="k">Need a look</span><span class="v" data-draw="k-attn" data-source="counts" data-field="n" data-where="status=attention">—</span><span class="s" data-draw="k-attn-sub">—</span></button>
-      <button type="button" class="fx-kpi" data-go="waiting"><span class="k">Waiting on you</span><span class="v" data-draw="k-wait" data-source="counts" data-field="n" data-where="status=waiting">—</span><span class="s" data-draw="k-wait-sub">—</span></button>
-      <div class="fx-kpi" id="k-cost"><span class="k">Claude cost, 30 days</span><span class="v" data-draw="k-cost" data-source="cost">—</span><span class="s">estimate, not billed</span></div>
-    </div>
-
-    <div class="fx-cols">
-      <section class="fx-card" id="attention">
-        <header><h2>Needs a look</h2></header>
-        <div data-draw="attn-list" data-source="loops changes talk"></div>
-      </section>
-      <section class="fx-card" id="next-up">
-        <header><h2>Next up for you</h2><button type="button" class="fx-link" data-go="waiting">See all</button></header>
-        <ul class="fx-list" data-draw="next-list" data-source="waiting"></ul>
-      </section>
-    </div>
-  </section>
-
-  <section class="fx-pane" id="loops" role="tabpanel" aria-labelledby="tab-loops" hidden>
-    <div class="fx-bar fx-toolbar">
-      <span class="fx-muted" data-draw="loop-count">—</span>
-      <select class="dash-select" id="loop-filter" data-draw="loop-filter" aria-label="Show loops" data-source="loops"></select>
-    </div>
-    <div id="loop-form" data-draw="loop-form" data-source="questions loops"></div>
-    <div class="fx-grid" id="loop-groups" data-draw="loop-list" data-source="loops changes talk"></div>
-    <section class="fx-card" id="services">
-      <header><h2>Services and one-off jobs</h2><span class="fx-muted" data-draw="svc-count">—</span></header>
-      <ul class="fx-list fx-two" data-draw="svc-list" data-source="loops"></ul>
-    </section>
-  </section>
-
-  <section class="fx-pane" id="factory" role="tabpanel" aria-labelledby="tab-factory" hidden>
-    <section class="fx-card" id="factory-card">
-      <header><h2>Who checks what</h2><span class="fx-muted" data-draw="factory-count" data-source="loops">—</span></header>
-      <div class="fx-fbody">
-        <p class="fx-fdoor" data-draw="factory-door" data-source="loops">—</p>
-        <p class="fx-muted">Loops check each other's output, supervisors set their Orders, and anything that needs a person climbs to the master before it reaches you. Tap a loop to trace it, or You to see every path in.</p>
-        <div class="fx-fview" role="group" aria-label="Show">
-          <button type="button" class="fx-ltog" data-layer="check"><i></i>Checks</button>
-          <button type="button" class="fx-ltog" data-layer="sup" data-sups hidden><i class="sup"></i>Supervises</button>
-          <button type="button" class="fx-ltog" data-layer="esc"><i class="esc"></i>Escalates</button>
-          <button type="button" class="fx-ltog" data-problems>Problems</button>
-        </div>
-        <div class="fx-flayers" aria-hidden="true"><span>Loops</span><span>Checked by</span><span>To you</span></div>
-        <p class="fx-muted" id="factory-note" hidden></p>
-        <div class="fx-factory" id="factory-graph" data-draw="factory" data-source="loops"></div>
+  <section class="fx-pane" id="factory" role="tabpanel" aria-labelledby="tab-factory">
+    <div class="fx-fbar">
+      <p class="fx-fdoor" data-draw="factory-door" data-source="loops"></p>
+      <div class="fx-seg" role="group" aria-label="Lines">
+        <button type="button" class="fx-ltog" data-layer="esc">Escalates</button>
+        <button type="button" class="fx-ltog" data-layer="check">Checks</button>
+        <button type="button" class="fx-ltog" data-layer="sup" data-sups hidden>Orders</button>
       </div>
-      <div class="fx-legend">
-        <span><span class="fx-dot" data-tone="ok"></span>Healthy</span>
-        <span><span class="fx-dot" data-tone="warn"></span>Needs a look</span>
-        <span><span class="fx-dot" data-tone="bad"></span>Failing or silent</span>
-        <span><span class="fx-dot" data-tone="none"></span>Not run yet or paused</span>
-        <span><i></i>Checks</span>
-        <span data-sups hidden><i class="sup"></i>Supervises</span>
-        <span><i class="esc"></i>Escalates</span>
-        <span id="legend-glass" hidden><i class="glass"></i>Break-glass</span>
-        <span><i class="gap"></i>Nobody reads it</span>
-      </div>
-    </section>
-    <section class="fx-card" id="evals" data-sec="c2">
-      <header><h2>Evaluations</h2></header>
-      <div data-draw="evals" data-source="loops changes talk"></div>
-    </section>
-    <section class="fx-card" id="improver" data-sec="c1">
-      <header><h2>Improver</h2><span class="fx-muted" data-draw="improver-rate" data-source="changes">—</span></header>
-      <ul class="fx-list" data-draw="improver-list" data-source="changes"></ul>
-    </section>
+      <button type="button" class="fx-ltog fx-solo" data-problems>Problems</button>
+      <span data-draw="new-loop" data-source="questions"></span>
+    </div>
+    <p class="fx-muted" id="factory-note" hidden><span data-draw="fleet-size" data-source="loops">—</span> loops are too many to draw at once. Pick a project:</p>
+    <div class="fx-card fx-plain" id="factory-card">
+      <div class="fx-flayers" aria-hidden="true"><span>Loops</span><span>Checked by</span><span>To you</span></div>
+      <div class="fx-factory" id="factory-graph" data-draw="factory" data-source="loops"></div>
+    </div>
+    <p class="fx-muted fx-center" data-draw="factory-count" data-source="loops">—</p>
+    <div class="fx-card fx-plain" id="loop-groups" data-draw="loop-list" data-source="loops changes talk" hidden></div>
+    <div class="fx-card fx-plain fx-disc">
+      <details id="health-sec"><summary><span>Fleet health</span><small data-draw="health-sum" data-source="loops changes"></small></summary>
+        <div id="evals" data-draw="evals" data-source="loops changes talk"></div>
+        <div id="improver"><h3 class="fx-group"><span>Improver</span><span data-draw="improver-rate" data-source="changes">—</span></h3><ul class="fx-list" data-draw="improver-list" data-source="changes"></ul></div>
+      </details>
+      <details id="services"><summary><span>Services and one-off jobs</span><small data-draw="svc-count" data-source="loops">—</small></summary>
+        <ul class="fx-list" data-draw="svc-list" data-source="loops"></ul>
+      </details>
+    </div>
   </section>
 
-  <section class="fx-pane" id="talk" role="tabpanel" aria-labelledby="tab-talk" hidden>
-    <section class="fx-card" id="talkers" data-sec="c3">
-      <header><h2>Who's talking</h2><span class="fx-muted" data-draw="talk-count" data-source="talk">—</span></header>
-      <div class="fx-who" data-draw="talk-who" data-source="talk loops"></div>
-    </section>
-    <div class="fx-grid" data-draw="talk-list" data-source="talk loops"></div>
+  <section class="fx-pane" id="feeds" role="tabpanel" aria-labelledby="tab-feeds" hidden>
+    <div class="fx-card fx-plain fx-feed" data-draw="feed" data-source="talk loops"></div>
   </section>
 
-  <section class="fx-pane" id="waiting" role="tabpanel" aria-labelledby="tab-waiting" hidden>
-    <div class="fx-grid" data-draw="wait-list" data-source="waiting"></div>
-  </section>
-
-  <div data-draw="loop-sheet" data-source="loops talk changes"></div>
-  <p class="fx-muted" id="foot"><span data-draw="refresh">—</span>.<span id="foot-window"> Pass rate and cost cover <span data-draw="window">—</span>.</span><span id="foot-registry"> Registry: <code data-draw="registry">—</code>.</span></p>
+  <div class="fx-tip" role="tooltip" hidden></div>
+  <div data-draw="sheet" data-source="loops talk changes waiting questions"></div>
 </div>
 
 <script>
-const FX = window.FX = window.FX || {filter: 'all', open: new Set()};
+const FX = window.FX = window.FX || {open: new Set(), stack: []};
 const NOT_LOOP = ['Service', 'One-off'];
 const URGENT = ['failing', 'silent', 'unregistered', 'chronic', 'stale', 'missing'];
 const GAPS = ['no check', 'no runs yet', 'no record'];
@@ -436,6 +411,7 @@ const ICONS = {
   x: '<path d="M18 6 6 18"/><path d="m6 6 12 12"/>',
   chev: '<path d="m6 9 6 6 6-6"/>',
   right: '<path d="m9 18 6-6-6-6"/>',
+  left: '<path d="m15 18-6-6 6-6"/>',
   ext: '<path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>',
   plus: '<path d="M5 12h14"/><path d="M12 5v14"/>',
   pencil: '<path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/><path d="m15 5 4 4"/>',
@@ -476,11 +452,6 @@ const nextText = (r) => {
   if (!r.next_due) return '';
   if (!/^\d/.test(r.next_due)) return r.next_due.replace('every ', 'every ');
   return new Date(r.next_due) < new Date() ? 'due now' : 'next ' + rel(r.next_due);
-};
-const meter = (parts) => {
-  const m = el('div', 'fx-meter');
-  parts.forEach(([share, color]) => { const s = el('span'); s.style.width = (Math.max(0, share) * 100) + '%'; s.style.background = color; m.append(s); });
-  return m;
 };
 const hist = (h) => {
   const box = el('span', 'fx-hist');
@@ -602,13 +573,11 @@ const promptText = (form) => [promptOf(form), ...asked(form).filter((q) => q.val
   const v = answer(q);
   return !v ? [] : (q.repeat ? v.split('\n').map((x) => x.trim()).filter(Boolean) : [v.replace(/\s*\n\s*/g, ' ')]).map((x) => q.id + ': ' + x);
 })].join('\n');
-const ask = (form, r) => {
+const ask = (form, r, from) => {
   const l = dash.data('loops'), {project = ''} = dash.params();
   const known = l.status === 'ok' && l.data.some((x) => x.project === project && !NOT_LOOP.includes(x.project));
   FX.form = {form, row: r || null, values: r ? {loop: r.loop} : known ? {project} : {}, built: null, missing: []};
-  if (FX.sheet) closeSheet();
-  go('loops'); dash.draw('loop-form');
-  document.getElementById('loop-form').scrollIntoView({block: 'start'});
+  openSheet({kind: 'form'}, from);
 };
 const field = (q, choices, onInput) => {
   const box = el('div', 'fx-q'), id = 'q-' + FX.form.form + '-' + q.id;
@@ -646,35 +615,32 @@ const field = (q, choices, onInput) => {
   if (FX.form.missing.includes(q.id)) { box.dataset.missing = ''; box.append(el('p', 'fx-miss', 'Answer this one first')); }
   return box;
 };
-dash.draw('loop-form', (box) => {
-  box.replaceChildren();
-  if (!promptOf('new') || !asked('new').length) return;
+/* the form, inside the drawer: answer, build, copy. The page runs nothing */
+const formBody = (box) => {
   const f = FX.form;
-  if (!f) {
-    const b = el('button', 'fx-btn'); b.type = 'button'; b.append(icon('plus', 14), document.createTextNode('New loop'));
-    b.onclick = () => ask('new'); box.append(b); return;
-  }
-  const card = el('section', 'fx-card fx-form'), head = el('header');
-  head.append(el('h2', '', f.form === 'edit' ? 'Change ' + nameOf(f.row) : 'New loop'));
-  const close = el('button', 'fx-link', 'Close'); close.type = 'button'; close.onclick = () => { FX.form = null; dash.draw('loop-form'); };
-  head.append(close); card.append(head);
-  const body = el('div', 'fx-form-body');
-  body.append(el('p', 'fx-muted', 'Answer here, copy the prompt, and paste it into Claude Code. It asks for anything missing and confirms before it changes a thing.'));
-  if (f.row) body.append(el('p', 'fx-muted', 'Now: ' + [f.row.runtime && 'runs on ' + f.row.runtime, f.row.schedule, f.row.supervisor && 'supervised by ' + f.row.supervisor].filter(Boolean).join(' · ')));
-  const out = el('div', 'fx-built');
+  box.append(el('p', 'fx-muted', 'Answer here, copy the prompt, and paste it into Claude Code. It asks for anything missing and confirms before it changes a thing.'));
+  if (f.row) box.append(el('p', 'fx-muted', 'Now: ' + [f.row.runtime && 'runs on ' + f.row.runtime, f.row.schedule, f.row.supervisor && 'supervised by ' + f.row.supervisor].filter(Boolean).join(' · ')));
+  const body = el('div', 'fx-form-body'), out = el('div', 'fx-built');
   const onInput = (id, v) => { f.values[id] = v; f.built = null; out.replaceChildren(); };
   const all = asked(f.form);
   all.filter((q) => q.value == null).forEach((q) => body.append(field(q, all.filter((c) => c.id === q.id && c.value != null), onInput)));
-  const build = el('button', 'fx-btn'); build.type = 'button'; build.textContent = 'Build prompt';
+  const build = el('button', 'fx-btn fx-primary'); build.type = 'button'; build.textContent = 'Build prompt';
   build.onclick = () => {
     f.missing = all.filter((q) => q.value == null && q.required && !answer(q)).map((q) => q.id);
     f.built = f.missing.length ? null : promptText(f.form);
-    dash.draw('loop-form');
-    const first = document.querySelector('#loop-form [data-missing], #loop-form .fx-built pre'); if (first) first.scrollIntoView({block: 'center'});
+    dash.draw('sheet');
+    const s = document.querySelector('.fx-sheet'), first = s && s.querySelector('[data-missing], .fx-built pre');
+    if (first) s.scrollTop += first.getBoundingClientRect().top - s.getBoundingClientRect().top - s.clientHeight / 3;
   };
   body.append(build);
   if (f.built) { const pre = el('pre', 'fx-prompt', f.built); out.append(pre, copyBtn(f.built, 'Copy prompt')); }
-  body.append(out); card.append(body); box.append(card);
+  body.append(out); box.append(body);
+};
+dash.draw('new-loop', (box) => {
+  box.replaceChildren();
+  if (!promptOf('new') || !asked('new').length) return;
+  const b = el('button', 'fx-btn'); b.type = 'button'; b.append(icon('plus', 14), document.createTextNode('New loop'));
+  b.onclick = () => ask('new', null, b); box.append(b);
 });
 const loopActs = (r) => {
   const acts = el('div', 'fx-acts');
@@ -682,7 +648,7 @@ const loopActs = (r) => {
   if (r.project === 'Service' && r.status === 'failing') acts.append(copyBtn('launchctl bootout gui/' + metaOf('uid') + '/' + r.job, 'Copy stop command'));
   if (registered(r) && promptOf('edit')) {
     const b = el('button', 'fx-btn'); b.type = 'button'; b.append(icon('pencil', 14), document.createTextNode('Change this loop'));
-    b.onclick = (e) => { e.stopPropagation(); ask('edit', r); };
+    b.onclick = (e) => { e.stopPropagation(); ask('edit', r, b); };
     acts.append(b);
   } else acts.append(copyBtn(retirePrompt(r), 'Copy retire prompt'));
   return acts.childElementCount ? acts : null;
@@ -720,48 +686,73 @@ const names = (cell) => cell ? String(cell).split(', ').filter(Boolean) : [];
 const talkOf = (loop) => { const t = dash.data('talk'); return t.status === 'ok' ? t.data.filter((e) => e.loop === loop || e.from === loop || names(e.to).includes(loop)) : []; };
 /* in talk, you is always the person, even beside a loop named you */
 const rowOf = (loop) => { const l = dash.data('loops'); return l.status === 'ok' && loop !== 'you' ? l.data.find((x) => x.loop === loop && registered(x)) : null; };
+/* a name in talk: a loop opens its drawer, you stays you, a sender nothing records is left out */
 const who = (n) => {
   const r = n && rowOf(n);
-  if (!r) return el('span', '', n === 'you' ? 'you' : n || 'unknown');
+  if (!r) return n === 'you' ? el('span', '', 'you') : n ? el('span', '', n) : null;
   const b = el('button', 'fx-name', nameOf(r)); b.type = 'button'; b.title = r.loop;
-  b.onclick = (e) => { e.stopPropagation(); openSheet(r.loop, b); };
+  b.onclick = (e) => { e.stopPropagation(); openSheet({kind: 'loop', id: r.loop}, b); };
   return b;
 };
 /* when something was said: "3h ago" today, else its day, with its time when the source keeps one */
 const stamp = (at) => !at ? '' : dayDiff(at.slice(0, 10)) === 0 ? (at.length > 10 ? rel(at) : 'Today') : dayMonth(at) + (at.length > 10 ? ' ' + at.slice(11, 16) : '');
-/* a line of talk; in a loop's own panel (self) it names only the other side */
-const talkRow = (e, self) => {
-  const li = el('li', 'fx-talk'), body = el('div'), meta = el('small'), right = el('span', 'r');
-  const to = names(e.to).filter((n) => n !== self), list = (ns) => ns.flatMap((n, i) => i ? [', ', who(n)] : [who(n)]);
-  if (!self) meta.append(who(e.from), ' → ', ...(to.length ? list(to) : [who(null)]), ' · ');
-  else if (e.from === self) { if (to.length) meta.append('to ', ...list(to), ' · '); }
-  else if (e.from) meta.append('from ', who(e.from), ' · ');
-  meta.append((KIND[e.kind] || e.kind) + (e.read_date ? ' · read ' + dayMonth(e.read_date) : ''));
-  body.append(el('p', '', e.text), meta);
+const extLink = (url) => { if (!/^https?:\/\//.test(url || '')) return null; const a = el('a', 'fx-ext'); a.href = url; a.target = '_blank'; a.rel = 'noopener'; a.setAttribute('aria-label', 'Open source'); a.append(icon('ext', 13)); return a; };
+const joinNames = (ns) => ns.map(who).filter(Boolean).flatMap((x, i) => i ? [', ', x] : [x]);
+/* one post in the feed: who said it and to whom, what, and when */
+const feedRow = (e) => {
+  const li = el('li', 'fx-post'), body = el('div', 'b'), head = el('div', 'h'), right = el('span', 'r');
+  const from = who(e.from), to = joinNames(names(e.to).filter((n) => n === 'you' || rowOf(n)));
+  if (from) head.append(from);
+  if (to.length) head.append(el('span', 'to', from ? ' → ' : 'To '), ...to);
+  head.append(el('span', 'k', (head.childNodes.length ? ' · ' : '') + (KIND[e.kind] || e.kind)));
+  body.append(head, el('p', '', e.text));
   right.append(el('span', '', stamp(e.at)));
-  if (/^https?:\/\//.test(e.link || '')) { const a = el('a'); a.href = e.link; a.target = '_blank'; a.rel = 'noopener'; a.setAttribute('aria-label', 'Open source'); a.append(icon('ext', 14)); right.append(a); }
+  const a = extLink(e.link); if (a) right.append(a);
   li.append(kindDot(e.kind), body, right);
   return li;
 };
-const loopTalk = (r) => {
-  const mine = talkOf(r.loop), orders = mine.filter((e) => !e.at), latest = mine.filter((e) => e.at).slice(0, 8);
-  if (!orders.length && !latest.length) return null;
-  const box = el('div', 'fx-said');
-  [['Orders now', orders], ['Latest', latest]].forEach(([title, rows]) => {
-    if (!rows.length) return;
-    const ul = el('ul', 'fx-list'); rows.forEach((e) => ul.append(talkRow(e, r.loop)));
-    box.append(el('b', '', title), ul);
-  });
-  return box;
+/* a loop's conversation, oldest first: what it said on the left, what it was told on the right, newest at the bottom */
+const bubble = (e, loop) => {
+  const mine = e.from === loop, li = el('li', 'fx-bubble' + (mine ? '' : ' in')), meta = el('small');
+  const other = mine ? joinNames(names(e.to).filter((n) => n !== loop)) : [who(e.from)].filter(Boolean);
+  if (other.length) meta.append(mine ? 'to ' : 'from ', ...other, ' · ');
+  meta.append((KIND[e.kind] || e.kind) + ' · ' + stamp(e.at));
+  const a = extLink(e.link); if (a) meta.append(' ', a);
+  li.append(el('p', '', e.text), meta);
+  return li;
 };
-/* from: the button that opened it (Safari doesn't focus a clicked button), so closing goes back to it */
-const openSheet = (loop, from) => { if (!FX.sheet) FX.back = from; FX.sheet = loop; dash.draw('loop-sheet'); };
+const tellPrompt = (r, text) => 'Tell the loop "' + r.loop + '" this from me: "' + text.trim() + '". '
+  + (r.charter ? 'Its charter is ' + r.charter + '. ' : '') + (r.orders ? 'Its Orders are ' + r.orders + '. ' : '')
+  + 'Decide whether it is a standing order (its Orders) or a one-off for its next run, show me the change and wait for my yes.';
+const loopTalk = (r, box) => {
+  const mine = talkOf(r.loop), orders = mine.filter((e) => !e.at), said = mine.filter((e) => e.at).slice(0, 20).reverse();
+  if (orders.length) {
+    const ul = el('ul', 'fx-orders'); orders.forEach((e) => { const li = el('li'); li.append(el('p', '', e.text), el('small', '', [e.from && 'from ' + e.from, e.read_date && 'read ' + dayMonth(e.read_date)].filter(Boolean).join(' · '))); ul.append(li); });
+    box.append(el('h3', 'fx-sec', 'Orders now'), ul);
+  }
+  box.append(el('h3', 'fx-sec', 'Conversation'));
+  if (said.length) { const ul = el('ul', 'fx-chat'); said.forEach((e) => ul.append(bubble(e, r.loop))); box.append(ul); }
+  else box.append(el('p', 'fx-muted', 'Nothing said in this window.'));
+  /* the composer: the page sends nothing, it writes the prompt you paste into Claude Code */
+  const form = el('div', 'fx-compose'), ta = el('textarea', 'fx-input'), go = el('div', 'fx-built');
+  ta.rows = 2; ta.placeholder = 'Message ' + nameOf(r) + '…'; ta.setAttribute('aria-label', 'Message ' + nameOf(r)); ta.value = FX.drafts?.[r.loop] || '';
+  const sync = () => { (FX.drafts ||= {})[r.loop] = ta.value; go.replaceChildren(...(ta.value.trim() ? [copyBtn(tellPrompt(r, ta.value), 'Copy for Claude Code')] : [])); };
+  ta.oninput = sync; sync();
+  form.append(ta, go, el('p', 'fx-muted', 'Paste it into Claude Code. The page itself sends nothing.'));
+  box.append(form);
+};
+/* the drawer: a stack, so a loop opened from Needs you goes back to it. from: the button that opened it (Safari doesn't
+   focus a clicked button), so closing goes back to it */
+/* modal: everything outside the drawer is inert while it's open, so Tab stays inside. Set here, not in the drawing, which
+   writes only inside itself */
+const modal = (on) => { for (let n = document.querySelector('[data-draw="sheet"]'); n && n !== document.body; n = n.parentElement) for (const s of n.parentElement.children) if (s !== n) s.inert = on; };
+const openSheet = (s, from) => { if (!FX.stack.length) FX.back = from; FX.stack.push(s); modal(true); dash.draw('sheet'); };
 const closeSheet = () => {
-  const back = FX.back; FX.sheet = FX.back = null; dash.draw('loop-sheet');
+  const back = FX.back; FX.stack = []; FX.back = null; modal(false); dash.draw('sheet');
   if (back && back.isConnected) back.focus({preventScroll: true});
 };
-addEventListener('keydown', (e) => { if (e.key === 'Escape' && FX.sheet) closeSheet(); });
-addEventListener('resize', () => { if (FX.sheet) dash.draw('loop-sheet'); });
+addEventListener('keydown', (e) => { if (e.key === 'Escape' && FX.stack.length) closeSheet(); });
+addEventListener('resize', () => { if (FX.stack.length) dash.draw('sheet'); });
 const loopChanges = (r) => {
   const rows = changesOf(r.loop);
   if (!rows || !rows.length) return null;
@@ -783,7 +774,7 @@ const goodText = (r) => r.kpi === 'met' || r.kpi === 'below'
   : r.kpi === 'measured' ? [r.kpi_value, r.kpi_better && r.kpi_better + ' is better', r.kpi_as_of && 'as of ' + dayMonth(String(r.kpi_as_of)),
     r.floor ? 'Floor ' + r.floor : 'no Floor set'].filter(Boolean).join(' · ')
   : 'not measured · ' + (r.floor ? 'Floor ' + r.floor : 'no Floor set');
-const loopMore = (r) => (more) => {
+const loopSummary = (r, more) => {
   if (r.detail) { const p = el('p'); p.append(el('b', '', 'Last result: '), document.createTextNode(r.detail)); more.append(p); }
   more.append(el('p', '', [LABEL[r.status], r.schedule, r.job && r.job !== r.loop && r.job, r.checks && r.checks + ' checks passed',
     r.cost != null ? '$' + r.cost.toLocaleString('en', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + ' in 30 days' : ledger() && /cloud|db|app/.test(r.runtime || '') ? 'cost not metered' : null].filter(Boolean).join(' · ')));
@@ -796,11 +787,8 @@ const loopMore = (r) => (more) => {
       r.pass_rate != null && 'health: ' + Math.round(100 * r.pass_rate) + '% of checks passed'].filter(Boolean).join(' · ')));
     more.append(p);
   }
-  const said = loopTalk(r); if (said) more.append(said);
-  const changes = loopChanges(r); if (changes) more.append(changes);
-  const defs = defsRow(r); if (defs) more.append(defs);
-  const acts = loopActs(r); if (acts) more.append(acts);
 };
+const loopMore = (r) => (more) => { loopSummary(r, more); [loopChanges(r), defsRow(r), loopActs(r)].forEach((x) => x && more.append(x)); };
 const loopRow = (r, key, grouped) => {
   const right = el('span', 'r');
   right.append(hist(r.history), el('span', '', r.last_run ? rel(r.last_run) : r.result || r.status === 'no record' ? 'unknown' : 'never'));
@@ -824,119 +812,69 @@ const metaOf = (label) => { const l = dash.data('loops'); const m = l.status ===
    config feeds one. Cost and pass rate show only once a ledger feeds them. */
 const health = () => metaOf('Mode') === 'health';
 const ledger = () => { const l = dash.data('loops'); return l.status === 'ok' && l.data.some((r) => r.cost != null || r.checks); };
-const go = (pane, filter) => {
-  if (filter) FX.filter = filter;
+const go = (pane) => {
   document.querySelectorAll('.fx-pane').forEach((p) => { p.hidden = p.id !== pane; });
   document.querySelectorAll('.fx-tab').forEach((t) => t.setAttribute('aria-selected', String(t.dataset.pane === pane)));
-  dash.setLink(pane === 'overview' ? null : pane);
-  if (filter) { dash.draw('loop-filter'); dash.draw('loop-list'); dash.draw('loop-count'); }
+  dash.setLink(pane === 'factory' ? null : pane);
 };
 const fxRoot = document.querySelector('.fx');
 [0, 1, 2, 3, 4, 5].forEach((i) => fxRoot.style.setProperty('--fx-c' + i, dash.colors[i]));
 document.querySelectorAll('.fx-tab').forEach((t) => t.addEventListener('click', () => go(t.dataset.pane)));
-document.querySelectorAll('[data-go]').forEach((b) => b.addEventListener('click', () => go(b.dataset.go, b.dataset.filter)));
-if (['loops', 'factory', 'talk', 'waiting'].includes(location.hash.slice(1))) go(location.hash.slice(1));
+/* old links: #talk and #feeds open Feeds, #waiting opens Needs you, anything else the Factory */
+const hash = location.hash.slice(1);
+if (['feeds', 'talk'].includes(hash)) go('feeds');
+if (hash === 'waiting') setTimeout(() => openSheet({kind: 'needs'})); /* after the scripts, which set only what any script may */
+const about = document.getElementById('about-btn');
+about.onclick = () => { const a = document.getElementById('about'); a.hidden = !a.hidden; about.setAttribute('aria-expanded', String(!a.hidden)); };
 
-/* header */
-dash.draw('mode', (h) => {
-  const w = dash.data('waiting'), quiet = health() && w.status === 'ok' && !w.data.length;
-  const hide = {'title-fleet': health(), 'title-health': !health(), 'tab-factory': health(), 'tab-talk': health(), 'tab-waiting': quiet, 'next-up': quiet, 'k-cost': !ledger(), 'foot-window': !ledger(), 'foot-registry': health()};
-  Object.entries(hide).forEach(([id, off]) => { document.getElementById(id).hidden = off; });
-  document.querySelector('[data-go="waiting"].fx-kpi').hidden = quiet;
-  if (health() && ['factory', 'talk', 'waiting'].includes(location.hash.slice(1))) go('overview');
-});
+/* header. With no registry (health mode) there's no graph and no talk: one page, the loops by where they run */
 dash.draw('synced', (e) => { const v = metaOf('Built'); e.textContent = v ? rel(v) : '—'; });
 dash.draw('window', (e) => { e.textContent = metaOf('Pass rate and cost window') || '—'; });
 dash.draw('refresh', (e) => { e.textContent = metaOf('Refresh') || 'Rebuilt by fleet.py'; });
 dash.draw('registry', (e) => { e.textContent = metaOf('Registry') || '—'; });
 dash.draw('scope', (sel) => {
   const l = dash.data('loops'), w = dash.data('waiting'), {project = ''} = dash.params();
-  const all = new Set([...l.data, ...w.data, {scope: project}].map((r) => r.scope).filter(Boolean)); /* a pick that left the data still shows */
+  const rows = (d) => d.status === 'ok' ? d.data : [];
+  const all = new Set([...rows(l), ...rows(w), {scope: project}].map((r) => r.scope).filter(Boolean)); /* a pick that left the data still shows */
   const projects = [...all].filter((p) => p !== 'General').sort((a, b) => a.localeCompare(b));
   sel.replaceChildren(new Option('All projects', ''), ...(all.has('General') ? [new Option('General')] : []), ...projects.map((p) => new Option(p)));
-  sel.value = project; sel.hidden = all.size < 2;
+  sel.value = project;
   sel.onchange = () => dash.setParams({project: sel.value});
 });
-dash.draw('badge-loops', (e) => { const n = countOf('attention'); e.textContent = n ? n : ''; });
-dash.draw('badge-waiting', (e) => { const n = countOf('waiting'); e.textContent = n ? n : ''; });
-
-/* overview */
-dash.draw('banner', (e) => {
-  const down = countOf('failing'), attn = countOf('attention'), soon = countOf('soon');
-  e.replaceChildren();
-  if (down == null) { e.textContent = '—'; return; }
-  e.dataset.tone = down ? 'bad' : attn ? 'warn' : 'ok';
-  const head = down ? down + (health() ? (down === 1 ? ' loop failed or went quiet' : ' loops failed or went quiet') : down === 1 ? ' loop is failing' : ' loops are failing') : attn ? 'All loops ran. ' + attn + (attn === 1 ? ' thing needs' : ' things need') + ' a look' : health() ? 'Nothing is failing or late' : 'All loops are healthy';
-  const sub = health() && !countOf('waiting') ? countOf('healthy') + ' of ' + countOf('loops') + ' ran on schedule' : soon ? soon + (soon === 1 ? ' item is' : ' items are') + ' due from you in the next two days' : 'Nothing from you is due in the next two days';
-  const text = el('div'); text.append(el('b', '', head), el('span', '', sub));
-  e.append(icon(down ? 'octagon' : attn ? 'alert' : 'check', 18), text);
-});
-const num = (name, s) => dash.draw(name, (e) => { const n = countOf(s); e.textContent = n == null ? '—' : n; });
-num('k-loops', 'loops'); num('k-wait', 'waiting');
-dash.draw('k-attn', (e) => { const n = countOf('attention'); e.textContent = n == null ? '—' : n; e.dataset.tone = !n ? '' : countOf('failing') ? 'bad' : 'warn'; });
-dash.draw('k-loops-sub', (e) => {
-  const loops = countOf('loops'), ok = countOf('healthy'), attn = countOf('attention'), down = countOf('failing');
-  e.replaceChildren();
-  if (!loops) return;
-  e.append(meter([[ok / loops, 'var(--color-ok)'], [(attn - down) / loops, 'var(--color-warn)'], [down / loops, 'var(--color-bad)']]), el('span', 's', ok + (health() ? ' ran' : ' healthy')));
-});
-dash.draw('k-attn-sub', (e) => { const f = countOf('failing'); e.textContent = f == null ? '—' : f ? f + ' failing or silent' : 'none failing'; });
-dash.draw('k-wait-sub', (e) => { const o = countOf('soon'); e.textContent = o == null ? '—' : o ? o + ' due within 2 days' : 'none due soon'; });
-dash.draw('k-cost', (e) => { const c = dash.data('cost'); e.textContent = c.status === 'ok' ? '$' + c.data.toLocaleString('en') : '—'; });
-
-dash.draw('attn-list', (box) => {
-  const l = dash.data('loops');
+/* the one status line: how the loops are, and what waits on you; both open Needs you */
+dash.draw('status', (box) => {
+  const down = countOf('failing'), attn = countOf('attention'), wait = countOf('waiting'), soon = countOf('soon');
   box.replaceChildren();
-  if (l.status !== 'ok') return failed(box, 'loop list', l.status);
-  const urgent = scoped(l.data).filter((r) => (!NOT_LOOP.includes(r.project) && URGENT.includes(r.status)) || (r.project === 'Service' && r.status === 'failing'))
-    .sort((a, b) => URGENT.indexOf(a.status) - URGENT.indexOf(b.status));
-  const gaps = scoped(l.data).filter((r) => !NOT_LOOP.includes(r.project) && GAPS.includes(r.status));
-  const ul = el('ul', 'fx-list');
-  if (!urgent.length) { const li = el('li', 'fx-empty'); li.append(icon('check', 16), el('span', '', health() ? 'Nothing is failing or late.' : 'Nothing is failing, flaky or unregistered.')); ul.append(li); }
-  capped(ul, urgent, 20, 'attn', (r) => {
-    const right = el('span', 'r'); right.append(hist(r.history), el('span', '', LABEL[r.status]));
-    return expandRow('a:' + r.loop, [dot(TONE[r.status], LABEL[r.status]), titleCell(nameOf(r), [r.project, reason(r)].filter(Boolean).join(' · '), null, runtimeMark(r)), right], loopMore(r), TONE[r.status]);
-  });
-  box.append(ul);
-  if (gaps.length) {
-    const b = el('button', 'fx-foot'); b.type = 'button';
-    b.append(document.createTextNode(gaps.length + (gaps.length === 1 ? ' loop' : ' loops') + (health() ? ' with no run on record' : (gaps.length === 1 ? ' runs' : ' run') + ' with no outcome check')), icon('right', 14));
-    b.onclick = () => go('loops', 'unchecked');
-    box.append(b);
-  }
+  if (down == null) return;
+  const tone = down ? 'bad' : attn ? 'warn' : 'ok';
+  const head = down ? down + (health() ? (down === 1 ? ' loop failed or went quiet' : ' loops failed or went quiet') : down === 1 ? ' loop is failing' : ' loops are failing')
+    : attn ? attn + (attn === 1 ? ' thing needs' : ' things need') + ' a look' : health() ? 'Nothing is failing or late' : 'All loops are healthy';
+  const pill = (kids, label) => { const b = el('button', 'fx-pill'); b.type = 'button'; b.append(...kids); b.setAttribute('aria-label', label); b.onclick = () => openSheet({kind: 'needs'}, b); box.append(b); return b; };
+  pill([dot(tone), el('span', '', head)], head + ', open Needs you').dataset.tone = tone;
+  if (wait) pill([el('b', '', String(wait)), el('span', '', 'waiting' + (soon ? ' · ' + soon + ' due soon' : ''))], wait + ' waiting on you, open Needs you');
+});
+dash.draw('health-sum', (e) => {
+  const c = dash.data('cost'), l = dash.data('loops');
+  if (l.status !== 'ok') { e.textContent = ''; return; }
+  const checks = scoped(l.data).map((r) => String(r.checks || '').match(/^(\d+) of (\d+)$/)).filter(Boolean), ran = checks.reduce((a, m) => a + +m[2], 0);
+  e.textContent = [ledger() && c.status === 'ok' && '$' + c.data.toLocaleString('en') + ' in 30 days', ran && Math.round(100 * checks.reduce((a, m) => a + +m[1], 0) / ran) + '% of checks passed'].filter(Boolean).join(' · ');
 });
 
-dash.draw('next-list', (ul) => {
-  const w = dash.data('waiting');
-  ul.replaceChildren();
-  if (w.status !== 'ok') return failed(ul, 'waiting list', w.status);
-  const next = scoped(w.data).filter((r) => !isNaN(dueIn(r))).slice(0, 5);
-  if (!next.length) { const li = el('li', 'fx-empty'); li.append(icon('check', 16), el('span', '', 'Nothing dated waits on you.')); ul.append(li); return; }
-  next.forEach((r) => ul.append(waitRow(r, 'n:')));
-});
-
-/* loops tab */
-dash.draw('loop-filter', (sel) => {
-  sel.replaceChildren(new Option('All loops', 'all'), new Option('Needs a look', 'attention'), new Option(health() ? 'No run on record' : 'No outcome check', 'unchecked'));
-  sel.value = FX.filter;
-  sel.onchange = () => { FX.filter = sel.value; dash.draw('loop-list'); dash.draw('loop-count'); };
-});
-const loopFilter = (r) => FX.filter === 'attention' ? URGENT.includes(r.status) : FX.filter === 'unchecked' ? GAPS.includes(r.status) : true;
+/* health mode: the loops by where they run */
 /* one card per project, General for loops with none; the projects with the most to look at come first */
 dash.draw('loop-list', (box) => {
   const l = dash.data('loops');
   box.replaceChildren();
   if (l.status !== 'ok') return failed(box, 'loop list', l.status);
   const order = [...URGENT, ...GAPS, 'healthy', 'ran', 'paused'];
-  const rows = scoped(l.data).filter((r) => !NOT_LOOP.includes(r.project) && loopFilter(r))
+  const rows = scoped(l.data).filter((r) => !NOT_LOOP.includes(r.project))
     .sort((a, b) => order.indexOf(a.status) - order.indexOf(b.status) || nameOf(a).localeCompare(nameOf(b)));
   if (!rows.length) { const d = el('div', 'fx-card fx-empty'); d.append(icon('check', 16), el('span', '', 'No loops match.')); box.append(d); return; }
-  const groups = groupBy(rows, (r) => health() ? (runtimeOf(r) || [, , 'Run ledger'])[2] : r.project || 'General');
+  const groups = groupBy(rows, (r) => (runtimeOf(r) || [, , 'Run ledger'])[2]);
   const urgent = (rs) => rs.filter((r) => URGENT.includes(r.status)).length;
   [...groups].sort(([a, ra], [b, rb]) => urgent(rb) - urgent(ra) || rb.length - ra.length || a.localeCompare(b)).forEach(([project, rs]) => {
     const n = urgent(rs), wide = rs.length > 8;
-    const card = el('section', 'fx-card' + (wide ? ' fx-span' : ''));
-    card.dataset.sec = n ? (rs.some((r) => TONE[r.status] === 'bad') ? 'bad' : 'warn') : 'c0';
+    const card = el('section');
     const head = el('h3', 'fx-group'), name = el('span');
     name.append(el('bdi', '', project), el('small', '', rs.length + (rs.length === 1 ? ' loop' : ' loops')));
     head.append(name, el('span', '', n ? n + ' need a look' : 'all fine'));
@@ -944,11 +882,6 @@ dash.draw('loop-list', (box) => {
     capped(ul, rs, 25, 'l:' + project, (r) => loopRow(r, 'l:', true));
     card.append(head, ul); box.append(card);
   });
-});
-dash.draw('loop-count', (e) => {
-  const l = dash.data('loops'); if (l.status !== 'ok') { e.textContent = '—'; return; }
-  const n = scoped(l.data).filter((r) => !NOT_LOOP.includes(r.project) && loopFilter(r)).length;
-  e.textContent = n + (n === 1 ? ' loop' : ' loops');
 });
 dash.draw('svc-list', (ul) => {
   const l = dash.data('loops');
@@ -977,9 +910,9 @@ dash.draw('svc-count', (e) => {
    master (the last column), or straight to you from the break-glass list. The page's scope picks the loops, and every
    loop their links reach comes too, so each chain stays whole. */
 const problem = (r) => ['failing', 'silent', 'chronic', 'no check'].includes(r.status) || !r.checked_by || !!(r.supervisor_issue || r.escalation_issue);
-const factoryGraph = (rows, problems) => {
+const factoryGraph = (rows, problems, params = dash.params()) => {
   const all = new Map(rows.filter((r) => !NOT_LOOP.includes(r.project)).map((r) => [r.loop, r]));
-  const loops = scoped([...all.values()]).filter((r) => !problems || problem(r)), keep = new Set(loops.map((r) => r.loop));
+  const loops = scoped([...all.values()], params).filter((r) => !problems || problem(r)), keep = new Set(loops.map((r) => r.loop));
   for (let k = 0; k < loops.length; k++) [...checkers(loops[k]), loops[k].supervisor, loops[k].escalates_to].map(person).forEach((c) => { if (all.has(c) && !keep.has(c)) { keep.add(c); loops.push(all.get(c)); } });
   const nodes = new Map(loops.map((r) => [r.loop, {id: r.loop, kind: 'loop', row: r, glass: r.break_glass}]));
   const services = new Set(rows.filter((x) => x.project === 'Service').map((x) => x.loop));
@@ -998,7 +931,7 @@ const factoryGraph = (rows, problems) => {
     esc(r.loop, person(r.escalates_to), !r.escalates_default, !!r.break_glass && r.escalates_to === 'you');
     if (r.break_glass && r.escalates_to !== 'you') esc(r.loop, YOU, true, true);
   });
-  scoped(rows.filter((r) => r.project === 'Service' && r.break_glass && !problems)).forEach((r) => { node(r.loop).glass = r.break_glass; esc(r.loop, YOU, true, true); });
+  scoped(rows.filter((r) => r.project === 'Service' && r.break_glass && !problems), params).forEach((r) => { node(r.loop).glass = r.break_glass; esc(r.loop, YOU, true, true); });
   /* each node's links, both ways, found once: every lookup below is by node, so a draw stays linear in loops and links */
   const by = (list, end) => groupBy(list, (e) => e[end]), from = by(edges, 'from'), to = by(edges, 'to');
   const outs = (id) => from.get(id) || [], ins = (id) => to.get(id) || [];
@@ -1045,49 +978,73 @@ const factoryGraph = (rows, problems) => {
 };
 const fname = (n) => n.kind === 'loop' ? nameOf(n.row) : n.kind === 'you' ? 'You' : n.kind === 'nobody' ? 'Nobody' : n.id;
 const fcurve = (x1, y1, x2, y2) => { const m = (x1 + x2) / 2; return `M${x1},${y1}C${m},${y1} ${m},${y2} ${x2},${y2}`; };
-/* what the graph shows, remembered per viewer in this browser: the kinds of line, and problems only. The default is
-   escalations alone, the one question the tab answers first: what can reach you */
+/* what the graph shows, remembered per viewer in this browser: one kind of line at a time, and problems only. The
+   default is escalations, the one question the page answers first: what can reach you */
 const LAYERS = ['check', 'sup', 'esc'], VIEW = 'fx-factory-view';
-if (!FX.hide) {
+if (!FX.layer) {
   let v = null; try { v = JSON.parse(localStorage.getItem(VIEW)); } catch (e) { /* storage blocked: the default stands */ }
-  FX.hide = new Set(v ? v.hide : ['check', 'sup']); FX.problems = !!(v && v.problems);
+  FX.layer = LAYERS.includes(v && v.layer) ? v.layer : 'esc'; FX.problems = !!(v && v.problems);
 }
-const saveView = () => { try { localStorage.setItem(VIEW, JSON.stringify({hide: [...FX.hide], problems: FX.problems})); } catch (e) { /* not remembered */ } };
-document.querySelectorAll('.fx-ltog[data-layer]').forEach((b) => {
-  b.setAttribute('aria-pressed', String(!FX.hide.has(b.dataset.layer)));
-  b.onclick = () => {
-    const k = b.dataset.layer, off = !FX.hide.has(k);
-    if (off) FX.hide.add(k); else FX.hide.delete(k);
-    b.setAttribute('aria-pressed', String(!off)); saveView();
-    document.querySelectorAll('#factory-graph').forEach((g) => g.classList.toggle('hide-' + k, off));
-  };
-});
-document.querySelectorAll('.fx-ltog[data-problems]').forEach((b) => {
-  b.setAttribute('aria-pressed', String(FX.problems));
-  b.onclick = () => { FX.problems = !FX.problems; b.setAttribute('aria-pressed', String(FX.problems)); saveView(); dash.draw('factory'); };
-});
+const saveView = () => { try { localStorage.setItem(VIEW, JSON.stringify({layer: FX.layer, problems: FX.problems})); } catch (e) { /* not remembered */ } };
+const showLayer = () => {
+  document.querySelectorAll('.fx-ltog[data-layer]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.layer === FX.layer)));
+  document.querySelectorAll('#factory-graph').forEach((g) => LAYERS.forEach((k) => g.classList.toggle('hide-' + k, k !== FX.layer)));
+};
+document.querySelectorAll('.fx-ltog[data-layer]').forEach((b) => { b.onclick = () => { FX.layer = b.dataset.layer; saveView(); showLayer(); }; });
+showLayer();
+const setProblems = (on) => {
+  FX.problems = on; saveView();
+  document.querySelectorAll('.fx-ltog[data-problems]').forEach((b) => b.setAttribute('aria-pressed', String(on)));
+  dash.draw('factory');
+};
+document.querySelectorAll('.fx-ltog[data-problems]').forEach((b) => { b.setAttribute('aria-pressed', String(FX.problems)); b.onclick = () => setProblems(!FX.problems); });
 
+dash.draw('fleet-size', (e) => { const l = dash.data('loops'); e.textContent = l.status === 'ok' ? l.data.filter((r) => !NOT_LOOP.includes(r.project)).length : '—'; });
 dash.draw('factory-count', (e) => {
   const l = dash.data('loops'); if (l.status !== 'ok') { e.textContent = '—'; return; }
   const g = factoryGraph(l.data), n = g.loops.length, gaps = g.ins(NOBODY).length;
   const lost = g.loops.filter((r) => g.outs(r.loop).some((x) => x.to !== NOBODY) && !g.route(r.loop)).length;
   e.textContent = n + (n === 1 ? ' loop' : ' loops') + (!n ? '' : !gaps && !lost ? ' · every one is read' : (gaps ? ' · ' + gaps + ' nobody reads' : '') + (lost ? ' · ' + lost + ' never reach you' : ''));
+  e.hidden = health();
 });
 /* the headline: how many paths can interrupt you, against one master plus the break-glass list */
 dash.draw('factory-door', (e) => {
   const l = dash.data('loops'); e.replaceChildren();
-  if (l.status !== 'ok') { e.textContent = '—'; return; }
+  if (l.status !== 'ok') return;
   const g = factoryGraph(l.data), n = g.doors.length, target = 1 + g.glass.length;
   if (!g.nodes.size) return;
-  e.dataset.tone = n <= target && g.hasMaster ? 'ok' : 'warn';
-  const v = el('b', '', String(n)), text = el('span');
-  text.append(el('strong', '', (n === 1 ? 'path' : 'paths') + ' to you'),
-    el('span', '', 'Target ' + target + ': the master' + (g.glass.length ? ' and ' + g.glass.length + ' break-glass' : '') + '.'
-      + (g.hasMaster ? (n > target ? ' ' + (n - target) + ' more ' + (n - target === 1 ? 'goes' : 'go') + ' around the master.' : ' Everything else goes through them.') : ' No loop has Role master yet, so every loop can reach you.')));
-  e.append(v, text);
+  const tone = n <= target && g.hasMaster ? 'ok' : 'warn';
+  e.dataset.tone = tone;
+  e.title = 'Target ' + target + ': the master' + (g.glass.length ? ' and ' + g.glass.length + ' break-glass' : '') + '.'
+    + (g.hasMaster ? (n > target ? ' ' + (n - target) + ' more ' + (n - target === 1 ? 'goes' : 'go') + ' around the master.' : ' Everything else goes through them.') : ' No loop has Role master yet, so every loop can reach you.');
+  e.append(dot(tone), el('b', '', String(n)), el('span', '', (n === 1 ? ' path reaches' : ' paths reach') + ' you'));
 });
+/* what a node in the graph means: its path to you and what steers it; the drawer shows it */
+const nodeParas = (g, id) => {
+  const n = g.nodes.get(id), out = [], say = (t, cls) => out.push(el('p', cls || '', t));
+  if (!n) return out;
+  const reads = g.ins(id).map((e) => fname(g.nodes.get(e.from))), by = g.outs(id).map((e) => e.to === YOU ? 'you' : fname(g.nodes.get(e.to)));
+  const label = (k) => k === 'you' ? 'you' : g.nodes.has(k) ? fname(g.nodes.get(k)) : k;
+  if (n.kind === 'you') { say(g.doors.length + (g.doors.length === 1 ? ' path reaches' : ' paths reach') + ' you: ' + g.doors.map((k) => label(k) + (g.nodes.get(k).glass ? ' (break-glass: ' + g.nodes.get(k).glass + ')' : '')).join(', ') + '. You read ' + reads.length + ' loops\' output yourself.'); return out; }
+  if (n.kind === 'nobody') { say(reads.length + (reads.length === 1 ? ' loop runs' : ' loops run') + ' with no one reading their output: ' + reads.join(', ') + '. Give each a Checked by in the registry.'); return out; }
+  if (n.kind === 'ext') say(n.service ? 'A service, not a loop: the registry doesn\'t say who reads its output.' : 'Not in the registry, so who reads its output is unknown.');
+  if (n.kind === 'ext' && n.glass) say('Break-glass: ' + n.glass + '. May message you directly.');
+  if (reads.length) say('Reads ' + reads.join(', ') + '.');
+  if (n.kind !== 'loop') return out;
+  const path = g.route(id);
+  say(g.outs(id).every((e) => e.to === NOBODY) ? 'Nobody reads its output.'
+    : path ? (path.length > 3 ? 'Reaches you through ' + path.slice(1, -1).map((k) => fname(g.nodes.get(k))).join(' → ') : by.includes('you') ? 'You read it yourself' : 'Reaches you through ' + by.join(', ')) + '.'
+    : 'Read by ' + by.join(', ') + ', but the chain never reaches you.', path ? '' : 'warn');
+  if (n.row.moves) say('Moves ' + n.row.moves + ', an input in its project\'s brief.');
+  if (n.row.escalates_to) say('Escalates to ' + g.ladder(id).slice(1).map(label).join(' → ') + (n.row.escalates_default ? ' (the default)' : '') + '.');
+  const sup = n.row.supervisor, kids = g.sups.filter((e) => e.from === id).map((e) => fname(g.nodes.get(e.to)));
+  if (sup) say('Orders from ' + label(sup) + '.');
+  if (kids.length) say('Writes Orders for ' + kids.join(', ') + '.');
+  [n.row.supervisor_issue, n.row.escalation_issue].filter(Boolean).forEach((i) => say(i[0].toUpperCase() + i.slice(1) + '.', 'warn'));
+  return out;
+};
 /* a mouse resting on a loop card shows its numbers for a moment, without a click; touch opens the detail below instead */
-const tip = document.querySelector('.fx').appendChild(el('div', 'fx-tip')); tip.hidden = true; tip.setAttribute('role', 'tooltip');
+const tip = document.querySelector('.fx-tip');
 let tipWait;
 const peek = (chip, r) => {
   clearTimeout(tipWait); tip.hidden = true;
@@ -1109,17 +1066,44 @@ const peek = (chip, r) => {
 };
 addEventListener('scroll', () => peek(), {passive: true});
 const FACTORY_ALL = 60;
+/* on a phone the three columns don't fit, so the graph reads as a list by route: each checker with the loops it reads and
+   where it hands on, then the loops you read yourself, then the ones nobody reads. Each loop shows once, under its first
+   checker in the graph's order */
+const PHONE = matchMedia('(max-width: 639px)');
+PHONE.addEventListener('change', () => dash.draw('factory'));
+const routeList = (box, g) => {
+  const rank = new Map(g.order.map((n, k) => [n.id, k])), under = new Map();
+  g.nodes.forEach((n) => { if (n.kind !== 'loop') return; const to = g.outs(n.id).map((e) => e.to).sort((a, b) => (rank.get(a) ?? 1e9) - (rank.get(b) ?? 1e9))[0] ?? NOBODY;
+    (under.get(to) || under.set(to, []).get(to)).push(n); });
+  const keys = [...under.keys()].sort((a, b) => (a === NOBODY) - (b === NOBODY) || (rank.get(a) ?? 1e9) - (rank.get(b) ?? 1e9));
+  keys.forEach((k) => {
+    const ns = under.get(k).sort((a, b) => URGENT.includes(b.row.status) - URGENT.includes(a.row.status) || nameOf(a.row).localeCompare(nameOf(b.row)));
+    const t = g.nodes.get(k), sec = el('section', 'fx-route' + (k === NOBODY ? ' gap' : '')), head = el('h3', 'fx-group'), name = el('span');
+    const title = k === YOU ? 'You read these' : k === NOBODY ? 'Nobody reads these' : 'Read by ' + fname(t), path = k === YOU || k === NOBODY ? null : g.route(k);
+    name.append(el('bdi', '', title), el('small', '', String(ns.length)));
+    head.append(name, el('span', 'via', path ? '→ ' + path.slice(1).map((x) => fname(g.nodes.get(x))).join(' → ') : ''));
+    if (t && t.kind === 'loop') { head.classList.add('tap'); head.tabIndex = 0; head.setAttribute('role', 'button');
+      head.onclick = () => openSheet({kind: 'loop', id: k}, head); head.onkeydown = (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); head.click(); } }; }
+    const ul = el('ul', 'fx-list');
+    capped(ul, ns, 25, 'route:' + k, (n) => {
+      const li = el('li'), b = el('button', 'fx-row fx-lrow'); b.type = 'button'; b.dataset.loop = n.id;
+      if (URGENT.includes(n.row.status)) b.dataset.tone = TONE[n.row.status];
+      b.append(dot(TONE[n.row.status], LABEL[n.row.status]), titleCell(nameOf(n.row), whenLine(n.row, n.row.project)), icon('right', 14, 'chev'));
+      b.onclick = () => openSheet({kind: 'loop', id: n.id}, b);
+      li.append(b); return li;
+    });
+    sec.append(head, ul); box.append(sec);
+  });
+};
 dash.draw('factory', (box) => {
   const l = dash.data('loops');
-  peek(); box.replaceChildren(); box.classList.remove('trace');
-  LAYERS.forEach((k) => box.classList.toggle('hide-' + k, FX.hide.has(k)));
+  box.replaceChildren(); box.classList.remove('trace');
+  LAYERS.forEach((k) => box.classList.toggle('hide-' + k, k !== FX.layer));
   if (!box.clientWidth) return; /* its tab is hidden: the runtime draws it again when the tab opens and the width changes */
   if (l.status !== 'ok') return failed(box, 'loop list', l.status);
   /* a big fleet on All projects is too many chips for one page: it offers its projects, the most problems first, and a
      picked project draws with every loop its chains reach */
   const real = l.data.filter((r) => !NOT_LOOP.includes(r.project)), big = !dash.params().project && real.length > FACTORY_ALL;
-  document.querySelectorAll('#factory-note').forEach((e) => { e.hidden = !big; e.textContent = real.length + ' loops are too many to draw at once. Pick a project:'; });
-  document.querySelectorAll('.fx-flayers').forEach((e) => { e.hidden = big; });
   if (big) {
     const picks = el('div', 'fx-acts'), bad = (rs) => rs.filter(problem).length;
     [...groupBy(real, (r) => r.scope)].sort(([a, ra], [b, rb]) => bad(rb) - bad(ra) || a.localeCompare(b)).forEach(([p, rs]) => {
@@ -1130,6 +1114,7 @@ dash.draw('factory', (box) => {
   }
   const g = factoryGraph(l.data, FX.problems);
   if (!g.nodes.size) { box.append(el('div', 'fx-empty', FX.problems ? 'No loop is failing, silent, unchecked or unread.' : 'No loops yet.')); return; }
+  if (PHONE.matches) return routeList(box, g);
   const cols = el('div', 'fx-fcols'), chips = new Map(), frames = new Map();
   const col = {workers: el('div', 'fx-fcol workers'), checkers: el('div', 'fx-fcol checkers'), ends: el('div', 'fx-fcol ends')};
   const chip = (n) => {
@@ -1141,14 +1126,13 @@ dash.draw('factory', (box) => {
     if (role === 'master') b.classList.add('door', 'fx-fend');
     if (role === 'manager') b.classList.add('mgr');
     if (n.glass) b.classList.add('glass');
-    const rt = n.kind === 'loop' && runtimeMark(n.row);
+    const rt = n.kind === 'loop' && runtimeOf(n.row);
     if (n.kind === 'loop') { b.dataset.tone = TONE[n.row.status]; b.append(dot(TONE[n.row.status], LABEL[n.row.status])); }
-    const name = el('span', '', fname(n)), cad = n.kind === 'loop' && cadenceMark(n.row);
-    if (cad) name.append(cad);
-    b.append(name);
-    if (rt) b.append(rt);
+    /* one line per chip: status and name; where and how often it runs show on hover and in its drawer */
+    const cad = n.kind === 'loop' && n.row.cadence;
+    b.append(el('span', '', fname(n)));
     if (read) b.append(el('b', '', String(read)));
-    b.setAttribute('aria-label', fname(n) + (n.kind === 'loop' ? ', ' + LABEL[n.row.status] + (rt ? ', ' + runtimeOf(n.row)[1] : '') + (cad ? ', ' + n.row.cadence : '') : n.kind === 'ext' ? (n.service ? ', a service' : ', not in the registry') : '')
+    b.setAttribute('aria-label', fname(n) + (n.kind === 'loop' ? ', ' + LABEL[n.row.status] + (rt ? ', ' + rt[1] : '') + (cad ? ', ' + cad : '') : n.kind === 'ext' ? (n.service ? ', a service' : ', not in the registry') : '')
       + (role ? ', ' + role : '') + (n.glass ? ', break-glass: ' + n.glass : '') + (read ? ', reads ' + read : '') + (gap ? ', nobody reads it' : '') + (issue ? ', ' + issue : ''));
     chips.set(n.id, b);
     return b;
@@ -1161,11 +1145,7 @@ dash.draw('factory', (box) => {
   if (toYou) ribbon.textContent = toYou + ' you read yourself';
   col.checkers.append(ribbon);
   cols.append(col.workers, col.checkers, col.ends);
-  const detail = el('div', 'fx-fdetail'); detail.hidden = true; detail.setAttribute('aria-live', 'polite');
-  detail.onclick = (e) => e.stopPropagation();
-  box.append(cols, detail);
-  document.querySelectorAll('[data-sups]').forEach((e) => { e.hidden = !g.sups.length; });
-  document.querySelectorAll('#legend-glass').forEach((e) => { e.hidden = !g.glass.length; });
+  box.append(cols);
 
   const paths = [];
   const base = box.getBoundingClientRect();
@@ -1221,44 +1201,10 @@ dash.draw('factory', (box) => {
   });
   box.prepend(svg);
 
-  const say = (id) => {
-    detail.replaceChildren(); detail.hidden = !id;
-    if (!id) return;
-    const n = g.nodes.get(id), reads = g.ins(id).map((e) => fname(g.nodes.get(e.from))), by = g.outs(id).map((e) => e.to === YOU ? 'you' : fname(g.nodes.get(e.to)));
-    const label = (k) => k === 'you' ? 'you' : g.nodes.has(k) ? fname(g.nodes.get(k)) : k;
-    detail.append(el('b', '', n.kind === 'loop' ? n.row.loop : fname(n)));
-    if (n.kind === 'loop') detail.append(el('p', '', [...new Set([LABEL[n.row.status], n.row.project || 'General'])].concat(n.row.role ? ['the ' + n.row.role] : [], n.row.last_run ? ['last run ' + rel(n.row.last_run)] : []).join(' · ')));
-    if (n.kind === 'loop' && (n.row.cadence || n.row.schedule)) {
-      const p = el('p', 'fx-when'), c = cadenceMark(n.row), next = nextText(n.row);
-      if (c) p.append(c);
-      const rest = [...new Set([n.row.schedule, next])].filter((x) => x && x !== n.row.cadence).join(' · ');
-      if (rest) p.append((c ? ' · ' : '') + rest);
-      detail.append(p);
-    }
-    if (n.kind === 'you') { detail.append(el('p', '', g.doors.length + (g.doors.length === 1 ? ' path reaches' : ' paths reach') + ' you: ' + g.doors.map((k) => label(k) + (g.nodes.get(k).glass ? ' (break-glass: ' + g.nodes.get(k).glass + ')' : '')).join(', ') + '. You read ' + reads.length + ' loops\' output yourself.')); return; }
-    if (n.kind === 'nobody') { detail.append(el('p', '', reads.length + (reads.length === 1 ? ' loop runs' : ' loops run') + ' with no one reading their output: ' + reads.join(', ') + '. Give each a Checked by in the registry.')); return; }
-    if (n.kind === 'ext') detail.append(el('p', '', n.service ? 'A service, not a loop: the registry doesn\'t say who reads its output.' : 'Not in the registry, so who reads its output is unknown.'));
-    if (n.glass) detail.append(el('p', '', 'Break-glass: ' + n.glass + '. May message you directly.'));
-    if (reads.length) detail.append(el('p', '', 'Reads ' + reads.join(', ') + '.'));
-    if (n.kind !== 'loop') return;
-    const path = g.route(id);
-    detail.append(el('p', '', g.outs(id).every((e) => e.to === NOBODY) ? 'Nobody reads its output.'
-      : path ? 'Read by ' + by.join(', ') + (path.length > 3 ? '. Reaches you through ' + path.slice(1, -1).map((k) => fname(g.nodes.get(k))).join(' → ') : '') + '.'
-      : 'Read by ' + by.join(', ') + ', but the chain never reaches you.'));
-    if (n.row.moves) detail.append(el('p', '', 'Moves ' + n.row.moves + ', an input in its project\'s brief.'));
-    if (n.row.escalates_to) detail.append(el('p', '', 'Escalates to ' + g.ladder(id).slice(1).map(label).join(' → ') + (n.row.escalates_default ? ' (the default)' : '') + '.'));
-    const sup = n.row.supervisor, kids = g.sups.filter((e) => e.from === id).map((e) => fname(g.nodes.get(e.to)));
-    if (sup) detail.append(el('p', '', 'Orders from ' + label(sup) + '.'));
-    if (kids.length) detail.append(el('p', '', 'Writes Orders for ' + kids.join(', ') + '.'));
-    [n.row.supervisor_issue, n.row.escalation_issue].filter(Boolean).forEach((i) => detail.append(el('p', 'warn', i[0].toUpperCase() + i.slice(1) + '.')));
-    const defs = defsRow(n.row); if (defs) detail.append(defs);
-    const open = el('div', 'fx-acts fx-defs'), b = el('button', 'fx-btn', 'Open details'); b.type = 'button';
-    b.onclick = (e) => { e.stopPropagation(); openSheet(n.row.loop, b); }; open.append(b); detail.append(open);
-  };
-  /* pointing only lights a chain; tapping also fills the card, so the page's height never moves under the pointer */
+  /* pointing lights a chain; tapping opens the node's drawer and keeps its chain lit */
   const lineOf = new Map(lines.flatMap((x) => x.es.map((e) => [e.i, x])));
   let own = [];
-  const trace = (id, tell) => {
+  const trace = (id) => {
     const c = id ? g.chain(id) : {on: new Set(), via: new Set(), esc: new Set(), into: []};
     const sup = new Set(id === YOU ? [] : g.sups.filter((e) => e.from === id || e.to === id).map((e) => { c.on.add(e.from); c.on.add(e.to); return e.i; }));
     /* an escalation into the node lights what its line starts from: the loop, or the project frame when the project shares one line */
@@ -1274,17 +1220,16 @@ dash.draw('factory', (box) => {
     chips.forEach((b, k) => { b.classList.toggle('on', c.on.has(k)); b.classList.toggle('sel', k === FX.fsel); b.setAttribute('aria-pressed', String(k === FX.fsel)); });
     frames.forEach((f, k) => f.firstChild.classList.toggle('on', shared.has(k)));
     paths.forEach((p) => p.classList.toggle('on', 's' in p.dataset ? sup.has(+p.dataset.s) : 'x' in p.dataset ? p.dataset.x.split(' ').every((i) => esc.has(+i)) : c.via.has(+p.dataset.e)));
-    if (tell) say(id);
   };
   chips.forEach((b, id) => {
     const r = g.nodes.get(id).row;
     b.onpointerenter = (e) => { if (e.pointerType === 'mouse') { trace(id); if (r) peek(b, r); } };
     b.onpointerleave = (e) => { if (e.pointerType === 'mouse') { trace(FX.fsel); peek(); } };
-    b.onclick = (e) => { e.stopPropagation(); peek(); FX.fsel = FX.fsel === id ? null : id; trace(FX.fsel, true); };
+    b.onclick = (e) => { e.stopPropagation(); peek(); FX.fsel = id; trace(id); openSheet(r ? {kind: 'loop', id} : {kind: 'node', id}, b); };
   });
-  box.onclick = () => { FX.fsel = null; trace(null, true); };
+  box.onclick = () => { FX.fsel = null; trace(null); };
   if (!g.nodes.has(FX.fsel)) FX.fsel = null;
-  trace(FX.fsel, true);
+  trace(FX.fsel);
 });
 
 /* the improver's history: every change, newest first, and its hit rate, the share of read changes that moved their metric */
@@ -1296,7 +1241,7 @@ dash.draw('improver-rate', (e) => {
 dash.draw('improver-list', (ul) => {
   /* a fleet with no improver, or none of its changes in the picked project, shows no card */
   const c = dash.data('changes'), rows = c.status === 'ok' ? scoped(c.data) : [];
-  ul.replaceChildren(); document.getElementById('improver').hidden = !rows.length;
+  ul.replaceChildren();
   capped(ul, rows, 12, 'improver', (x) => {
     const [tone, label] = OUTCOME(x), right = el('span', 'r');
     right.append(el('span', '', x.outcome === 'pending' && x.read_date ? 'read ' + rel(x.read_date) : label));
@@ -1332,78 +1277,131 @@ dash.draw('evals', (box) => {
   }
 });
 
-/* talk tab: who said what to whom, newest day first; the roster opens each loop's sheet */
-dash.draw('talk-count', (e) => { const t = dash.data('talk'); if (t.status !== 'ok') { e.textContent = '—'; return; }
-  const w = (t.meta || []).find((m) => m.label === 'Window');
-  e.textContent = scoped(t.data).filter((x) => x.at).length + ' in ' + (w ? w.value : 'the window'); });
-dash.draw('talk-who', (box) => {
+/* feeds: everything said in the window, newest first, under a small label per day. The same line from two sources (a
+   commit seen in two repos) shows once */
+const FEED_FIRST = 40;
+dash.draw('feed', (box) => {
   const t = dash.data('talk'); box.replaceChildren();
-  if (t.status !== 'ok') return failed(box, 'talk', t.status);
-  const seen = new Map();
-  scoped(t.data).filter((e) => e.at).forEach((e) => new Set([e.from, e.loop, ...names(e.to)]).forEach((n) => { if (n && rowOf(n)) seen.set(n, (seen.get(n) || 0) + 1); }));
-  if (!seen.size) { box.append(el('span', 'fx-muted', 'No loop has said anything in this window.')); return; }
-  [...seen].forEach(([n, c]) => { const b = el('button', 'fx-btn'); b.type = 'button'; b.title = n;
-    b.append(dot(TONE[rowOf(n).status], LABEL[rowOf(n).status]), nameOf(rowOf(n)), el('small', '', String(c)));
-    b.onclick = () => openSheet(n, b); box.append(b); });
-});
-dash.draw('talk-list', (box) => {
-  const t = dash.data('talk'); box.replaceChildren();
-  if (t.status !== 'ok') return failed(box, 'talk', t.status);
-  const days = new Map();
-  scoped(t.data).filter((e) => e.at).forEach((e) => { const d = e.at.slice(0, 10); days.set(d, [...(days.get(d) || []), e]); });
-  if (!days.size) { const d = el('div', 'fx-card fx-empty'); d.append(el('span', '', 'Nothing said in this window.')); box.append(d); return; }
-  [...days].forEach(([day, rows], i) => {
-    const card = el('section', 'fx-card fx-span'); card.dataset.sec = 'c3';
-    const head = el('h3', 'fx-group'); head.append(el('span', '', dayDiff(day) === 0 ? 'Today' : dayDiff(day) === -1 ? 'Yesterday' : dayMonth(day)), el('span', '', String(rows.length)));
-    const ul = el('ul', 'fx-list'); capped(ul, rows, i ? 6 : 12, 'talk:' + day, talkRow);
-    card.append(head, ul); box.append(card);
+  if (t.status !== 'ok') return failed(box, 'feed', t.status);
+  const seen = new Set(), rows = scoped(t.data).filter((e) => { const k = e.at && e.at.slice(0, 10) + '\n' + e.text + '\n' + e.link; return e.at && !seen.has(k) && seen.add(k); });
+  if (!rows.length) { box.append(el('div', 'fx-empty', 'Nothing said in this window.')); return; }
+  const ul = el('ul', 'fx-list'), all = FX.open.has('feed:all'); let day;
+  (all ? rows : rows.slice(0, FEED_FIRST)).forEach((e) => {
+    const d = e.at.slice(0, 10);
+    if (d !== day) { day = d; ul.append(el('li', 'fx-day', dayDiff(d) === 0 ? 'Today' : dayDiff(d) === -1 ? 'Yesterday' : dayMonth(d))); }
+    ul.append(feedRow(e));
   });
+  box.append(ul);
+  if (!all && rows.length > FEED_FIRST) { const b = el('button', 'fx-foot', 'Show ' + (rows.length - FEED_FIRST) + ' more'); b.type = 'button'; b.onclick = () => { FX.open.add('feed:all'); dash.draw('feed'); }; box.append(b); }
 });
-/* a loop's sheet: its status, what it was told and said, then the same panel as everywhere else */
-dash.draw('loop-sheet', (box) => {
-  const r = FX.sheet && rowOf(FX.sheet), fresh = !box.firstChild, held = box.contains(document.activeElement), top = box.querySelector('.fx-sheet')?.scrollTop;
+
+/* Needs you: what is failing or needs a look, then everything waiting on you by when it's due */
+const needsBody = (box) => {
+  const l = dash.data('loops'), w = dash.data('waiting');
+  if (l.status === 'ok') {
+    const urgent = scoped(l.data).filter((r) => (!NOT_LOOP.includes(r.project) && URGENT.includes(r.status)) || (r.project === 'Service' && r.status === 'failing'))
+      .sort((a, b) => URGENT.indexOf(a.status) - URGENT.indexOf(b.status));
+    const gaps = scoped(l.data).filter((r) => !NOT_LOOP.includes(r.project) && GAPS.includes(r.status));
+    box.append(el('h3', 'fx-sec', 'Needs a look'));
+    const ul = el('ul', 'fx-list fx-inset');
+    if (!urgent.length) { const li = el('li', 'fx-empty'); li.append(icon('check', 16), el('span', '', health() ? 'Nothing is failing or late.' : 'Nothing is failing, flaky or unregistered.')); ul.append(li); }
+    capped(ul, urgent, 20, 'attn', (r) => {
+      const li = el('li'), b = el('button', 'fx-row fx-lrow'); b.type = 'button'; b.dataset.tone = TONE[r.status]; b.dataset.loop = r.loop;
+      b.append(dot(TONE[r.status], LABEL[r.status]), titleCell(nameOf(r), [r.project, reason(r)].filter(Boolean).join(' · '), null, runtimeMark(r)), icon('right', 14, 'chev'));
+      b.onclick = () => openSheet({kind: 'loop', id: r.loop}, b);
+      li.append(b); return li;
+    });
+    box.append(ul);
+    if (gaps.length && !health()) {
+      const b = el('button', 'fx-link fx-more-link'); b.type = 'button';
+      b.append(document.createTextNode(gaps.length + (gaps.length === 1 ? ' loop runs' : ' loops run') + ' with no outcome check'), icon('right', 14));
+      b.onclick = () => { closeSheet(); go('factory'); setProblems(true); };
+      box.append(b);
+    }
+  }
+  if (w.status !== 'ok') return;
+  const mine = scoped(w.data);
+  if (!mine.length) return;
+  const groups = [['Due now', (d) => d <= 0], ['This week', (d) => d > 0 && d <= 7], ['Later', (d) => d > 7],
+    ['PRs to review', (d, r) => isNaN(d) && r.tag === 'PR review'], ['To do, no date', (d, r) => isNaN(d) && r.tag === 'To do'],
+    ['Open decisions, no date', (d, r) => isNaN(d) && r.tag === 'Decision'], ['Other, no date', (d, r) => isNaN(d) && !['PR review', 'To do', 'Decision'].includes(r.tag)]];
+  box.append(el('h3', 'fx-sec', mine.length + ' waiting on you'));
+  groups.forEach(([name, test]) => {
+    const rows = mine.filter((r) => test(dueIn(r), r));
+    if (!rows.length) return;
+    const ul = el('ul', 'fx-list fx-inset'); rows.forEach((r) => ul.append(waitRow(r, 'w:')));
+    box.append(el('p', 'fx-sub-h', name + ' · ' + rows.length), ul);
+  });
+};
+
+/* the drawer's pages: a loop, any other node in the graph, Needs you, and the loop form */
+const anyRow = (id) => { const l = dash.data('loops'); return l.status === 'ok' ? l.data.find((x) => x.loop === id) : null; };
+const SHEETS = {
+  loop: ({id}) => {
+    const r = anyRow(id); if (!r) return null;
+    return {title: nameOf(r), tone: TONE[r.status], sub: [LABEL[r.status], r.project || 'General', r.loop !== nameOf(r) && r.loop].filter(Boolean).join(' · '), fill: (box) => {
+      loopSummary(r, box);
+      if (registered(r)) { const path = nodeParas(factoryGraph(dash.data('loops').data, false, {project: ''}), r.loop); if (path.length) { const d = el('div', 'fx-path'); d.append(...path); box.append(d); } }
+      [loopChanges(r), defsRow(r), loopActs(r)].forEach((x) => x && box.append(x));
+      if (registered(r)) loopTalk(r, box);
+    }};
+  },
+  node: ({id}) => {
+    const l = dash.data('loops'); if (l.status !== 'ok') return null;
+    const g = factoryGraph(l.data, false, {project: ''}), n = g.nodes.get(id); if (!n) return null;
+    return {title: fname(n), sub: n.kind === 'you' ? 'Every path that can reach you' : n.kind === 'nobody' ? 'Loops nobody reads' : n.service ? 'Service' : 'Not in the registry', fill: (box) => box.append(...nodeParas(g, id))};
+  },
+  needs: () => ({title: 'Needs you', sub: [countOf('attention') && countOf('attention') + ' to look at', countOf('waiting') && countOf('waiting') + ' waiting'].filter(Boolean).join(' · ') || 'Nothing right now', fill: needsBody}),
+  form: () => FX.form && {title: FX.form.form === 'edit' ? 'Change ' + nameOf(FX.form.row) : 'New loop', fill: formBody},
+};
+dash.draw('sheet', (box) => {
+  const cur = FX.stack[FX.stack.length - 1], prev = box.querySelector('.fx-sheet');
+  if (prev && FX.drawn) FX.drawn.top = prev.scrollTop;
+  const fresh = !box.firstChild, held = box.contains(document.activeElement);
   box.replaceChildren();
-  /* modal: everything outside the sheet is inert while it's open, so Tab stays inside */
-  for (let n = box; n.parentElement; n = n.parentElement) for (const s of n.parentElement.children) if (s !== n) s.inert = !!r;
-  if (!r) return;
-  const bg = el('div', 'fx-sheet-bg'), sheet = el('div', 'fx-sheet'), head = el('header'), title = el('div'), h = el('h2', '', nameOf(r)), x = el('button', 'fx-link');
+  const page = cur && SHEETS[cur.kind](cur);
+  FX.drawn = page ? cur : null;
+  if (!page) return;
+  const bg = el('div', 'fx-sheet-bg'), sheet = el('div', 'fx-sheet'), head = el('header'), title = el('div'), h = el('h2', '', page.title), x = el('button', 'fx-icon fx-close');
   h.id = 'sheet-title'; sheet.setAttribute('role', 'dialog'); sheet.setAttribute('aria-modal', 'true'); sheet.setAttribute('aria-labelledby', 'sheet-title');
-  x.type = 'button'; x.setAttribute('aria-label', 'Close'); x.append(icon('x', 18)); x.onclick = closeSheet;
-  title.append(h, el('small', '', [LABEL[r.status], r.project || 'General', r.loop !== nameOf(r) && r.loop].filter(Boolean).join(' · ')));
-  head.append(dot(TONE[r.status], LABEL[r.status]), title, x);
-  const more = el('div', 'fx-more'); loopMore(r)(more);
+  x.type = 'button'; x.setAttribute('aria-label', 'Close'); x.append(icon('x', 16)); x.onclick = closeSheet;
+  if (FX.stack.length > 1) { const back = el('button', 'fx-icon fx-back'); back.type = 'button'; back.setAttribute('aria-label', 'Back'); back.append(icon('left', 16));
+    back.onclick = () => { FX.stack.pop(); dash.draw('sheet'); }; head.append(back); }
+  else head.append(page.tone ? dot(page.tone, LABEL[page.tone]) : el('span'));
+  title.append(h); if (page.sub) title.append(el('small', '', page.sub));
+  head.append(title, x);
+  const more = el('div', 'fx-more'); page.fill(more);
   sheet.append(head, more); bg.append(sheet); box.append(bg);
   bg.onclick = (e) => { if (e.target === bg) closeSheet(); };
   /* on claude.ai the page scrolls inside an element of the runtime's, not the document, and "fixed" doesn't hold there. So
      the backdrop is placed over that scroller's visible area (inside its scrollbar) and scrolling through it is stopped;
-     the sheet fills the backdrop's height and scrolls on its own. The container is never hidden: the runtime doesn't draw
-     under a hidden attribute. */
+     the drawer fills the backdrop's height and scrolls on its own. The container is never hidden: the runtime doesn't
+     draw under a hidden attribute. */
   let s = box.parentElement;
   while (s.parentElement && !(s.scrollHeight > s.clientHeight && /auto|scroll/.test(getComputedStyle(s).overflowY))) s = s.parentElement;
   const v = s.parentElement ? s.getBoundingClientRect() : {left: 0, top: 0}, b = box.getBoundingClientRect();
   Object.assign(bg.style, {left: v.left + s.clientLeft - b.left + 'px', top: v.top + s.clientTop - b.top + 'px', width: s.clientWidth + 'px', height: s.clientHeight + 'px'});
   for (const ev of ['wheel', 'touchmove']) bg.addEventListener(ev, (e) => { if (!sheet.contains(e.target)) e.preventDefault(); }, {passive: false});
-  sheet.scrollTop = top || 0;
+  sheet.scrollTop = cur.top || 0;
   if (fresh || held) x.focus({preventScroll: true});
 });
-
-/* waiting tab */
-dash.draw('wait-list', (box) => {
-  const w = dash.data('waiting');
-  box.replaceChildren();
-  if (w.status !== 'ok') return failed(box, 'waiting list', w.status);
-  const mine = scoped(w.data);
-  if (!mine.length) { const d = el('div', 'fx-card fx-empty'); d.append(icon('check', 16), el('span', '', 'Nothing waits on you.')); box.append(d); return; }
-  const groups = [['Due now', (d) => d <= 0, 'bad'], ['This week', (d) => d > 0 && d <= 7, 'warn'], ['Later', (d) => d > 7, 'c0'],
-    ['PRs to review', (d, r) => isNaN(d) && r.tag === 'PR review', 'c1'], ['To do, no date', (d, r) => isNaN(d) && r.tag === 'To do', 'c2'],
-    ['Open decisions, no date', (d, r) => isNaN(d) && r.tag === 'Decision', 'c4']];
-  groups.forEach(([name, test, sec]) => {
-    const rows = mine.filter((r) => test(dueIn(r), r));
-    if (!rows.length) return;
-    const card = el('section', 'fx-card' + (rows.length > 8 ? ' fx-span' : '')); card.dataset.sec = sec; const head = el('h3', 'fx-group');
-    head.append(el('span', '', name), el('span', '', String(rows.length)));
-    const ul = el('ul', 'fx-list' + (rows.length > 8 ? ' fx-two' : '')); rows.forEach((r) => ul.append(waitRow(r, 'w:')));
-    card.append(head, ul); box.append(card);
-  });
+/* what shows at all is decided here, before the drawings: an element a drawing hid would never be drawn again */
+dash.onData(() => {
+  const rows = (id) => { const d = dash.data(id); return d.status === 'ok' ? d.data : null; }, l = rows('loops'), w = rows('waiting'), c = rows('changes');
+  document.querySelectorAll('#scope').forEach((e) => { e.hidden = !!l && !!w && new Set([...l, ...w].map((r) => r.scope).filter(Boolean)).size < 2 && !dash.params().project; });
+  document.querySelectorAll('#improver').forEach((e) => { e.hidden = !c || !scoped(c).length; });
+  /* with no registry, health mode: no tabs, no graph */
+  const hide = {'title-fleet': health(), 'title-health': !health(), tabs: health(), 'factory-card': health(), 'loop-groups': !health(), 'health-sec': health(),
+    'foot-window': !ledger(), 'foot-registry': health()};
+  Object.entries(hide).forEach(([id, off]) => { document.getElementById(id).hidden = off; });
+  document.querySelectorAll('.fx-fbar, [data-draw="factory-count"]').forEach((e) => { e.hidden = health(); });
+  if (health()) go('factory');
+  /* the graph's own furniture: a big fleet on All projects asks for one, and the legend names only lines it can draw */
+  const real = (l || []).filter((r) => !NOT_LOOP.includes(r.project)), big = !dash.params().project && real.length > FACTORY_ALL, g = l && factoryGraph(l);
+  document.querySelectorAll('#factory-note').forEach((e) => { e.hidden = !big; });
+  document.querySelectorAll('.fx-flayers').forEach((e) => { e.hidden = big; });
+  document.querySelectorAll('[data-sups]').forEach((e) => { e.hidden = !g || !g.sups.length; });
+  document.querySelectorAll('#legend-glass').forEach((e) => { e.hidden = !g || !g.glass.length; });
+  peek();
 });
 </script>
