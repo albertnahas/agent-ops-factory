@@ -69,6 +69,19 @@ if (form.offered) {
   form.loop = await page.inputValue('#loop-form [data-q="loop"] .fx-input');
   form.editFields = await fields(); await fill(); form.edit = await built();
 }
+/* the Talk tab: who's talking, a card per day, and a loop's sheet with its Orders now and Latest, closed by Escape */
+await page.click('#tab-talk'); await frames();
+const talk = await page.evaluate(() => ({who: document.querySelectorAll('#talkers .fx-btn').length, rows: document.querySelectorAll('#talk .fx-talk').length,
+  unknown: [...document.querySelectorAll('#talk .fx-talk small')].some((s) => s.textContent.startsWith('unknown → '))}));
+if (talk.who) {
+  await page.click('#talkers .fx-btn'); await frames();
+  Object.assign(talk, await page.evaluate(() => ({sheet: document.querySelector('.fx-sheet h2')?.textContent ?? null,
+    sections: [...document.querySelectorAll('.fx-sheet .fx-said > b')].map((b) => b.textContent), focus: document.activeElement?.getAttribute('aria-label') ?? null,
+    overflow: Math.max(...[...document.querySelectorAll('.fx-sheet *')].map((e) => e.getBoundingClientRect().right)) - innerWidth})));
+  if (process.env.SHOTS) await page.screenshot({path: process.env.SHOTS + '/loop-sheet.png'});
+  await page.keyboard.press('Escape'); await frames();
+  talk.closed = await page.evaluate(() => !document.querySelector('.fx-sheet'));
+}
 await page.click('#tab-waiting'); await frames();
 const waiting = await page.evaluate(() => ({
   badge: +document.querySelector('[data-draw="badge-waiting"]').textContent || 0,
@@ -102,4 +115,4 @@ if (improver.rows) {
 }
 ms.overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
 await browser.close();
-console.log(JSON.stringify({ms, errors, attention, factory, loops, improver, form, evals, waiting: {...waiting, invalid: /Invalid Date|NaN/.test(waiting.text), text: undefined}}));
+console.log(JSON.stringify({ms, errors, attention, factory, loops, improver, form, talk, evals, waiting: {...waiting, invalid: /Invalid Date|NaN/.test(waiting.text), text: undefined}}));

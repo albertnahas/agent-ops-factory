@@ -280,17 +280,20 @@ mk mac; python3 - "$O/la" <<'P'
 import plistlib, sys
 for n, pl in {"str": {"Label": "com.t.str", "StartCalendarInterval": {"Hour": "9", "Minute": 0}}, "list": [1, 2],
               "fast": {"Label": 77, "ProgramArguments": ["/bin/echo", 5], "StartInterval": 30, "StandardOutPath": "/"},
-              "intv": {"Label": "com.t.intv", "StartInterval": 300}, "exit": {"Label": "com.t.exit", "StartCalendarInterval": {"Hour": 9}}}.items():
+              "intv": {"Label": "com.t.intv", "StartInterval": 300}, "exit": {"Label": "com.t.exit", "StartCalendarInterval": {"Hour": 9}},
+              "crash": {"Label": "com.t.crash", "KeepAlive": True}, "steady": {"Label": "com.t.steady", "KeepAlive": True},
+              "stopped": {"Label": "com.t.stopped", "KeepAlive": True}}.items():
     open(f"{sys.argv[1]}/{n}.plist", "wb").write(plistlib.dumps(pl))
 P
-printf 'PID\tStatus\tLabel\n-\t0\t77\n-\t0\tcom.t.intv\n-\t1\tcom.t.exit\n-\t0\tcom.t.str\n' > "$O/launchctl.txt"
+printf 'PID\tStatus\tLabel\n-\t0\t77\n-\t0\tcom.t.intv\n-\t1\tcom.t.exit\n-\t0\tcom.t.str\n9\t1\tcom.t.crash\n8\t0\tcom.t.steady\n7\t-15\tcom.t.stopped\n' > "$O/launchctl.txt"
 printf '*/0 * * * * /bin/x.sh\n0 25 * * * /bin/y.sh\n0 22-2 * * * /bin/z.sh\n5 L * * * /bin/w.sh\n0 6 * * * /bin/ok.sh\n0 6 * * * /bin/%s.sh >> /tmp/%s.log\n' "$(printf 'l%.0s' $(seq 300))" "$(printf 'l%.0s' $(seq 300))" > "$O/crontab.txt"
-{ reg; for j in fast:77 intv:com.t.intv exit:com.t.exit; do echo "| ${j%%:*} | P | mac | ${j#*:} | daily | | | you | |"; done; } > "$O/REGISTRY.md"
+{ reg; for j in fast:77 intv:com.t.intv exit:com.t.exit crash:com.t.crash steady:com.t.steady stopped:com.t.stopped; do echo "| ${j%%:*} | P | mac | ${j#*:} | daily | | | you | |"; done; } > "$O/REGISTRY.md"
 echo "{\"loop\":\"intv\",\"date\":\"$(day 5)\",\"check\":\"pass\"}" > "$O/runs.jsonl"
 expect "odd plists and crontab lines, a 300-character script name too, don't stop the build" "build && scalar && [ -z \"\$(get com.t.str .loop)\" ]"
 expect "a 5-minute job quiet for 5 days is silent" "[ \"\$(get intv .status)\" = silent ]"
 expect "a 30-second interval says so"          "[ \"\$(get fast .next_due)\" = 'every 30 s' ]"
 expect "a launchd exit is the exit code"       "get exit .detail | grep -q '^last run exited 1;'"
+expect "a kept-alive job running again after exiting 1 crashed, so it fails; one that never failed or was stopped doesn't" "[ \"\$(get crash .status)\" = failing ] && get crash .detail | grep -q 'restarted' && [ \"\$(get steady .result)\$(get stopped .result)\" = nullnull ]"
 expect "a crontab line cron would reject has no next run" "[ \"\$(get cron:x.sh .next_due)\$(get cron:y.sh .next_due)\$(get cron:z.sh .next_due)\$(get cron:w.sh .next_due)\" = nullnullnullnull ] && [ \"\$(get cron:ok.sh .next_due)\" != null ]"
 
 mk qdir; mkdir "$O/QUEUE.md"
@@ -390,8 +393,8 @@ expect "a memo in bets/ is read too" "python3 -c \"import sys; sys.path.insert(0
 mk sync; build; python3 - "$O/fleet" <<'P'
 import datetime as dt, hashlib, json, os, sys
 d = sys.argv[1]; t = int(dt.datetime.now().timestamp())
-for f in ("loops.json", "waiting.json", "changes.json", "questions.json"): os.utime(f"{d}/{f}", (t + .5, t + .5))
-json.dump({"at": dt.datetime.fromtimestamp(t).isoformat(), "blobs": {"loops": 1, "waiting": 1, "changes": 1, "questions": 1},
+for f in ("loops.json", "waiting.json", "changes.json", "questions.json", "talk.json"): os.utime(f"{d}/{f}", (t + .5, t + .5))
+json.dump({"at": dt.datetime.fromtimestamp(t).isoformat(), "blobs": {"loops": 1, "waiting": 1, "changes": 1, "questions": 1, "talk": 1},
            "page": hashlib.sha256(open("fleet/dashboard/index.html", "rb").read()).hexdigest()}, open(f"{d}/receipt.json", "w"))
 json.dump({"at": dt.datetime.fromtimestamp(t).astimezone().isoformat(), "routines": [], "tasks": []}, open(f"{d}/cloud.json", "w"))
 P
@@ -402,6 +405,26 @@ expect "a failed kit pull in the receipt fails the check" "! sync && grep -q \"k
 mv "$O/r0" "$O/fleet/receipt.json"
 jq -c '.rows = [{"loop": "a", "schedule": ["0 6 * * *"]}]' "$O/fleet/loops.json" > "$O/l" && mv "$O/l" "$O/fleet/loops.json" && touch -t "$(date -v-1M +%Y%m%d%H%M 2>/dev/null || date -d '1 minute ago' +%Y%m%d%H%M)" "$O/fleet/loops.json"
 expect "the sync check fails on a cell that isn't a scalar" "! sync && grep -q \"isn't a scalar\" $O/said"
+
+# Talk: what loops tell each other, read from their Orders, their latest report, message logs and a file's commits.
+mk talk; d1=$(day 1 | cut -c1-10)
+reg "| boss | P | cloud | routine:boss | daily | | | you | |" "| shop | P | cloud | routine:shop | daily | \`LOOP.md\` | | boss | boss |" \
+    "| shop2 | P | cloud | routine:shop2 | daily | \`LOOP.md\` | | boss | boss |" > "$O/REGISTRY.md"
+mkdir -p "$O/orders" "$O/reports" "$O/q"
+printf '# Shop\n\nOrders: `orders/shop.md`.\n\n## Report\n\n`reports/YYYY-MM-DD.md`\n' > "$O/LOOP.md"
+printf '| Order | Moves | Read date |\n|---|---|---|\n| **Raise the cap** to 5 ([CAP.md](CAP.md)) | sales | 2026-12-01 |\n\n## Changes\n\ndate | why | by\n%s | Cap raised after the read | strategy\n%s | Too old to show | strategy\n' "$d1" "$(day 30 | cut -c1-10)" > "$O/orders/shop.md"
+printf '## 1. TLDR\n- fine\n\n## 6. Escalations\n1. **Price** needs the founder\n\n## Orders requests\n- Raise the cap to 8\n' > "$O/reports/$d1.md"
+{ printf '{"date":"%s","subject":"Three things for you","loop":"shop"}\nnot json\n{"date":"%s","subject":"old"}\n{"date":"%s","subject":["x"]}\n{"date":"%s","subject":"Cap hit","from":"routine:shop2"}\n' "$(day 1)" "$(day 30)" "$(day 1)" "$(day 1)"; } > "$O/sent.jsonl"
+git -C "$O/q" init -q && echo line > "$O/q/QUEUE.md" && git -C "$O/q" add -A && git -C "$O/q" -c user.name=t -c user.email=t@t commit -qm "queue: price line"
+jq --arg s "$O/sent.jsonl" --arg q "$O/q/QUEUE.md" '.talk = {"logs": [{"path": $s, "to": "you"}], "history": [{"path": $q, "to": "queue", "kind": "queue"}]}' "$O/fleet.json" > "$O/f" && mv "$O/f" "$O/fleet.json"
+build; T=$O/fleet/talk.json; t() { jq -e "$1" "$T" >/dev/null; }
+expect "talk: a standing order, from the supervisor, once for the loops sharing it, with its read date" "t '[.rows[] | select(.kind == \"order\")] | length == 1 and .[0].from == \"boss\" and .[0].to == \"shop, shop2\" and .[0].read_date == \"2026-12-01\" and .[0].text == \"Raise the cap to 5 (CAP.md)\" and .[0].at == null'"
+expect "talk: an Orders change in the window, by its writer; an older one left out" "t '[.rows[] | select(.kind == \"change\")] | length == 1 and .[0].from == \"strategy\" and .[0].at == \"$d1\"'"
+expect "talk: the latest report's escalations go up, its Orders requests to the supervisor" "t '[.rows[] | select(.from == \"shop\")] | (map(select(.kind == \"escalation\" and .text == \"Price needs the founder\" and .to != null)) | length == 1) and (map(select(.kind == \"request\" and .to == \"boss\")) | length == 1) and (map(select(.kind == \"report\" and .to == \"boss\")) | length == 1)'"
+expect "talk: a logged message keeps its sender, a job label shown as its loop; junk, old and list subjects are left out" "t '[.rows[] | select(.kind == \"message\")] | length == 2 and any(.[]; .from == \"shop\" and .to == \"you\" and .loop == \"shop\") and any(.[]; .from == \"shop2\" and .text == \"Cap hit\")'"
+expect "talk: a file's commits are news, from no one it can name" "t '[.rows[] | select(.kind == \"queue\")] | length == 1 and .[0].text == \"queue: price line\" and .[0].from == null'"
+expect "talk: newest first, standing orders last, every cell a scalar; a loop's lines in its project, the rest General" "t '(.rows | map(.at // \"\") | . == (sort | reverse)) and .rows[-1].at == null and all(.rows[][]; type != \"array\" and type != \"object\") and all(.rows[]; .scope == (if .kind == \"queue\" then \"General\" else \"P\" end))' && t '.meta[] | select(.label == \"Window\") | .value == \"14 days\"'"
+expect "talk: the page carries it" "grep -q 'Raise the cap to 5' $O/fleet/dashboard.html"
 
 # Schedules: the next two fires after 10:00 on Sunday 22 Nov 2026 (or the day given), as crontab reads them.
 fires() { python3 -c "import sys, datetime as dt; sys.path.insert(0, 'fleet'); from fleet import cron_spec, fires, nth
