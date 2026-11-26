@@ -13,7 +13,8 @@
       --cds-font-size-caption:${look.sizes.caption}; --cds-font-size-body:${look.sizes.body}; --cds-font-size-heading:${look.sizes.heading};
       --cds-font-size-title:${look.sizes.title}; --font-anthropic-sans:${look.fonts.text}; --font-anthropic-serif:${look.fonts.display}; color-scheme: light dark; }
     @media (prefers-color-scheme: dark) { :root { ${tokens(look.dark)} } }
-    body { margin: 0; background: var(--fx-ground); }
+    /* as on claude.ai, the page scrolls inside an element, not the document */
+    html { height: 100%; overflow: hidden; } body { height: 100%; overflow-y: auto; margin: 0; background: var(--fx-ground); }
     #dash-root { max-width: 1200px; margin: 0 auto; padding: 24px 16px 48px; }
     .dash-select { font: inherit; font-size: var(--cds-font-size-caption); color: var(--color-fg); background: var(--color-bg);
       border: 1px solid var(--color-border-line); border-radius: 6px; padding: 5px 8px; }`;
@@ -22,7 +23,7 @@
   const datasets = {}, calcs = {}, draws = {}, widths = new WeakMap();
   /* as on claude.ai, a drawing runs again when its element's width changes, opening a hidden tab included */
   const resized = new ResizeObserver((entries) => requestAnimationFrame(() => entries.forEach(({target: e}) => {
-    if (widths.get(e) !== e.clientWidth) { widths.set(e, e.clientWidth); draws[e.dataset.draw](e); }
+    if (!e.closest('[hidden]') && widths.get(e) !== e.clientWidth) { widths.set(e, e.clientWidth); draws[e.dataset.draw](e); }
   })));
   for (const id of ['loops', 'waiting', 'changes', 'questions', 'talk']) {
     const d = window.FLEET[id];
@@ -44,9 +45,11 @@
     calc(id, spec) { calcs[id] = {...spec}; },
     draw(name, fn) {
       if (fn) draws[name] = fn;
+      /* as on claude.ai, an element under a hidden attribute (its own, or a hidden tab's) is drawn once that's lifted */
       document.querySelectorAll(`[data-draw="${name}"]`).forEach((e) => {
         if (!draws[name]) return;
-        draws[name](e); widths.set(e, e.clientWidth); resized.observe(e);
+        resized.observe(e); if (e.closest('[hidden]')) return;
+        draws[name](e); widths.set(e, e.clientWidth);
       });
     },
     params() { return {...params}; },

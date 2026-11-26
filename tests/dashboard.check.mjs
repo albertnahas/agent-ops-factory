@@ -63,7 +63,7 @@ const form = {offered: await page.locator('#loop-form .fx-btn', {hasText: 'New l
 if (form.offered) {
   await page.click('#loop-form .fx-btn'); await frames();
   form.fields = await fields(); form.empty = await built(); await fill(); form.new = await built();
-  form.overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+  form.overflow = await page.evaluate(() => document.body.scrollWidth - document.body.clientWidth);
   const row = page.locator('#loop-groups .fx-row').first(); await row.click(); await frames();
   await row.locator('xpath=..').locator('.fx-btn', {hasText: 'Change this loop'}).click(); await frames();
   form.loop = await page.inputValue('#loop-form [data-q="loop"] .fx-input');
@@ -78,6 +78,7 @@ if (talk.who) {  /* the odd fixture's expect needs who == 2, so this can't be sk
   Object.assign(talk, await page.evaluate(() => ({sheet: document.querySelector('.fx-sheet h2')?.textContent ?? null,
     sections: [...document.querySelectorAll('.fx-sheet .fx-said > b')].map((b) => b.textContent), focus: document.activeElement?.getAttribute('aria-label') ?? null,
     overflow: Math.max(...[...document.querySelectorAll('.fx-sheet *')].map((e) => e.getBoundingClientRect().right)) - innerWidth,
+    inView: ((b) => b.top >= 0 && b.top < innerHeight)(document.querySelector('.fx-sheet').getBoundingClientRect()),
     inert: [...document.body.children].filter((e) => !e.contains(document.querySelector('.fx-sheet'))).every((e) => e.inert)})));
   await page.keyboard.press('Tab'); await page.keyboard.press('Tab'); await page.keyboard.press('Tab');
   talk.trapped = await page.evaluate(() => !!document.activeElement?.closest('.fx-sheet'));
@@ -87,7 +88,12 @@ if (talk.who) {  /* the odd fixture's expect needs who == 2, so this can't be sk
   await page.setViewportSize(size); await frames();
   if (process.env.SHOTS) await page.screenshot({path: process.env.SHOTS + '/loop-sheet.png'});
   await page.keyboard.press('Escape'); await frames();
-  talk.closed = await page.evaluate(() => !document.querySelector('.fx-sheet') && ![...document.body.querySelectorAll('[inert]')].length);
+  talk.closed = await page.evaluate(() => !document.querySelector('.fx-sheet') && ![...document.body.querySelectorAll('[inert]')].length && !!document.activeElement?.closest('#talkers'));
+  /* opened from the feed's last name in a short window, the page scrolled: the whole sheet is in view, the page no wider */
+  await page.setViewportSize({...size, height: 300}); await page.locator('#talk .fx-name').last().click(); await frames();
+  talk.deep = await page.evaluate(() => ({scrolled: document.body.scrollTop > 0, page: document.body.scrollWidth - document.body.clientWidth,
+    fits: ((b) => b.top >= 0 && b.bottom <= innerHeight)(document.querySelector('.fx-sheet').getBoundingClientRect())}));
+  await page.keyboard.press('Escape'); await page.setViewportSize(size); await frames();
 }
 await page.click('#tab-waiting'); await frames();
 const waiting = await page.evaluate(() => ({
@@ -120,6 +126,6 @@ if (improver.rows) {
   improver.detail = await page.evaluate(() => /Why: .*Read on: /s.test(document.querySelector('#improver .fx-more:not([hidden])')?.textContent || ''));
   if (process.env.SHOTS) await page.locator('#improver').screenshot({path: process.env.SHOTS + '/improver.png'});
 }
-ms.overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+ms.overflow = await page.evaluate(() => document.body.scrollWidth - document.body.clientWidth);
 await browser.close();
 console.log(JSON.stringify({ms, errors, attention, factory, loops, improver, form, talk, evals, waiting: {...waiting, invalid: /Invalid Date|NaN/.test(waiting.text), text: undefined}}));
