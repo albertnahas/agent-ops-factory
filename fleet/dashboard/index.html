@@ -357,6 +357,7 @@ textarea.fx-input { resize: vertical; }
     <div class="fx-card fx-plain fx-feed" data-draw="feed" data-source="talk loops"></div>
   </section>
 
+  <div class="fx-tip" role="tooltip" hidden></div>
   <div data-draw="sheet" data-source="loops talk changes waiting questions"></div>
 </div>
 
@@ -1043,7 +1044,7 @@ const nodeParas = (g, id) => {
   return out;
 };
 /* a mouse resting on a loop card shows its numbers for a moment, without a click; touch opens the detail below instead */
-const tip = document.querySelector('.fx').appendChild(el('div', 'fx-tip')); tip.hidden = true; tip.setAttribute('role', 'tooltip');
+const tip = document.querySelector('.fx-tip');
 let tipWait;
 const peek = (chip, r) => {
   clearTimeout(tipWait); tip.hidden = true;
