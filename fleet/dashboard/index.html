@@ -5,7 +5,7 @@
 .fx { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--cds-gap-md); font-family: var(--font-anthropic-sans); color: var(--color-fg); font-size: var(--cds-font-size-body); }
 .fx-top { display: flex; align-items: center; justify-content: space-between; gap: var(--cds-gap-sm); }
 .fx-tools { display: flex; align-items: center; gap: 8px; min-width: 0; }
-.fx-tools .dash-select { min-width: 0; max-width: 46vw; border-radius: 8px; }
+.fx-tools .dash-select { width: auto; min-width: 0; max-width: 46vw; border-radius: 8px; }
 .fx-title { min-width: 0; }
 .fx-icon { all: unset; box-sizing: border-box; flex: none; width: 30px; height: 30px; border-radius: 50%; display: inline-grid; place-items: center; cursor: pointer;
   color: var(--color-fg-muted); background: color-mix(in srgb, var(--color-fg) 6%, transparent); font-size: 13px; font-weight: 700; font-style: italic; font-family: Georgia, serif; transition: opacity 120ms; }
@@ -332,7 +332,7 @@ textarea.fx-input { resize: vertical; }
       <button type="button" class="fx-ltog fx-solo" data-problems>Problems</button>
       <span data-draw="new-loop" data-source="questions"></span>
     </div>
-    <p class="fx-muted" id="factory-note" hidden></p>
+    <p class="fx-muted" id="factory-note" hidden><span data-draw="fleet-size" data-source="loops">—</span> loops are too many to draw at once. Pick a project:</p>
     <div class="fx-card fx-plain" id="factory-card">
       <div class="fx-flayers" aria-hidden="true"><span>Loops</span><span>Checked by</span><span>To you</span></div>
       <div class="fx-factory" id="factory-graph" data-draw="factory" data-source="loops"></div>
@@ -837,7 +837,7 @@ dash.draw('scope', (sel) => {
   const all = new Set([...l.data, ...w.data, {scope: project}].map((r) => r.scope).filter(Boolean)); /* a pick that left the data still shows */
   const projects = [...all].filter((p) => p !== 'General').sort((a, b) => a.localeCompare(b));
   sel.replaceChildren(new Option('All projects', ''), ...(all.has('General') ? [new Option('General')] : []), ...projects.map((p) => new Option(p)));
-  sel.value = project; sel.hidden = all.size < 2;
+  sel.value = project; sel.hidden = l.status === 'ok' && w.status === 'ok' && all.size < 2; /* hidden, it never draws again: so only once the data says so */
   sel.onchange = () => dash.setParams({project: sel.value});
 });
 /* the one status line: how the loops are, and what waits on you; both open Needs you */
@@ -998,6 +998,7 @@ const setProblems = (on) => {
 };
 document.querySelectorAll('.fx-ltog[data-problems]').forEach((b) => { b.setAttribute('aria-pressed', String(FX.problems)); b.onclick = () => setProblems(!FX.problems); });
 
+dash.draw('fleet-size', (e) => { const l = dash.data('loops'); e.textContent = l.status === 'ok' ? l.data.filter((r) => !NOT_LOOP.includes(r.project)).length : '—'; });
 dash.draw('factory-count', (e) => {
   const l = dash.data('loops'); if (l.status !== 'ok') { e.textContent = '—'; return; }
   const g = factoryGraph(l.data), n = g.loops.length, gaps = g.ins(NOBODY).length;
@@ -1102,7 +1103,7 @@ dash.draw('factory', (box) => {
   /* a big fleet on All projects is too many chips for one page: it offers its projects, the most problems first, and a
      picked project draws with every loop its chains reach */
   const real = l.data.filter((r) => !NOT_LOOP.includes(r.project)), big = !dash.params().project && real.length > FACTORY_ALL;
-  document.querySelectorAll('#factory-note').forEach((e) => { e.hidden = !big; e.textContent = real.length + ' loops are too many to draw at once. Pick a project:'; });
+  document.querySelectorAll('#factory-note').forEach((e) => { e.hidden = !big; });
   document.querySelectorAll('.fx-flayers').forEach((e) => { e.hidden = big; });
   if (big) {
     const picks = el('div', 'fx-acts'), bad = (rs) => rs.filter(problem).length;
