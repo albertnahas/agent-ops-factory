@@ -149,16 +149,20 @@ if (await page.locator('#factory-canvas.on').count()) {
   const dragged = await view();
   canvas.drag = !dragged.sheet && dragged.t !== before.t;
   await page.click('[data-cv="fit"]'); await frames();
-  canvas.fit = await page.evaluate(() => { const s = document.querySelector('.fx-stage').getBoundingClientRect(), c = document.querySelector('#factory-canvas').getBoundingClientRect();
+  const fits = () => page.evaluate(() => { const s = document.querySelector('.fx-stage').getBoundingClientRect(), c = document.querySelector('#factory-canvas').getBoundingClientRect();
     return s.left >= c.left - 1 && s.right <= c.right + 1 && s.top >= c.top - 1 && s.bottom <= c.bottom + 1; });
-  await page.click('[data-cv="big"]'); await frames();
+  canvas.fit = await fits();
+  await page.mouse.move(cv.x + cv.width / 2, cv.y + cv.height / 2); await page.mouse.wheel(0, 120); await frames();
+  const was = (await view()).t;
+  await page.click('[data-cv="big"]'); await frames(); await frames();
+  canvas.bigFits = await fits();
   const big = await page.locator('#factory-canvas').boundingBox(), size = page.viewportSize();
   canvas.big = big.width >= size.width - 60 && big.height >= size.height - 60;
   await page.locator('#factory-graph .fx-fnode[data-tone]').first().click(); await frames();
   canvas.drawerOver = await page.evaluate(() => { const r = document.querySelector('.fx-sheet')?.getBoundingClientRect();
     return !!r && !!document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2)?.closest('.fx-sheet'); });
   await close(); await close();
-  canvas.back = (await page.locator('#factory-canvas').boundingBox()).width < size.width - 60;
+  canvas.back = (await page.locator('#factory-canvas').boundingBox()).width < size.width - 60 && (await view()).t === was;
 }
 
 /* the same Factory on a phone: a list by route, each loop once, under who reads it */
