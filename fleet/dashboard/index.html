@@ -12,7 +12,7 @@
 .fx-tab { flex: 1; font: inherit; font-size: var(--cds-font-size-caption); font-weight: var(--cds-font-weight-medium); color: var(--color-fg-muted); background: none; border: 0; border-radius: 7px; padding: 7px 8px; cursor: pointer; display: inline-flex; justify-content: center; align-items: center; gap: 6px; transition: opacity 120ms; }
 .fx-tab[aria-selected="true"] { background: var(--color-bg); color: var(--color-fg); font-weight: 600; box-shadow: 0 1px 3px rgb(0 0 0 / .12), 0 0 0 1px var(--color-border-line); }
 .fx-tab:focus-visible { outline: 2px solid var(--color-fg); outline-offset: 1px; }
-@media (max-width: 359px) { .fx-tab { padding: 7px 3px; gap: 4px; } }
+@media (max-width: 399px) { .fx-tab { padding: 7px 3px; gap: 4px; } }
 .fx-badge { min-width: 18px; padding: 0 6px; border-radius: 999px; font-size: 11px; font-weight: 600; line-height: 18px; text-align: center; background: var(--color-fg); color: var(--color-bg); font-variant-numeric: tabular-nums; }
 .fx-badge:empty { display: none; }
 .fx-pane { display: grid; gap: var(--cds-gap-md); min-width: 0; }
@@ -131,9 +131,9 @@ button.fx-kpi:focus-visible { outline: 2px solid var(--color-fg); outline-offset
 .fx-said { display: grid; gap: 6px; }
 .fx-said > .fx-list { border: 1px solid var(--color-border-line); border-radius: 8px; }
 .fx-said .fx-talk { padding: 7px 10px; }
-.fx-sheet-bg { position: fixed; inset: 0; z-index: 20; display: flex; justify-content: flex-end; background: rgb(0 0 0 / .35);
-  padding: env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px) env(safe-area-inset-bottom, 0px) 0; }
-.fx-sheet { width: min(560px, 100%); height: 100%; overflow-y: auto; overscroll-behavior: contain; background: var(--color-bg); border-left: 1px solid var(--color-border-line);
+[data-draw="loop-sheet"] { position: relative; }
+.fx-sheet-bg { position: absolute; z-index: 20; background: rgb(0 0 0 / .35); }
+.fx-sheet { position: absolute; top: 0; right: 0; bottom: 0; width: min(560px, 100%); overflow-y: auto; padding-bottom: env(safe-area-inset-bottom, 0px); overscroll-behavior: contain; background: var(--color-bg); border-left: 1px solid var(--color-border-line);
   box-shadow: -8px 0 32px rgb(0 0 0 / .18); display: grid; align-content: start; }
 .fx-sheet > header { position: sticky; top: 0; z-index: 1; display: grid; grid-template-columns: 9px minmax(0, 1fr) auto; align-items: center; column-gap: 10px;
   padding: 14px 16px; background: var(--color-bg); border-bottom: 1px solid var(--color-border-line); }
@@ -364,7 +364,7 @@ textarea.fx-input { resize: vertical; }
       <header><h2>Evaluations</h2></header>
       <div data-draw="evals" data-source="loops changes talk"></div>
     </section>
-    <section class="fx-card" id="improver" data-sec="c1" hidden>
+    <section class="fx-card" id="improver" data-sec="c1">
       <header><h2>Improver</h2><span class="fx-muted" data-draw="improver-rate" data-source="changes">—</span></header>
       <ul class="fx-list" data-draw="improver-list" data-source="changes"></ul>
     </section>
@@ -382,7 +382,7 @@ textarea.fx-input { resize: vertical; }
     <div class="fx-grid" data-draw="wait-list" data-source="waiting"></div>
   </section>
 
-  <div data-draw="loop-sheet" data-source="loops talk changes" hidden></div>
+  <div data-draw="loop-sheet" data-source="loops talk changes"></div>
   <p class="fx-muted" id="foot"><span data-draw="refresh">—</span>.<span id="foot-window"> Pass rate and cost cover <span data-draw="window">—</span>.</span><span id="foot-registry"> Registry: <code data-draw="registry">—</code>.</span></p>
 </div>
 
@@ -724,7 +724,7 @@ const who = (n) => {
   const r = n && rowOf(n);
   if (!r) return el('span', '', n === 'you' ? 'you' : n || 'unknown');
   const b = el('button', 'fx-name', nameOf(r)); b.type = 'button'; b.title = r.loop;
-  b.onclick = (e) => { e.stopPropagation(); openSheet(r.loop); };
+  b.onclick = (e) => { e.stopPropagation(); openSheet(r.loop, b); };
   return b;
 };
 /* when something was said: "3h ago" today, else its day, with its time when the source keeps one */
@@ -754,9 +754,14 @@ const loopTalk = (r) => {
   });
   return box;
 };
-const openSheet = (loop) => { if (!FX.sheet) FX.back = document.activeElement; FX.sheet = loop; dash.draw('loop-sheet'); };
-const closeSheet = () => { FX.sheet = null; dash.draw('loop-sheet'); if (FX.back && FX.back.isConnected) FX.back.focus(); FX.back = null; };
+/* from: the button that opened it (Safari doesn't focus a clicked button), so closing goes back to it */
+const openSheet = (loop, from) => { if (!FX.sheet) FX.back = from; FX.sheet = loop; dash.draw('loop-sheet'); };
+const closeSheet = () => {
+  const back = FX.back; FX.sheet = FX.back = null; dash.draw('loop-sheet');
+  if (back && back.isConnected) back.focus({preventScroll: true});
+};
 addEventListener('keydown', (e) => { if (e.key === 'Escape' && FX.sheet) closeSheet(); });
+addEventListener('resize', () => { if (FX.sheet) dash.draw('loop-sheet'); });
 const loopChanges = (r) => {
   const rows = changesOf(r.loop);
   if (!rows || !rows.length) return null;
@@ -1248,7 +1253,7 @@ dash.draw('factory', (box) => {
     [n.row.supervisor_issue, n.row.escalation_issue].filter(Boolean).forEach((i) => detail.append(el('p', 'warn', i[0].toUpperCase() + i.slice(1) + '.')));
     const defs = defsRow(n.row); if (defs) detail.append(defs);
     const open = el('div', 'fx-acts fx-defs'), b = el('button', 'fx-btn', 'Open details'); b.type = 'button';
-    b.onclick = (e) => { e.stopPropagation(); openSheet(n.row.loop); }; open.append(b); detail.append(open);
+    b.onclick = (e) => { e.stopPropagation(); openSheet(n.row.loop, b); }; open.append(b); detail.append(open);
   };
   /* pointing only lights a chain; tapping also fills the card, so the page's height never moves under the pointer */
   const lineOf = new Map(lines.flatMap((x) => x.es.map((e) => [e.i, x])));
@@ -1339,7 +1344,7 @@ dash.draw('talk-who', (box) => {
   if (!seen.size) { box.append(el('span', 'fx-muted', 'No loop has said anything in this window.')); return; }
   [...seen].forEach(([n, c]) => { const b = el('button', 'fx-btn'); b.type = 'button'; b.title = n;
     b.append(dot(TONE[rowOf(n).status], LABEL[rowOf(n).status]), nameOf(rowOf(n)), el('small', '', String(c)));
-    b.onclick = () => openSheet(n); box.append(b); });
+    b.onclick = () => openSheet(n, b); box.append(b); });
 });
 dash.draw('talk-list', (box) => {
   const t = dash.data('talk'); box.replaceChildren();
@@ -1357,7 +1362,7 @@ dash.draw('talk-list', (box) => {
 /* a loop's sheet: its status, what it was told and said, then the same panel as everywhere else */
 dash.draw('loop-sheet', (box) => {
   const r = FX.sheet && rowOf(FX.sheet), fresh = !box.firstChild, held = box.contains(document.activeElement), top = box.querySelector('.fx-sheet')?.scrollTop;
-  box.replaceChildren(); box.hidden = !r; document.documentElement.style.overflow = r ? 'hidden' : '';
+  box.replaceChildren();
   /* modal: everything outside the sheet is inert while it's open, so Tab stays inside */
   for (let n = box; n.parentElement; n = n.parentElement) for (const s of n.parentElement.children) if (s !== n) s.inert = !!r;
   if (!r) return;
@@ -1369,8 +1374,17 @@ dash.draw('loop-sheet', (box) => {
   const more = el('div', 'fx-more'); loopMore(r)(more);
   sheet.append(head, more); bg.append(sheet); box.append(bg);
   bg.onclick = (e) => { if (e.target === bg) closeSheet(); };
+  /* on claude.ai the page scrolls inside an element of the runtime's, not the document, and "fixed" doesn't hold there. So
+     the backdrop is placed over that scroller's visible area (inside its scrollbar) and scrolling through it is stopped;
+     the sheet fills the backdrop's height and scrolls on its own. The container is never hidden: the runtime doesn't draw
+     under a hidden attribute. */
+  let s = box.parentElement;
+  while (s.parentElement && !(s.scrollHeight > s.clientHeight && /auto|scroll/.test(getComputedStyle(s).overflowY))) s = s.parentElement;
+  const v = s.parentElement ? s.getBoundingClientRect() : {left: 0, top: 0}, b = box.getBoundingClientRect();
+  Object.assign(bg.style, {left: v.left + s.clientLeft - b.left + 'px', top: v.top + s.clientTop - b.top + 'px', width: s.clientWidth + 'px', height: s.clientHeight + 'px'});
+  for (const ev of ['wheel', 'touchmove']) bg.addEventListener(ev, (e) => { if (!sheet.contains(e.target)) e.preventDefault(); }, {passive: false});
   sheet.scrollTop = top || 0;
-  if (fresh || held) x.focus({preventScroll: true});  /* a redraw keeps focus in the sheet and where it was scrolled */
+  if (fresh || held) x.focus({preventScroll: true});
 });
 
 /* waiting tab */
