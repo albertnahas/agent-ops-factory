@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Fleet builder, no model. Reads $AGENT_OPS_DIR/fleet.json and writes <out>/loops.json (every scheduled loop, service and
-one-off job with its health), <out>/waiting.json (everything waiting on you) and <out>/dashboard.html (both, drawn).
+one-off job with its health), <out>/waiting.json (everything waiting on you), <out>/talk.json (what loops tell each
+other and you) and <out>/dashboard.html (all three, drawn).
 Sources: the registry file, launchd plists, your crontab, the run ledger, <out>/cloud.json (Claude routines and
 desktop tasks, written by the claude.ai sync in fleet/SYNC.md), and optionally a queue file, GitHub PRs and decision memos.
 fleet/README.md says how each status is decided."""
@@ -25,7 +26,7 @@ def load_config():
             "kit": Path(cfg.get("kit", os.environ.get("AGENT_OPS_KIT", Path.home() / ".agent-ops/kit"))).expanduser(),
             "improvements": path("improvements", "improvements.jsonl"), "kpi": path("kpi", "kpi.jsonl"),
             "eval": path("eval", "eval/result.json"),
-            "refresh": cfg.get("refresh", "Rebuilt by fleet.py"), "waiting": cfg.get("waiting", {})}
+            "refresh": cfg.get("refresh", "Rebuilt by fleet.py"), "waiting": cfg.get("waiting", {}), "talk": cfg.get("talk", {})}
 
 C = load_config()
 GH = shutil.which("gh") or next((p for p in ("/opt/homebrew/bin/gh", "/usr/local/bin/gh") if Path(p).exists()), None)
@@ -184,10 +185,14 @@ def launchd_jobs():
     """Each plist's job; a plist launchd wouldn't run (unreadable, wrong types, a time out of range) is left out."""
     jobs = {}
     if not shutil.which("launchctl") or not C["launch_agents"].is_dir(): return jobs
-    listed = {}  # label -> (running, last exit), from one `launchctl list`: PID, Status, Label columns
+    listed = {}  # label -> (pid or None, last exit), from one `launchctl list`: PID, Status, Label columns
     for l in subprocess.run(["launchctl", "list"], capture_output=True, text=True, errors="replace").stdout.split("\n"):
         m = re.match(r"(\S+)\t(-?\d+|-)\t(.+)$", l)
-        if m: listed[m.group(3)] = (m.group(1) != "-", None if m.group(2) == "-" else int(m.group(2)))
+        if m: listed[m.group(3)] = (None if m.group(1) == "-" else m.group(1), None if m.group(2) == "-" else int(m.group(2)))
+    up = {}  # pid -> seconds it has run, from `ps` etime ([[dd-]hh:]mm:ss)
+    for l in subprocess.run(["ps", "-A", "-o", "pid=,etime="], capture_output=True, text=True, errors="replace").stdout.split("\n"):
+        m = re.match(r"\s*(\d+)\s+(?:(\d+)-)?(?:(\d+):)?(\d+):(\d+)\s*$", l)
+        if m: up[m.group(1)] = sum(int(v or 0) * k for v, k in zip(m.groups()[1:], (86400, 3600, 60, 1)))
     for p in sorted(C["launch_agents"].glob("*.plist")):
         try:
             pl = plistlib.loads(p.read_bytes())
@@ -196,7 +201,8 @@ def launchd_jobs():
             spec = plist_spec(cals)
         except Exception: continue
         label = name(pl.get("Label")) or p.stem
-        running, code = listed.get(label, (False, None))
+        pid, code = listed.get(label, (None, None))
+        running = pid is not None
         interval = pl.get("StartInterval") if type(pl.get("StartInterval")) is int and pl["StartInterval"] > 0 else None
         args = [str(a) for a in pl.get("ProgramArguments") or [pl.get("Program", "")]] if isinstance(pl.get("ProgramArguments") or [], list) else []
         logs = [Path(pl[k]).expanduser() for k in ("StandardOutPath", "StandardErrorPath") if isinstance(pl.get(k), str)]
@@ -205,7 +211,10 @@ def launchd_jobs():
             "schedule": every(interval) if interval else ", ".join(" ".join(str(c.get(k, "*")) for k in RANGES) for c in cals),
             "vendor": ".app/Contents/" in str(args),
             "loaded": label in listed,
-            "exit": None if running else code,  # a running job's last exit is history
+            # a running job's last exit is history, unless launchd keeps it alive, it didn't end on a stop (SIGTERM, -15) and
+            # it was restarted within the hour: then it is crashing now
+            "exit": code if not running or (pl.get("KeepAlive") and code not in (None, 0, -15) and up.get(pid, 3600) < 3600) else None,
+            "running": running,
             "spec": spec or None,
             "interval": interval,
             "oneoff": bool(cals) and all("Month" in c and "Day" in c for c in cals),
@@ -321,12 +330,21 @@ def origin(top):
     m = re.search(r"github\.com[:/]([^/]+/[^/]+?)(?:\.git)?$", git(top, "remote", "get-url", "origin"))
     return (m.group(1), git(top, "symbolic-ref", "--short", "refs/remotes/origin/HEAD") or "origin/main") if m else None
 
-def on_github(path):
+@functools.cache
+def fetched(top):
+    """Fetch a checkout once a build, so a clone nobody pulls still reads today's default branch. It leaves FETCH_HEAD
+    alone: the checkout's own loop may be pulling at the same moment, and two fetches writing it break that pull."""
+    try: subprocess.run(["git", "-C", top, "fetch", "-q", "--no-write-fetch-head", "origin"], capture_output=True, timeout=60, env={**os.environ, "GIT_TERMINAL_PROMPT": "0"})
+    except subprocess.TimeoutExpired: pass
+
+def on_github(path, fresh=False):
     """(owner/name, ref, path in the repo) when path is on its GitHub checkout's default branch, else None. The default
-    branch decides, not this checkout's files, so a stale or partial clone gives the same answer."""
+    branch decides, not this checkout's files, so a stale or partial clone gives the same answer; `fresh` fetches it
+    first, for a file whose contents are read."""
     top = git(next(a for a in (path, *path.parents) if a.is_dir()), "rev-parse", "--show-toplevel")
     o = top and origin(top)
     if not o: return None
+    if fresh: fetched(top)
     rel = path.resolve().relative_to(Path(top).resolve()).as_posix()
     return (*o, rel) if subprocess.run(["git", "-C", top, "cat-file", "-e", f"{o[1]}:{rel}"], capture_output=True).returncode == 0 else None
 
@@ -334,7 +352,7 @@ def exists(path):
     return path.exists() or bool(on_github(path))
 
 def read(path):
-    g = on_github(path)
+    g = on_github(path, fresh=True)
     return git(path.parent, "show", f"{g[1]}:{g[2]}") if g else path.read_text(errors="ignore")
 
 def tilde(path):
@@ -371,10 +389,10 @@ def newest_report(charter, text):
         if not m: continue
         folder = next((a / m.group(1) for a in charter.parents if exists(a / m.group(1))), None)
         if not folder: return None
-        g, dated = on_github(folder), re.compile(r"\d{4}-\d{2}-\d{2}\.md$")
+        g, dated = on_github(folder, fresh=True), re.compile(r"\d{4}-\d{2}-\d{2}\.md$")
         names = git(charter.parent, "ls-tree", "--full-tree", "--name-only", f"{g[1]}:{g[2]}").splitlines() if g else [f.name for f in folder.iterdir()]
         latest = max((n for n in names if dated.match(n)), default=None)
-        return latest and where(folder / latest)
+        return latest and folder / latest
     return None
 
 def job_links(j):
@@ -397,7 +415,8 @@ def definitions(reg, kind, ref, item, roots):
             "floor": floor.group(1) if floor else None, "target": target.group(1) if target else None,
             "prompt": f"https://claude.ai/code/routines/{item['id']}" if kind == "routine" and (item or {}).get("id")
                       else where(task) if kind == "task" and task.is_file() else None,
-            "report": newest_report(charter, text) if charter else None,
+            "report": where(report := newest_report(charter, text) if charter else None),
+            "charter_file": charter, "orders_file": orders, "report_file": report,
             "charter_paused": bool(re.search(r"^status:[ \t]*paused\b", text, re.M))}
 
 # --- the ledger claude-run and ops-check append to
@@ -735,7 +754,8 @@ def build():
             row["detail"] = " ".join((c.stdout or c.stderr).split())[:200]
         elif j and j.get("exit") is not None:  # nothing logged: launchd's last exit and its log file's time
             row.update(result="pass" if j["exit"] == 0 else "fail", last_run=iso(j["log_at"]),
-                       detail=f"last run exited {j['exit']}" + ("" if j["log_at"] else "; it has no log file, so when it last ran is unknown"))
+                       detail=f"last run exited {j['exit']}" + ("; launchd restarted it" if j["running"] else "" if j["log_at"]
+                                                       else "; it has no log file, so when it last ran is unknown"))
         elif j and j.get("log_at"):  # cron, or a launchd job running now: no exit code, only the time its output file last changed
             row.update(last_run=iso(j["log_at"]), detail="cron keeps no exit codes; last run is when its output file last changed"
                        if job.startswith("cron:") else "running now; its log last changed at the time shown")
@@ -801,6 +821,7 @@ def build():
                          "last_run": l["last"][:16], "schedule": "logs to the ledger with no registry row"})
     of, kpi = scoping(registry), kpis()
     for r in rows: r.update(scope=of(r["project"])[1], **kpi.get(r["loop"], {}))
+    said = talk(rows, now)
     keys = ["loop", "project", "scope", "runtime", "job", "schedule", "cadence", "status", "last_run", "result", "detail",
             "next_due", "pass_rate", "checks", "cost", "history", "checked_by", "supervisor", "supervisor_issue",
             "role", "escalates_to", "escalates_default", "break_glass", "escalation_issue", "improver", "moves",
@@ -824,8 +845,113 @@ def build():
     asked, prompts, why = questions()
     if why: print(f"questions: {why}", file=sys.stderr)
     write("questions", asked, meta[:1] + prompts)
-    html(rows, items, meta, "Loop health" if health else "Loop fleet", changes, (asked, meta[:1] + prompts))
+    heard = (said, meta[:1] + [{"label": "Window", "value": f"{C['talk'].get('days', 14)} days"}])
+    write("talk", *heard)
+    html(rows, items, meta, "Loop health" if health else "Loop fleet", changes, (asked, meta[:1] + prompts), heard)
     return rows
+
+# --- what loops say to each other
+
+TALK = ("at", "kind", "from", "to", "loop", "text", "read_date", "link", "scope")
+DAY = re.compile(r"\d{4}-\d\d-\d\d")
+
+def plain(text, cap=200):
+    """One line of markdown as text: links to their words, no emphasis or code marks, cut at a word."""
+    t = re.sub(r"\[([^\]]*)\]\([^)]*\)", r"\1", text)
+    t = " ".join(re.sub(r"\*\*|__|`", "", t).split())
+    return t if len(t) <= cap else t[:cap].rsplit(" ", 1)[0] + "…"
+
+def tables_in(md):
+    """Every table in a file, as (headers in lower case, rows of cells), with or without the pipes at either end."""
+    out, cur = [], []
+    for l in md.split("\n") + [""]:
+        if "|" in l and l.strip(): cur.append(cells(l, outer=l.lstrip().startswith("|"))); continue
+        if len(cur) > 2 and set(cur[1]) <= {c for c in cur[1] if re.fullmatch(r":?-+:?", c)}: out.append(([h.lower() for h in cur[0]], cur[2:]))
+        elif len(cur) > 1 and [h.lower() for h in cur[0]][:3] == ["date", "why", "by"]: out.append((["date", "why", "by"], cur[1:]))
+        cur = []
+    return out
+
+def items_under(md, heading):
+    """The bullets and numbered items under every heading that matches, numbering before the heading's words allowed."""
+    found = []
+    for sec in re.split(r"^(?=#{1,4} )", md, flags=re.M):
+        if re.match(rf"#{{1,4}} [\d. ]*(?:{heading})", sec, re.I):
+            found += [plain(m.group(1)) for m in re.finditer(r"^\s*(?:[-*]|\d+[.)])\s+(\S.*)$", sec.split("\n", 1)[-1], re.M)]
+    return found
+
+def commits(path, since):
+    """(time, subject, link) of each commit to a file on its repo's default branch since a date."""
+    g = on_github(path, fresh=True)
+    if not g: return []
+    out = []
+    for l in git(path.parent, "log", g[1], f"--since={since}", "--format=%H%x09%cI%x09%s", "--", f":(top){g[2]}").splitlines():
+        sha, t, subject = l.split("\t", 2)
+        out.append((when(t).isoformat(timespec="minutes"), subject, f"https://github.com/{g[0]}/commit/{sha}"))
+    return out
+
+names = lambda cell: [n for n in (cell or "").split(", ") if n]
+
+def talk(rows, now):
+    """What loops tell each other, read where they already write it: each loop's Orders (its standing orders, and the
+    Changes lines its supervisor adds), commits to its charter on its default branch (its rules changing), the Escalations and Orders requests of its latest report, and the logs and files
+    `talk` in fleet.json names: JSON-lines logs of sent messages ({date, subject, and from or loop, to}) and files whose
+    commits are the news (a queue). A sender named by its job label is shown as its loop; one nothing names stays unknown. One line each, never a body, newest first,
+    within `talk.days` (14); standing orders carry no date and come last. Loops that share a charter or Orders file
+    share its lines: one row, sent to all of them."""
+    cfg = C["talk"]
+    since = (now - dt.timedelta(days=cfg.get("days", 14))).date().isoformat()
+    loops = {r["loop"]: r for r in rows if r.get("orders_file") or r.get("report_file") or r.get("charter")}
+    alias = {r["job"]: r["loop"] for r in rows if r.get("job")}
+    scope = lambda *names: next((loops[n]["scope"] for n in names if n in loops), "General")
+    said = []
+    add = lambda **e: said.append({k: e.get(k) for k in TALK} | {"scope": scope(e.get("loop"), e.get("from"), e.get("to"))})
+    for loop, r in loops.items():
+        if r.get("orders_file"):
+            md = read(r["orders_file"])
+            for head, body in tables_in(md):
+                if head[0] == "order":
+                    due = next((i for i, h in enumerate(head) if "read" in h), None)
+                    for c in body:
+                        d = due is not None and due < len(c) and DAY.search(c[due])
+                        add(kind="order", to=loop, loop=loop, **{"from": r.get("supervisor") or "you"}, text=plain(c[0], 140),
+                            read_date=d and d.group(0), link=r["orders"])
+                elif head[:3] == ["date", "why", "by"]:
+                    for c in body:
+                        if DAY.fullmatch(c[0]) and c[0] >= since and len(c) > 2:
+                            add(kind="change", at=c[0], to=loop, loop=loop, **{"from": c[2] or None}, text=plain(c[1]), link=r["orders"])
+        if r.get("charter_file"):
+            for t, subject, url in commits(r["charter_file"], since):
+                add(kind="rule", at=t, to=loop, loop=loop, text=plain(subject), link=url)
+        f = r.get("report_file")
+        if f and DAY.search(f.name) and DAY.search(f.name).group(0) >= since:
+            day, md = DAY.search(f.name).group(0), read(f)
+            add(kind="report", at=day, loop=loop, to=r.get("checked_by"), text=f"{day} report", link=r["report"], **{"from": loop})
+            for t in items_under(md, "escalat"):
+                add(kind="escalation", at=day, loop=loop, to=r.get("escalates_to") or "you", text=t, link=r["report"], **{"from": loop})
+            for t in items_under(md, "orders? requests?"):
+                add(kind="request", at=day, loop=loop, to=r.get("supervisor"), text=t, link=r["report"], **{"from": loop})
+    for log in cfg.get("logs", []):
+        for l in lines(Path(log["path"]).expanduser()):
+            try: m = json.loads(l)
+            except (ValueError, RecursionError): continue
+            t = isinstance(m, dict) and when(m.get("date"))
+            if t and t.date().isoformat() >= since and name(m.get("subject")):
+                sender = name(m.get("from")) or name(m.get("loop"))
+                sender = alias.get(sender, sender)
+                add(kind=log.get("kind", "message"), at=t.isoformat(timespec="minutes"), to=name(m.get("to")) or log.get("to"),
+                    loop=sender if sender in loops else None, text=plain(str(m["subject"])), link=log.get("link"), **{"from": sender})
+    for h in cfg.get("history", []):
+        f = Path(h["path"]).expanduser()
+        if not f.is_file(): continue
+        for l in git(f.parent, "log", f"--since={since}", "--format=%cI%x09%s", "--", f.name).splitlines():
+            t, _, subject = l.partition("\t")
+            add(kind=h.get("kind", "update"), at=when(t).isoformat(timespec="minutes"), to=h.get("to"), text=plain(subject), link=h.get("link"))
+    one = {}
+    for e in said:
+        k = (e["kind"], e["at"], e["from"], e["text"], e["link"])
+        if k in one and e["to"]: one[k]["to"] = ", ".join(dict.fromkeys(names(one[k]["to"]) + names(e["to"])))
+        else: one.setdefault(k, e)
+    return sorted(one.values(), key=lambda e: (e["at"] is not None, e["at"] or ""), reverse=True)
 
 # --- what waits on you
 
@@ -923,11 +1049,12 @@ def write(name, rows, meta):
     C["out"].mkdir(parents=True, exist_ok=True)
     (C["out"] / f"{name}.json").write_text(json.dumps({"rows": rows, "meta": meta}, indent=1, ensure_ascii=False) + "\n")
 
-def html(rows, items, meta, title, changes=(), questions=((), ())):
+def html(rows, items, meta, title, changes=(), questions=((), ()), heard=((), ())):
     """The same page the claude.ai dashboard runs, with a local stand-in for its runtime and the data inlined."""
     data = json.dumps({"loops": {"rows": rows, "meta": meta}, "waiting": {"rows": items, "meta": meta[:1]},
                        "changes": {"rows": list(changes), "meta": meta[:1]},
                        "questions": {"rows": list(questions[0]), "meta": list(questions[1])},
+                       "talk": {"rows": list(heard[0]), "meta": list(heard[1])},
                        "look": json.loads((ROOT / "dashboard/look.json").read_text()),
                        "params": json.loads((ROOT / "dashboard/params.json").read_text())}, ensure_ascii=False).replace("<", "\\u003c")  # no </script> or <!-- can end the script
     page = (ROOT / "dashboard/index.html").read_text()

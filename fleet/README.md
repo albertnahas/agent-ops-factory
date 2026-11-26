@@ -20,8 +20,9 @@ It works with nothing set up. With no registry it lists every job it finds with 
 | `improvements.jsonl` | the improver's history: each change it made to a loop, what it read, the metric it should move and whether it did | once an improver runs |
 | GitHub, a queue file, decision memos | what waits on you: PRs with your label, owner-you queue lines, open decisions in your repos' `docs/` and `bets/` | optional, `waiting` in `fleet.json` |
 | `kpi.jsonl` | each loop's KPI, read weekly by the improver: its Good against the Floor in its charter | once an improver runs |
+| Orders, charters, reports, message logs | what loops tell each other, on the Talk tab and in each loop's panel | Orders and reports once loops have them; logs and history files with `talk` in `fleet.json` |
 
-Without a ledger, a launchd loop's last exit and the time its log file last changed stand in for its last run, so a fleet you haven't instrumented still shows what failed.
+Without a ledger, a launchd loop's last exit and the time its log file last changed stand in for its last run, so a fleet you haven't instrumented still shows what failed. A kept-alive service that launchd restarted within the hour after a failed exit is crashing, so it shows as failing. One that was stopped (SIGTERM), or has run for over an hour since, doesn't.
 
 ## Statuses
 
@@ -54,6 +55,20 @@ Open a loop, in the lists or by tapping it on the Factory tab, and the buttons u
 - A registered loop whose charter isn't found says **Charter: none**, so the gap shows. Write `none` in the Charter cell when there is none.
 - Above the buttons, the panel says who reads the loop, who supervises it, where it escalates, its role and any break-glass reason, then **Good**: the `**Floor:**` line the charter keeps in its Mission, read only inside `mission` markers, and any `Target:` line of its Orders. With no Floor it says Good: not set. A loop that is Unchecked says what that costs: nothing writes a pass or fail line for it.
 - A service whose job nothing on this machine runs, or a routine or task the claude.ai snapshot doesn't list, is Missing, not Paused.
+
+## Talk
+
+The Talk tab shows what loops tell each other, read where they already write it, so nothing new has to talk. `fleet.py` writes it as a fifth dataset, `talk`, one row per line said, newest first, from the last `talk.days` days (14 unless set):
+
+- **Orders.** Each standing order in a loop's Orders file (the first column of its `Order` table, with its read date) comes from its supervisor, or from you when it has none. Each line under `Changes` (`date | why | by`) is an Orders change from whoever its `by` cell names.
+- **Charter changes.** Each commit to a loop's charter on its repo's default branch. A commit doesn't say who asked for it, so the sender is unknown.
+- **Its latest report.** The report itself goes to whoever checks the loop. The items under an `Escalations` heading go where it escalates. The items under `Orders requests` go to its supervisor.
+- **Message logs** (`talk.logs`). JSON lines with `date`, `subject` and the sender as `from` or `loop`, and optionally `to`, which otherwise comes from the log's `to`. Log only the subject, never the body.
+- **History files** (`talk.history`). Each commit to a file, like a queue, by its subject.
+
+A sender nothing records shows as unknown. It's never guessed. Loops that share a charter or Orders file get one row, sent to all of them. Each row is one line and a link, never a body, so reports that quote strangers stay where they are. Every checkout whose files are read is fetched first, once a build, so a clone nobody pulls still shows today's default branch.
+
+Who's talking, at the top, lists each loop that said or heard something in the window. Tap any loop name, there or in a line, and its sheet opens beside the page: its status, **Orders now**, its **Latest** eight lines, then the same panel the Loops tab opens. The Factory tab's loop card has an Open details button for the same sheet. Escape, the close button or a tap outside closes it.
 
 ## Start or change a loop
 

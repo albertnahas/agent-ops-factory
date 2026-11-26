@@ -46,7 +46,13 @@ changes = [change(6, "shop1", outcome="closed"), change(5, "shop1", outcome="clo
 kpi = {"shop1": {"improver": True, "floor": "at least 62%", "kpi": "below", "kpi_value": 50, "kpi_of": 2, "kpi_attempts": 1, "kpi_since": "2026-11-15", "kpi_escalated": False, "kpi_as_of": "2026-11-21"},
        "ops-a": {"floor": "at most 3", "kpi": "met", "kpi_value": 2}, "lonely": {"kpi": "measured", "kpi_value": 5, "kpi_better": "higher", "kpi_as_of": "2026-11-22", "kpi_since": 7}}
 for r in loops["rows"]: r.update(kpi.get(r["loop"], {}))
-html(loops["rows"], waiting["rows"], loops["meta"], "Loop fleet", changes)
+said = lambda **k: {"at": None, "kind": "order", "from": None, "to": None, "loop": None, "text": "Hold the price", "read_date": None,
+                    "link": "https://github.com/o/r/blob/main/orders.md", "scope": "Shop", **k}
+talk = [said(at="2026-11-25T08:11", kind="message", to="you", text="Three things for you today", scope="General"),
+        said(at="2026-11-25", kind="escalation", **{"from": "shop1"}, to="ops-a", loop="shop1", text="Price needs the founder " * 12),
+        said(at="2026-11-24", kind="change", **{"from": "strategy"}, to="shop1", loop="shop1", text="Price held after the read"),
+        said(kind="order", **{"from": "you"}, to="shop1", loop="shop1", read_date="2026-12-01")]
+html(loops["rows"], waiting["rows"], loops["meta"], "Loop fleet", changes, heard=(talk, loops["meta"][:1]))
 EOF
 cp "$AGENT_OPS_DIR/fleet/dashboard.html" "$AGENT_OPS_DIR/odd.html"
 # a fleet of 70: Shop has 30 loops, 22 of them failing, and Blog 40 healthy ones
@@ -110,6 +116,11 @@ expect "a loop's panel shows its Good against its Floor and its attempts" "q odd
 expect "Evaluations, in the picked project, shows the fleet KPIs and lists the loops below the bar" "q odd '.evals.rows[\"Loops at or above their Floor\"] == \"0% of measured (0 of 1)\" and .evals.rows[\"Loops whose Good is measured\"] == \"33% (2 of 6)\" and .evals.rows[\"Improver hit rate\"] == \"1 of 2 read changes moved their Good\" and .evals.below == 1'"
 expect "with no data, every evaluation says not measured, none hidden" "q clique '.evals.rows[\"Loops at or above their Floor\"] == \"not measured\" and .evals.rows[\"Replay\"] == \"not measured\" and (.evals.rows[\"Improver hit rate\"] | startswith(\"not measured\")) and .evals.below == 0'"
 expect "nothing is wider than the phone"             "q odd '.ms.overflow == 0'"
+expect "Talk: who's talking, then each dated line, an unknown sender named so" "q odd '.talk.who == 2 and .talk.rows == 3 and .talk.unknown'"
+expect "Talk: a name opens the loop's sheet, its Orders now then Latest, focus on Close, as wide as the phone" "q odd '.talk.sheet == \"shop1\" and .talk.sections == [\"Orders now\", \"Latest\"] and .talk.focus == \"Close\" and .talk.overflow <= 0'"
+expect "Talk: the sheet is modal: the page behind it is inert, Tab stays inside, a redraw keeps focus and scroll" "q odd '.talk.inert and .talk.trapped and .talk.redraw.focus and .talk.redraw.top > 0'"
+expect "Talk: Escape closes the sheet and frees the page" "q odd '.talk.closed'"
+expect "Talk: a fleet that said nothing says so" "q clique '.talk.who == 0 and .talk.rows == 0'"
 expect "a long project name keeps its loop count in view" "q odd '.loops.countsVisible'"
 expect "a project card shows 25 loops, then See all opens the rest in place" "q big '.loops.firstCard == 25 and .loops.firstCardAll == 30'"
 expect "Needs a look shows 20, then See all"         "q big '.attention == 20'"

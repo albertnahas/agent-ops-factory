@@ -8,6 +8,11 @@
   "out": "~/.agent-ops/fleet",
   "refresh": "Rebuilt every 30 minutes by fleet.py",
   "general": ["Ops", "Personal"],
+  "talk": {
+    "days": 14,
+    "logs": [{"path": "~/.agent-ops/logs/sent.jsonl", "to": "you", "link": null}],
+    "history": [{"path": "~/.agent-ops/QUEUE.md", "to": "queue", "kind": "queue", "link": null}]
+  },
   "waiting": {
     "github": {
       "owner": "your-github-login",
