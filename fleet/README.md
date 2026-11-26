@@ -22,7 +22,7 @@ It works with nothing set up. With no registry it lists every job it finds with 
 | `kpi.jsonl` | each loop's KPI, read weekly by the improver: its Good against the Floor in its charter | once an improver runs |
 | Orders, charters, reports, message logs | what loops tell each other, on the Talk tab and in each loop's panel | Orders and reports once loops have them; logs and history files with `talk` in `fleet.json` |
 
-Without a ledger, a launchd loop's last exit and the time its log file last changed stand in for its last run, so a fleet you haven't instrumented still shows what failed. A kept-alive service that is running again after a failed exit crashed and was restarted, so it shows as failing; one that was stopped (SIGTERM) doesn't.
+Without a ledger, a launchd loop's last exit and the time its log file last changed stand in for its last run, so a fleet you haven't instrumented still shows what failed. A kept-alive service that launchd restarted within the hour after a failed exit is crashing, so it shows as failing. One that was stopped (SIGTERM), or has run for over an hour since, doesn't.
 
 ## Statuses
 

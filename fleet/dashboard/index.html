@@ -1356,8 +1356,10 @@ dash.draw('talk-list', (box) => {
 });
 /* a loop's sheet: its status, what it was told and said, then the same panel as everywhere else */
 dash.draw('loop-sheet', (box) => {
-  const r = FX.sheet && rowOf(FX.sheet), fresh = !box.firstChild;
+  const r = FX.sheet && rowOf(FX.sheet), fresh = !box.firstChild, held = box.contains(document.activeElement), top = box.querySelector('.fx-sheet')?.scrollTop;
   box.replaceChildren(); box.hidden = !r; document.documentElement.style.overflow = r ? 'hidden' : '';
+  /* modal: everything outside the sheet is inert while it's open, so Tab stays inside */
+  for (let n = box; n.parentElement; n = n.parentElement) for (const s of n.parentElement.children) if (s !== n) s.inert = !!r;
   if (!r) return;
   const bg = el('div', 'fx-sheet-bg'), sheet = el('div', 'fx-sheet'), head = el('header'), title = el('div'), h = el('h2', '', nameOf(r)), x = el('button', 'fx-link');
   h.id = 'sheet-title'; sheet.setAttribute('role', 'dialog'); sheet.setAttribute('aria-modal', 'true'); sheet.setAttribute('aria-labelledby', 'sheet-title');
@@ -1367,7 +1369,8 @@ dash.draw('loop-sheet', (box) => {
   const more = el('div', 'fx-more'); loopMore(r)(more);
   sheet.append(head, more); bg.append(sheet); box.append(bg);
   bg.onclick = (e) => { if (e.target === bg) closeSheet(); };
-  if (fresh) x.focus();
+  sheet.scrollTop = top || 0;
+  if (fresh || held) x.focus({preventScroll: true});  /* a redraw keeps focus in the sheet and where it was scrolled */
 });
 
 /* waiting tab */

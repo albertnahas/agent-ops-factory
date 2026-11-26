@@ -12,6 +12,7 @@ trap 'rm -rf "$AGENT_OPS_DIR" "$H" "$H.reg"' EXIT
 mkdir "$AGENT_OPS_DIR/bin" && export PATH="$AGENT_OPS_DIR/bin:$PATH"
 printf '#!/bin/sh\n[ "$1" = list ] && cat "$AGENT_OPS_DIR/launchctl.txt" 2>/dev/null; exit 0\n' > "$AGENT_OPS_DIR/bin/launchctl"
 printf '#!/bin/sh\ncat "$AGENT_OPS_DIR/crontab.txt" 2>/dev/null; exit 0\n' > "$AGENT_OPS_DIR/bin/crontab"
+printf '#!/bin/sh\ncat "$AGENT_OPS_DIR/ps.txt" 2>/dev/null; exit 0\n' > "$AGENT_OPS_DIR/bin/ps"  # and ps: pid, how long it has run
 chmod +x "$AGENT_OPS_DIR/bin/"*
 fail=0
 expect() { if eval "$2"; then echo "ok    $1"; else echo "FAIL  $1"; fail=1; fi; }
@@ -282,18 +283,18 @@ for n, pl in {"str": {"Label": "com.t.str", "StartCalendarInterval": {"Hour": "9
               "fast": {"Label": 77, "ProgramArguments": ["/bin/echo", 5], "StartInterval": 30, "StandardOutPath": "/"},
               "intv": {"Label": "com.t.intv", "StartInterval": 300}, "exit": {"Label": "com.t.exit", "StartCalendarInterval": {"Hour": 9}},
               "crash": {"Label": "com.t.crash", "KeepAlive": True}, "steady": {"Label": "com.t.steady", "KeepAlive": True},
-              "stopped": {"Label": "com.t.stopped", "KeepAlive": True}}.items():
+              "stopped": {"Label": "com.t.stopped", "KeepAlive": True}, "once": {"Label": "com.t.once", "KeepAlive": True}}.items():
     open(f"{sys.argv[1]}/{n}.plist", "wb").write(plistlib.dumps(pl))
 P
-printf 'PID\tStatus\tLabel\n-\t0\t77\n-\t0\tcom.t.intv\n-\t1\tcom.t.exit\n-\t0\tcom.t.str\n9\t1\tcom.t.crash\n8\t0\tcom.t.steady\n7\t-15\tcom.t.stopped\n' > "$O/launchctl.txt"
+printf 'PID\tStatus\tLabel\n-\t0\t77\n-\t0\tcom.t.intv\n-\t1\tcom.t.exit\n-\t0\tcom.t.str\n9\t1\tcom.t.crash\n8\t0\tcom.t.steady\n7\t-15\tcom.t.stopped\n6\t1\tcom.t.once\n' > "$O/launchctl.txt"; printf '    9    00:12\n    6 3-02:00:00\n' > "$O/ps.txt"
 printf '*/0 * * * * /bin/x.sh\n0 25 * * * /bin/y.sh\n0 22-2 * * * /bin/z.sh\n5 L * * * /bin/w.sh\n0 6 * * * /bin/ok.sh\n0 6 * * * /bin/%s.sh >> /tmp/%s.log\n' "$(printf 'l%.0s' $(seq 300))" "$(printf 'l%.0s' $(seq 300))" > "$O/crontab.txt"
-{ reg; for j in fast:77 intv:com.t.intv exit:com.t.exit crash:com.t.crash steady:com.t.steady stopped:com.t.stopped; do echo "| ${j%%:*} | P | mac | ${j#*:} | daily | | | you | |"; done; } > "$O/REGISTRY.md"
+{ reg; for j in fast:77 intv:com.t.intv exit:com.t.exit crash:com.t.crash steady:com.t.steady stopped:com.t.stopped once:com.t.once; do echo "| ${j%%:*} | P | mac | ${j#*:} | daily | | | you | |"; done; } > "$O/REGISTRY.md"
 echo "{\"loop\":\"intv\",\"date\":\"$(day 5)\",\"check\":\"pass\"}" > "$O/runs.jsonl"
 expect "odd plists and crontab lines, a 300-character script name too, don't stop the build" "build && scalar && [ -z \"\$(get com.t.str .loop)\" ]"
 expect "a 5-minute job quiet for 5 days is silent" "[ \"\$(get intv .status)\" = silent ]"
 expect "a 30-second interval says so"          "[ \"\$(get fast .next_due)\" = 'every 30 s' ]"
 expect "a launchd exit is the exit code"       "get exit .detail | grep -q '^last run exited 1;'"
-expect "a kept-alive job running again after exiting 1 crashed, so it fails; one that never failed or was stopped doesn't" "[ \"\$(get crash .status)\" = failing ] && get crash .detail | grep -q 'restarted' && [ \"\$(get steady .result)\$(get stopped .result)\" = nullnull ]"
+expect "a kept-alive job running again after exiting 1 crashed, so it fails; one that never failed, was stopped, or has run 3 days since doesn't" "[ \"\$(get crash .status)\" = failing ] && get crash .detail | grep -q 'restarted' && [ \"\$(get steady .result)\$(get stopped .result)\$(get once .result)\" = nullnullnull ]"
 expect "a crontab line cron would reject has no next run" "[ \"\$(get cron:x.sh .next_due)\$(get cron:y.sh .next_due)\$(get cron:z.sh .next_due)\$(get cron:w.sh .next_due)\" = nullnullnullnull ] && [ \"\$(get cron:ok.sh .next_due)\" != null ]"
 
 mk qdir; mkdir "$O/QUEUE.md"

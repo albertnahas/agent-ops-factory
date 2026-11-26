@@ -185,10 +185,14 @@ def launchd_jobs():
     """Each plist's job; a plist launchd wouldn't run (unreadable, wrong types, a time out of range) is left out."""
     jobs = {}
     if not shutil.which("launchctl") or not C["launch_agents"].is_dir(): return jobs
-    listed = {}  # label -> (running, last exit), from one `launchctl list`: PID, Status, Label columns
+    listed = {}  # label -> (pid or None, last exit), from one `launchctl list`: PID, Status, Label columns
     for l in subprocess.run(["launchctl", "list"], capture_output=True, text=True, errors="replace").stdout.split("\n"):
         m = re.match(r"(\S+)\t(-?\d+|-)\t(.+)$", l)
-        if m: listed[m.group(3)] = (m.group(1) != "-", None if m.group(2) == "-" else int(m.group(2)))
+        if m: listed[m.group(3)] = (None if m.group(1) == "-" else m.group(1), None if m.group(2) == "-" else int(m.group(2)))
+    up = {}  # pid -> seconds it has run, from `ps` etime ([[dd-]hh:]mm:ss)
+    for l in subprocess.run(["ps", "-A", "-o", "pid=,etime="], capture_output=True, text=True, errors="replace").stdout.split("\n"):
+        m = re.match(r"\s*(\d+)\s+(?:(\d+)-)?(?:(\d+):)?(\d+):(\d+)\s*$", l)
+        if m: up[m.group(1)] = sum(int(v or 0) * k for v, k in zip(m.groups()[1:], (86400, 3600, 60, 1)))
     for p in sorted(C["launch_agents"].glob("*.plist")):
         try:
             pl = plistlib.loads(p.read_bytes())
@@ -197,7 +201,8 @@ def launchd_jobs():
             spec = plist_spec(cals)
         except Exception: continue
         label = name(pl.get("Label")) or p.stem
-        running, code = listed.get(label, (False, None))
+        pid, code = listed.get(label, (None, None))
+        running = pid is not None
         interval = pl.get("StartInterval") if type(pl.get("StartInterval")) is int and pl["StartInterval"] > 0 else None
         args = [str(a) for a in pl.get("ProgramArguments") or [pl.get("Program", "")]] if isinstance(pl.get("ProgramArguments") or [], list) else []
         logs = [Path(pl[k]).expanduser() for k in ("StandardOutPath", "StandardErrorPath") if isinstance(pl.get(k), str)]
@@ -206,9 +211,10 @@ def launchd_jobs():
             "schedule": every(interval) if interval else ", ".join(" ".join(str(c.get(k, "*")) for k in RANGES) for c in cals),
             "vendor": ".app/Contents/" in str(args),
             "loaded": label in listed,
-            # a running job's last exit is history, unless launchd keeps it alive and it didn't end on a stop (SIGTERM, -15):
-            # then it crashed and was restarted
-            "exit": code if not running or (pl.get("KeepAlive") and code not in (None, 0, -15)) else None, "running": running,
+            # a running job's last exit is history, unless launchd keeps it alive, it didn't end on a stop (SIGTERM, -15) and
+            # it was restarted within the hour: then it is crashing now
+            "exit": code if not running or (pl.get("KeepAlive") and code not in (None, 0, -15) and up.get(pid, 3600) < 3600) else None,
+            "running": running,
             "spec": spec or None,
             "interval": interval,
             "oneoff": bool(cals) and all("Month" in c and "Day" in c for c in cals),
