@@ -148,7 +148,14 @@ if (await page.locator('#factory-canvas.on').count()) {
   await page.mouse.move(chip.x + 70, chip.y + 60, {steps: 5}); await page.mouse.up(); await frames();
   const dragged = await view();
   canvas.drag = !dragged.sheet && dragged.t !== before.t;
+  /* another tab and back keeps the view; a double click on a loop opens its drawer once */
+  const kept = (await view()).t;
+  await page.click('#tab-feeds'); await frames(); await page.click('#tab-factory'); await frames();
+  canvas.tabKeeps = (await view()).t === kept;
   await page.click('[data-cv="fit"]'); await frames();
+  await page.locator('#factory-graph .fx-fnode[data-tone]').first().dblclick(); await frames();
+  canvas.once = await page.evaluate(() => !!document.querySelector('.fx-sheet') && !document.querySelector('.fx-sheet .fx-back'));
+  await close();
   const fits = () => page.evaluate(() => { const s = document.querySelector('.fx-stage').getBoundingClientRect(), c = document.querySelector('#factory-canvas').getBoundingClientRect();
     return s.left >= c.left - 1 && s.right <= c.right + 1 && s.top >= c.top - 1 && s.bottom <= c.bottom + 1; });
   canvas.fit = await fits();
@@ -158,6 +165,8 @@ if (await page.locator('#factory-canvas.on').count()) {
   canvas.bigFits = await fits();
   const big = await page.locator('#factory-canvas').boundingBox(), size = page.viewportSize();
   canvas.big = big.width >= size.width - 60 && big.height >= size.height - 60;
+  /* expanded is modal: what's behind it is inert */
+  canvas.bigModal = await page.evaluate(() => document.querySelector('#tabs').closest('[inert]') !== null && !document.querySelector('#factory-canvas').closest('[inert]'));
   await page.locator('#factory-graph .fx-fnode[data-tone]').first().click(); await frames();
   canvas.drawerOver = await page.evaluate(() => { const r = document.querySelector('.fx-sheet')?.getBoundingClientRect();
     return !!r && !!document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2)?.closest('.fx-sheet'); });

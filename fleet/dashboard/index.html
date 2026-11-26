@@ -770,12 +770,19 @@ const loopTalk = (r, box) => {
 };
 /* the drawer: a stack, so a loop opened from Needs you goes back to it. from: the button that opened it (Safari doesn't
    focus a clicked button), so closing goes back to it */
-/* modal: everything outside the drawer is inert while it's open, so Tab stays inside. Set here, not in the drawing, which
-   writes only inside itself */
-const modal = (on) => { for (let n = document.querySelector('[data-draw="sheet"]'); n && n !== document.body; n = n.parentElement) for (const s of n.parentElement.children) if (s !== n) s.inert = on; };
-const openSheet = (s, from) => { if (!FX.stack.length) FX.back = from; FX.stack.push(s); modal(true); dash.draw('sheet'); };
+/* modal: while the drawer, or else the expanded canvas, is open, everything outside it is inert, so Tab stays inside. Set
+   here, not in a drawing, which writes only inside itself */
+const modal = () => {
+  document.querySelectorAll('[inert]').forEach((e) => { e.inert = false; });
+  const top = FX.stack.length ? document.querySelector('[data-draw="sheet"]') : CV.big && canvas;
+  for (let n = top; n && n !== document.body; n = n.parentElement) for (const s of n.parentElement.children) if (s !== n) s.inert = true;
+};
+const openSheet = (s, from) => {
+  const cur = FX.stack[FX.stack.length - 1]; if (cur && cur.kind === s.kind && cur.id === s.id) return; /* a double tap opens it once */
+  if (!FX.stack.length) FX.back = from; FX.stack.push(s); modal(); dash.draw('sheet');
+};
 const closeSheet = () => {
-  const back = FX.back; FX.stack = []; FX.back = null; modal(false); dash.draw('sheet');
+  const back = FX.back; FX.stack = []; FX.back = null; modal(); dash.draw('sheet');
   if (back && back.isConnected) back.focus({preventScroll: true});
 };
 addEventListener('keydown', (e) => { if (e.key === 'Escape' && FX.stack.length) closeSheet(); else if (e.key === 'Escape' && CV.big) expand(false); });
@@ -1300,6 +1307,7 @@ const expand = (on) => {
   if (on) CV.before = {s: CV.s, x: CV.x, y: CV.y};
   CV.big = on; card.style.height = on ? card.offsetHeight + 'px' : ''; card.classList.toggle('cv-big', on); canvas.classList.toggle('big', on);
   if (on) place(); else ['left', 'top', 'width', 'height'].forEach((k) => { canvas.style[k] = ''; });
+  modal();
   canvas.querySelector('[data-cv="big"]').setAttribute('aria-pressed', String(on));
   canvas.querySelector('[data-cv="big"]').setAttribute('aria-label', on ? 'Leave expanded view' : 'Expand');
   if (on) fit(); else { Object.assign(CV, CV.before, {auto: false}); view(); }
@@ -1310,6 +1318,7 @@ addEventListener('scroll', () => { if (CV.big) place(); }, {capture: true, passi
 /* the graph's size changes when it's drawn: the canvas turns on for a graph (not on a phone, a project list or an empty
    fleet) and keeps the view; the first graph starts at full size, top left */
 new ResizeObserver(() => {
+  if (!canvas.clientWidth) return; /* its tab is hidden: the view waits as it was */
   const on = !PHONE.matches && !!graph.querySelector('.fx-fcols');
   if (on !== cvOn()) { canvas.classList.toggle('on', on); Object.assign(CV, {s: 1, x: 0, y: 0, auto: false}); if (!on && CV.big) expand(false); }
   if (CV.auto) fit(); else view();
@@ -1502,7 +1511,7 @@ dash.draw('sheet', (box) => {
   head.append(title, x);
   const more = el('div', 'fx-more'); page.fill(more);
   sheet.append(head, more); bg.append(sheet); box.append(bg);
-  bg.onclick = (e) => { if (e.target === bg) closeSheet(); };
+  bg.onclick = (e) => { if (e.target === bg && e.detail < 2) closeSheet(); }; /* a double tap's second half lands here: it isn't a close */
   /* the backdrop covers the visible area (see seen) and scrolling through it is stopped; the drawer fills the backdrop's
      height and scrolls on its own. The container is never hidden: the runtime doesn't
      draw under a hidden attribute. */

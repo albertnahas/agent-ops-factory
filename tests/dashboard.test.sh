@@ -86,7 +86,8 @@ for f in clique odd; do
   expect "$f: scrolling over the graph moves it, not the page; Ctrl-scroll zooms" "q $f '.canvas.wheel and .canvas.zoom != \"100%\"'"
   expect "$f: zoomed and redrawn, every line starts on its chip" "q $f '.canvas.onChips'"
   expect "$f: a drag moves the graph and opens nothing; Fit shows all of it" "q $f '.canvas.drag and .canvas.fit'"
-  expect "$f: Expand fills the view with the whole graph, a drawer opens over it, Escape twice comes back to the view before" "q $f '.canvas.big and .canvas.bigFits and .canvas.drawerOver and .canvas.back'"
+  expect "$f: another tab and back keeps the view; a double click opens one drawer" "q $f '.canvas.tabKeeps and .canvas.once'"
+  expect "$f: Expand fills the view with the whole graph, modal, a drawer opens over it, Escape twice comes back to the view before" "q $f '.canvas.big and .canvas.bigFits and .canvas.bigModal and .canvas.drawerOver and .canvas.back'"
 done
 expect "a loop named you or nobody leaves one You and one Nobody" "q odd '.factory.you == 1 and .factory.nobody == 1'"
 expect "the scoped count counts the loops it draws"  "q odd '.factory as \$f | \$f.count | startswith(\"\(\$f.loops) loops\")'"
