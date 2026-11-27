@@ -26,5 +26,7 @@ expect "a dropped duplicate or a changed indent is a lost line" "{ check $T/dup.
 expect "a missing or empty BEFORE proves nothing" "! check $T/gone.md $T/after.md && : > $T/empty.md && ! check $T/empty.md $T/after.md"
 sed 's|(./OPS.archive.md)|OPS.archive.md is somewhere|' "$T/after.md" > "$T/after-named.md"
 expect "naming the archive without linking it fails" "! check $T/before.md $T/after-named.md $T/OPS.archive.md"
+sed 's|(./OPS.archive.md)|(https://example.com/OPS.archive.md)|' "$T/after.md" > "$T/after-away.md"
+expect "a link to the archive's name on another site isn't a link to it" "! check $T/before.md $T/after-away.md $T/OPS.archive.md"
 expect "the pass says how many lines moved" "check $T/before.md $T/after.md $T/OPS.archive.md | grep -q ', 3 moved out,'"
 [ "$fail" -eq 0 ] && echo "all passed" || { echo "some failed"; exit 1; }

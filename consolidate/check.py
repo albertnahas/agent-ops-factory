@@ -23,7 +23,7 @@ moved = sum((lines(old) - lines(new)).values())
 bad = ([f"{len(lost)} lines are gone, not moved, the first: {lost[0].strip()[:120]}"] if lost else []) + \
       ["a mission block changed"] * (missions(old) != missions(new)) + \
       [f"{a.name} doesn't exist" for a in archives if not a.is_file()] + \
-      [f"{after.name} doesn't link {a.name}" for a in archives if not re.search(rf"\]\((?:[^)]*/)?{re.escape(a.name)}\)", new)]
+      [f"{after.name} doesn't link {a.name}" for a in archives if not re.search(rf"\]\((?![a-z]+:)(?:[^)]*/)?{re.escape(a.name)}\)", new)]
 print("; ".join(bad) or f"nothing lost: {sum(lines(old).values())} lines, {moved} moved out, "
                          f"{len(old.encode()) / 1024:.1f} KB to {len(new.encode()) / 1024:.1f} KB")
 sys.exit(1 if bad else 0)
