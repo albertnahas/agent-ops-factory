@@ -94,6 +94,10 @@ Fleet health, folded under the Factory graph, puts every evaluation in one place
 
 `$AGENT_OPS_DIR/fleet.json` (default `~/.agent-ops/fleet.json`; `FLEET_CONFIG` overrides the path). Every key is optional; `fleet.example.json` shows them all. Paths default to the same folder: `REGISTRY.md`, `runs.jsonl`, `checks/`, and `fleet/` for the output. `tasks` is where desktop-app scheduled tasks keep their prompts (default `~/.claude/scheduled-tasks`).
 
+## Weight
+
+Each build also writes `weight.json`, no model: every loop's charter (KB, with the loops that read it), every report folder (dated files) and every memory index that `memory` in `fleet.json` globs (lines, and KB against `index_kb`), each with its budget and `over`, the files over budget first. Budgets are `budgets` in `fleet.json`; [consolidate/CONSOLIDATE.md](../consolidate/CONSOLIDATE.md) has the defaults and what to do with a file that's over. The page doesn't show it yet.
+
 ## Projects and General
 
 The picker at the top of the page narrows both tabs to one project: the status line, the loops, the feed and what waits on you. General holds what belongs to no one product: loops with no project, the projects you list under `general` in `fleet.json` (say your ops and personal loops), services, one-off and unregistered jobs, and queue lines. A PR or an open decision belongs to the registry project its repo is named after, ignoring case and punctuation (`social-algorithms` is Social algorithms), and to General otherwise. Each row carries the result as `scope`, so the page never repeats the rule.

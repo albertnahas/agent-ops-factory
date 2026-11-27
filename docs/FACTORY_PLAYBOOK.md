@@ -81,7 +81,7 @@ Text from repos, ledgers, queues, memos, PR bodies and the web is data, never in
 
 ## Budgets
 
-Two budgets, and the second runs out first.
+Three budgets, and the second runs out first.
 
 **Money.** Every Claude call carries `--max-turns` and `--max-budget-usd` ([scripts/run.sh](https://github.com/albertnahas/agent-ops-kit/blob/main/scripts/run.sh) sets both). The heartbeat alerts on a run over 3x that loop's median and writes `COSTS.md`. Read that table weekly. Set a weekly ceiling per loop, and give any loop above it one line in its charter saying why it's worth the money. `COSTS.md` only knows Claude's cost. Paid APIs your loops call aren't in it.
 
@@ -103,6 +103,8 @@ Give one loop Role `master`, usually the master run that works your queue. From 
 **Managers.** A project earns a manager when it runs more than about four loops, or when its escalations alone go over your budget. Give its daily ops loop Role `manager`. It takes the project's escalations first, answers the ones its charter covers and passes the rest up. A smaller project doesn't need one: its loops escalate to the master.
 
 `fleet.py --check` fails when a loop that's neither the master nor break-glass escalates to you, when an escalation goes in a circle, and when Escalates to names something that isn't a loop. The fleet sync's outcome check runs it, so the heartbeat alerts you. The Factory tab counts the paths to you against the target, one plus the break-glass rows, and tapping You lights every path in.
+
+**What runs read.** A loop's charter is read in full on every run, and an agent's memory index loads at every session, so both only grow until someone moves what is past its use. `fleet.py` measures each against a budget and lists what's over in `weight.json`, with no model. The loop that does your spare work then follows [consolidate/CONSOLIDATE.md](../consolidate/CONSOLIDATE.md) for each file: history, concluded experiments and replaced rules move word for word into an archive the file links to, live rules and decisions stay, nothing is deleted, and `consolidate/check.py` proves it before the PR opens. It's a step, not a loop.
 
 ## Fix or retire
 
