@@ -1069,7 +1069,7 @@ def weight(rows):
         text = f.read_text(errors="replace")
         n, kb = len(text.splitlines()), round(len(text.encode()) / 1024, 1)
         items.append({"kind": "memory", "path": tilde(f), "where": tilde(f), "loops": [], "size": n, "unit": "lines",
-                      "budget": b["index_lines"], "over": n > b["index_lines"] or kb > b["index_kb"]})
+                      "budget": b["index_lines"], "kb": kb, "kb_budget": b["index_kb"], "over": n > b["index_lines"] or kb > b["index_kb"]})
     return sorted(({"over": i["size"] > i["budget"], **i} for i in items), key=lambda i: (not i["over"], i["kind"], i["path"]))
 
 # --- output

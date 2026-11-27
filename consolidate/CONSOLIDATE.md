@@ -19,7 +19,7 @@ Set in `fleet.json` under `budgets`; these are the defaults.
 ## What moves and what stays
 
 Stays where the run reads it:
-- every `mission` block, byte for byte (only its owner changes those);
+- every `mission` block, byte for byte, and with it the Floor and Source (only their owner changes those);
 - every rule, hard limit and step the loop still follows, and every decision still in force, with its date (its full reasoning may move);
 - anything a script parses: the `status:` line, the report section and its `YYYY-MM-DD.md` path, the Orders link, any format a check reads.
 
@@ -29,7 +29,7 @@ Moves to the archive, word for word:
 - rules that were replaced, with the date and what replaced them;
 - in a memory index, entries about work that is finished or a project that is gone, and duplicates (keep the better one).
 
-If you can't tell whether something is still in use, it stays. Under budget is the aim, not a reason to move a live rule; a file that can't get under budget safely is reported with why.
+The check proves nothing was lost, not that what moved was past its use, so whoever grades the PR reads every moved line. If you can't tell whether something is still in use, it stays. Under budget is the aim, not a reason to move a live rule; a file that can't get under budget safely is reported with why.
 
 ## How, by kind
 

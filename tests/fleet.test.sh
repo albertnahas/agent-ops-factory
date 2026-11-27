@@ -204,6 +204,7 @@ python3 fleet/fleet.py >/dev/null; W="$AGENT_OPS_DIR/fleet/weight.json"
 over() { jq -r '[.rows[] | select(.over) | "\(.kind) \(.size)"] | join(", ")' "$W"; }
 expect "weight: a charter, a report folder (dated files only) and a memory index over budget, the one under not" "[ \"\$(over)\" = 'charter 0.3, memory 3, reports 3' ] && jq -e '[.rows[] | select(.kind == \"memory\")] | length == 2' $W >/dev/null"
 expect "weight: a dated file with a suffix isn't the latest report" "[ \"\$(def ops report)\" = docs/reports/2026-11-21.md ]"
+expect "weight: a memory index carries its KB and KB budget too" "jq -e '[.rows[] | select(.kind == \"memory\") | (.kb | type) == \"number\" and .kb_budget == 20] | all' $W >/dev/null"
 expect "weight: a charter names the loops that read it" "jq -e '.rows[] | select(.kind == \"charter\") | .loops == [\"ops\"]' $W >/dev/null"
 # The prompt builder's questions: the kit's spec, flattened to rows of scalars in its order, choices after their question.
 Q="$AGENT_OPS_DIR/fleet/questions.json"
