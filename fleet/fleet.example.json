@@ -6,6 +6,8 @@
   "kpi": "~/.agent-ops/kpi.jsonl",
   "checks": "~/.agent-ops/checks",
   "out": "~/.agent-ops/fleet",
+  "memory": ["~/.claude/projects/*/memory/MEMORY.md"],
+  "budgets": {"charter_kb": 32, "reports": 30, "index_lines": 150, "index_kb": 20},
   "refresh": "Rebuilt every 30 minutes by fleet.py",
   "general": ["Ops", "Personal"],
   "talk": {

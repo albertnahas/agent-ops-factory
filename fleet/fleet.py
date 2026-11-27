@@ -5,7 +5,7 @@ other and you) and <out>/dashboard.html (all three, drawn).
 Sources: the registry file, launchd plists, your crontab, the run ledger, <out>/cloud.json (Claude routines and
 desktop tasks, written by the claude.ai sync in fleet/SYNC.md), and optionally a queue file, GitHub PRs and decision memos.
 fleet/README.md says how each status is decided."""
-import datetime as dt, functools, json, math, os, plistlib, re, shlex, shutil, statistics, subprocess, sys, urllib.parse
+import datetime as dt, functools, glob, json, math, os, plistlib, re, shlex, shutil, statistics, subprocess, sys, urllib.parse
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
@@ -380,20 +380,25 @@ def locate(cell, project, roots):
     found = {c.resolve() for c in cands if c.is_file()}
     return found.pop() if len({where(f) for f in found}) == 1 else None
 
-def newest_report(charter, text):
-    """The latest dated file in the folder the charter's report section names (`docs/ops-reports/YYYY-MM-DD.md`, found
-    from the nearest folder above the charter that has it), read from its repo's default branch when the folder is
-    there, else from disk."""
+def report_folder(charter, text):
+    """The folder the charter's report section names (a heading with "report" in it, then `docs/ops-reports/YYYY-MM-DD.md`),
+    found from the nearest folder above the charter that has it."""
     for sec in re.split(r"^(?=#{1,4} )", text, flags=re.M):
         m = re.match(r"#{1,4} .*report", sec, re.I) and re.search(r"([\w./-]+)/YYYY-MM-DD\.md", sec)
-        if not m: continue
-        folder = next((a / m.group(1) for a in charter.parents if exists(a / m.group(1))), None)
-        if not folder: return None
-        g, dated = on_github(folder, fresh=True), re.compile(r"\d{4}-\d{2}-\d{2}\.md$")
-        names = git(charter.parent, "ls-tree", "--full-tree", "--name-only", f"{g[1]}:{g[2]}").splitlines() if g else [f.name for f in folder.iterdir()]
-        latest = max((n for n in names if dated.match(n)), default=None)
-        return latest and folder / latest
+        if m: return next((a / m.group(1) for a in charter.parents if exists(a / m.group(1))), None)
     return None
+
+def dated(folder):
+    """The dated files (YYYY-MM-DD….md) directly in a folder, read from its repo's default branch when it's there, else from disk."""
+    g, pat = on_github(folder, fresh=True), re.compile(r"\d{4}-\d{2}-\d{2}.*\.md$")
+    names = git(folder, "ls-tree", "--full-tree", "--name-only", f"{g[1]}:{g[2]}").splitlines() if g else [f.name for f in folder.iterdir() if f.is_file()]
+    return sorted(n for n in names if pat.match(n))
+
+def newest_report(charter, text):
+    """The latest dated file in the charter's report folder."""
+    folder = report_folder(charter, text)
+    latest = folder and max((n for n in dated(folder) if re.match(r"\d{4}-\d{2}-\d{2}\.md$", n)), default=None)
+    return latest and folder / latest
 
 def job_links(j):
     """A local job's script (else its plist) and its log file."""
@@ -417,6 +422,7 @@ def definitions(reg, kind, ref, item, roots):
                       else where(task) if kind == "task" and task.is_file() else None,
             "report": where(report := newest_report(charter, text) if charter else None),
             "charter_file": charter, "orders_file": orders, "report_file": report,
+            "reports_dir": charter and report_folder(charter, text),
             "charter_paused": bool(re.search(r"^status:[ \t]*paused\b", text, re.M))}
 
 # --- the ledger claude-run and ops-check append to
@@ -822,6 +828,7 @@ def build():
     of, kpi = scoping(registry), kpis()
     for r in rows: r.update(scope=of(r["project"])[1], **kpi.get(r["loop"], {}))
     said = talk(rows, now)
+    heavy = weight(rows)
     keys = ["loop", "project", "scope", "runtime", "job", "schedule", "cadence", "status", "last_run", "result", "detail",
             "next_due", "pass_rate", "checks", "cost", "history", "checked_by", "supervisor", "supervisor_issue",
             "role", "escalates_to", "escalates_default", "break_glass", "escalation_issue", "improver", "moves",
@@ -847,6 +854,7 @@ def build():
     write("questions", asked, meta[:1] + prompts)
     heard = (said, meta[:1] + [{"label": "Window", "value": f"{C['talk'].get('days', 14)} days"}])
     write("talk", *heard)
+    write("weight", heavy, meta[:1])
     html(rows, items, meta, "Loop health" if health else "Loop fleet", changes, (asked, meta[:1] + prompts), heard)
     return rows
 
@@ -1042,6 +1050,27 @@ def waiting(now, of, issues=()):
     return sorted(({**{k: i.get(k) for k in keys}, "title": i.get("title") or short(i["item"]),
                     **dict(zip(("project", "scope"), of(i.get("repo"))))} for i in items),
                   key=lambda i: (i["due"] or "9999", i["kind"]))
+
+# --- weight: what every run loads, against its budget
+
+BUDGETS = {"charter_kb": 32, "reports": 30, "index_lines": 150, "index_kb": 20}
+
+def weight(rows):
+    """Each loop's charter (read in full every run), its report folder and each agent memory index, measured against the
+    budgets in fleet.json (`budgets`, defaults BUDGETS; `memory` globs the indexes). Over budget is work for
+    consolidate/CONSOLIDATE.md, which moves what is past its use into an archive the file links to and never deletes it."""
+    b = {**BUDGETS, **C.get("budgets", {})}
+    by = lambda key: {r[key]: [x["loop"] for x in rows if x.get(key) == r[key]] for r in rows if r.get(key)}
+    items = [{"kind": "charter", "path": tilde(f), "where": where(f), "loops": ls, "size": round(len(read(f).encode()) / 1024, 1),
+              "unit": "KB", "budget": b["charter_kb"]} for f, ls in by("charter_file").items() if f.suffix == ".md"]  # a script as charter is code, not context
+    items += [{"kind": "reports", "path": tilde(d), "where": where(d), "loops": ls, "size": len(dated(d)), "unit": "files",
+               "budget": b["reports"]} for d, ls in by("reports_dir").items()]
+    for f in sorted({Path(p) for g in C.get("memory", []) for p in glob.glob(os.path.expanduser(g))}):
+        text = f.read_text(errors="replace")
+        n, kb = len(text.splitlines()), round(len(text.encode()) / 1024, 1)
+        items.append({"kind": "memory", "path": tilde(f), "where": tilde(f), "loops": [], "size": n, "unit": "lines",
+                      "budget": b["index_lines"], "kb": kb, "kb_budget": b["index_kb"], "over": n > b["index_lines"] or kb > b["index_kb"]})
+    return sorted(({"over": i["size"] > i["budget"], **i} for i in items), key=lambda i: (not i["over"], i["kind"], i["path"]))
 
 # --- output
 

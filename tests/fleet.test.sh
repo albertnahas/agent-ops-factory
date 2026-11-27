@@ -196,6 +196,16 @@ expect "a routine links to its claude.ai page"   "[ \"\$(def ops prompt)\" = htt
 expect "a task links to its prompt file"         "[ \"\$(def nightly prompt)\" = tasks/nightly/SKILL.md ]"
 expect "a charter cell with no path, or a missing file, links nothing" "[ -z \"\$(def nightly charter)\$(def bare charter)\$(def bare orders)\$(def bare report)\" ]"
 expect "every link cell is a scalar"             "jq -e 'all(.rows[][]; type != \"array\" and type != \"object\")' $L >/dev/null"
+# Weight: each charter, report folder and memory index against its budget; over budget is listed first
+mkdir -p "$AGENT_OPS_DIR/mem/a" "$AGENT_OPS_DIR/mem/b" && printf -- '- one\n- two\n- three\n' > "$AGENT_OPS_DIR/mem/a/MEMORY.md" && printf -- '- one\n' > "$AGENT_OPS_DIR/mem/b/MEMORY.md"
+touch "$AGENT_OPS_DIR/docs/reports/2026-11-22-review.md"
+echo "{\"launch_agents\": \"$AGENT_OPS_DIR/none\", \"tasks\": \"$AGENT_OPS_DIR/tasks\", \"memory\": [\"$AGENT_OPS_DIR/mem/*/MEMORY.md\"], \"budgets\": {\"charter_kb\": 0.1, \"reports\": 2, \"index_lines\": 2}}" > "$AGENT_OPS_DIR/fleet.json"
+python3 fleet/fleet.py >/dev/null; W="$AGENT_OPS_DIR/fleet/weight.json"
+over() { jq -r '[.rows[] | select(.over) | "\(.kind) \(.size)"] | join(", ")' "$W"; }
+expect "weight: a charter, a report folder (dated files only) and a memory index over budget, the one under not" "[ \"\$(over)\" = 'charter 0.3, memory 3, reports 3' ] && jq -e '[.rows[] | select(.kind == \"memory\")] | length == 2' $W >/dev/null"
+expect "weight: a dated file with a suffix isn't the latest report" "[ \"\$(def ops report)\" = docs/reports/2026-11-21.md ]"
+expect "weight: a memory index carries its KB and KB budget too" "jq -e '[.rows[] | select(.kind == \"memory\") | (.kb | type) == \"number\" and .kb_budget == 20] | all' $W >/dev/null"
+expect "weight: a charter names the loops that read it" "jq -e '.rows[] | select(.kind == \"charter\") | .loops == [\"ops\"]' $W >/dev/null"
 # The prompt builder's questions: the kit's spec, flattened to rows of scalars in its order, choices after their question.
 Q="$AGENT_OPS_DIR/fleet/questions.json"
 qs() { python3 -c "import sys; sys.path.insert(0, 'fleet'); import fleet; r, p, why = fleet.questions(); print(why or '')"; }
