@@ -467,7 +467,7 @@ expect "health: a non-zero exit is failing"    "[ \"\$(status com.example.price-
 expect "health: an old log makes the last run unknown, not silent" "jq -e '.rows[] | select(.loop == \"com.example.weekly-review\") | .status == \"no record\" and .last_run == null and (.detail | test(\"unknown\"))' $L >/dev/null"
 expect "health: a routine past its period is silent" "[ \"\$(status competitor-digest)\" = silent ]"
 expect "health: a job launchd keeps running is a service" "jq -e '.rows[] | select(.loop == \"com.example.notes-sync\") | .project == \"Service\" and .status == \"service\"' $L >/dev/null"
-expect "health: a job run only at login is a service that says so" "jq -e '.rows[] | select(.loop == \"com.example.login-mount\") | .project == \"Service\" and .schedule == \"runs once at login\"' $L >/dev/null"
+expect "health: a job run only at login is a service that says so" "jq -e '.rows[] | select(.loop == \"com.example.login-mount\") | .project == \"Service\" and .schedule == \"runs once at login\" and .cadence == \"at login\"' $L >/dev/null"
 expect "health: a dated job is a one-off"      "[ \"\$(status com.example.launch-reminder)\" = one-off ]"
 expect "health: unloaded and vendor jobs stay out" "! jq -e '.rows[] | select(.loop | test(\"old-experiment|vendor\"))' $L >/dev/null"
 expect "health: cron with an output file ran"  "[ \"\$(status cron:backup.sh)\" = ran ]"

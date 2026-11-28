@@ -765,7 +765,7 @@ def build():
         if not spec and not row["next_due"]:
             row["next_due"] = "on event"
         row["cadence"] = (every(j["interval"]) if j and j["interval"] else cadence(spec) if spec
-                          else "always on" if j and (j["keepalive"] or j["daemon"]) else "on event" if j or kind != "local" else None)
+                          else "always on" if j and j["keepalive"] else "at login" if j and j["daemon"] else "on event" if j or kind != "local" else None)
         check = check_of(loop)
         if loop in led:
             l = led[loop]

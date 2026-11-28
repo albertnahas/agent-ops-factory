@@ -552,7 +552,9 @@ const whenText = (r) => {
   const t = upcoming(r), sched = r.schedule && r.schedule !== r.next_due ? ' (' + r.schedule + ')' : '';
   if (t) return 'Next run ' + rel(t) + ', ' + fullWhen(t) + sched;
   if (!r.next_due) return r.status === 'paused' || r.status === 'missing' ? 'No next run: it is ' + LABEL[r.status].toLowerCase() : 'No schedule found' + sched;
-  if (!/^\d/.test(r.next_due)) return (CADENCE[r.next_due] ? CADENCE[r.next_due][1] : 'Runs ' + r.next_due) + sched;
+  const c = r.cadence || r.next_due;
+  const w = CADENCE[c] ? CADENCE[c][1] : 'Runs ' + c;
+  if (!/^\d/.test(r.next_due)) return w + (w.toLowerCase() === r.schedule ? '' : sched);
   return 'Due now' + sched;
 };
 /* the card's mark: when it runs next, or with no clock schedule, when it last ran */
@@ -646,7 +648,7 @@ const runtimeMark = (r) => {
   return s;
 };
 /* how often a loop runs, from its real schedule: a clock when it repeats, a bolt when something triggers it */
-const CADENCE = {'on event': ['zap', 'Runs when something triggers it'], 'one-off': ['calendar', 'Runs once'], 'always on': ['infinity', 'Always running']};
+const CADENCE = {'on event': ['zap', 'Runs when something triggers it'], 'one-off': ['calendar', 'Runs once'], 'always on': ['infinity', 'Always running'], 'at login': ['zap', 'Runs once at login']};
 const cadenceMark = (r) => {
   if (!r.cadence) return null;
   const [name, what] = CADENCE[r.cadence] || ['clock', 'Runs on a schedule'], m = el('span', 'fx-cad');
@@ -1258,7 +1260,7 @@ const peek = (chip, r) => {
     if (!chip.isConnected) return;
     const spent = r.cost != null ? money(r.cost) + ' in 30 days' : null;
     tip.replaceChildren(el('b', '', r.loop),
-      ...[[upcoming(r) ? whenText(r) : 'No set next run, so the card shows its last run. ' + whenText(r)],
+      ...[[upcoming(r) || !r.last_run ? whenText(r) : 'No set next run, so the card shows its last run. ' + whenText(r)],
         [r.last_run ? 'Last run ' + rel(r.last_run) + (r.took != null ? ', took ' + took(r.took) : '') + (r.result ? ', ' + r.result + 'ed' : '') : 'Never run', r.checks && r.checks + ' checks passed', spent],
         [r.kpi && 'North Star: ' + goodText(r)]]
         .map((xs) => xs.filter(Boolean).join(' · ')).filter(Boolean).map((t) => el('p', '', t)),
