@@ -748,15 +748,16 @@ def build():
                 row["detail"] = f"routine run {item['last_status']}"
         row.update({"charter_paused": False} if service else definitions(reg, kind, ref, item, roots), **job_links(j))
         if override: spec = cron_spec(override.group(1), both=True)
-        if spec and not (row["next_due"] and kind != "local"):
-            row["next_due"] = iso(nth(fires(spec, now, 1), 0))
-        if spec:  # the fires after the next one too, so a page built hours ago still knows the next run once that one passed.
-            # A routine's or task's cron is in UTC, and claude.ai's own next run comes first
+        if spec:  # the next run and the four fires after it, in local time (a routine's or task's cron is in UTC), so a page
+            # built hours ago still knows the next run once one has passed. claude.ai's own next run, when it has one, comes first
             utc = kind != "local" and not override
             local = (lambda t: t.replace(tzinfo=dt.timezone.utc).astimezone().replace(tzinfo=None)) if utc else (lambda t: t)
             start = now.astimezone(dt.timezone.utc).replace(tzinfo=None) if utc else now
-            after = dt.datetime.fromisoformat(row["next_due"]) if row["next_due"] and kind != "local" else now
-            row["next_runs"] = " ".join(iso(t) for t, _ in zip((t for t in map(local, fires(spec, start, 1)) if t > after), range(4)))
+            known = bool(row["next_due"]) and kind != "local"
+            after = dt.datetime.fromisoformat(row["next_due"]) if known else now
+            ahead = [t for t, _ in zip((t for t in map(local, fires(spec, start, 1)) if t > after), range(5))]
+            if not known: row["next_due"], ahead = (iso(ahead[0]), ahead[1:]) if ahead else (None, ahead)
+            row["next_runs"] = " ".join(iso(t) for t in ahead[:4])
         if not spec and not row["next_due"]:
             row["next_due"] = "on event"
         row["cadence"] = (every(j["interval"]) if j and j["interval"] else cadence(spec) if spec

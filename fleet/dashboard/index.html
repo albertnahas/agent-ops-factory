@@ -152,14 +152,14 @@
 .fx-good { color: var(--color-fg-muted); }
 .fx-rels { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
 .fx-rels li { display: flex; align-items: center; gap: 10px; min-width: 0; overflow-wrap: anywhere; }
-.fx-ris { display: inline-flex; gap: 3px; flex: none; min-width: 90px; }
+.fx-ris { display: inline-flex; gap: 3px; flex: none; min-width: calc(var(--n, 1) * 31px - 3px); }
 .fx-sub { font-size: 11px; font-weight: 600; color: var(--color-fg-muted); margin-top: 2px !important; }
 .fx-ri { all: unset; position: relative; box-sizing: border-box; width: 28px; height: 28px; display: inline-grid; place-items: center; border-radius: 7px; cursor: pointer;
   color: var(--color-fg); background: color-mix(in srgb, var(--color-fg) 8%, transparent); }
 .fx-ri:focus-visible { outline: 2px solid var(--color-fg); outline-offset: 1px; }
 .fx-ri-tip { position: absolute; left: 0; bottom: calc(100% + 6px); z-index: 3; width: max-content; max-width: 240px; padding: 6px 8px; border-radius: 6px;
   background: var(--color-fg); color: var(--fx-card); font-size: 12px; font-weight: 400; line-height: 1.35; pointer-events: none; opacity: 0; visibility: hidden; transition: opacity 120ms; }
-.fx-ri:hover .fx-ri-tip, .fx-ri:focus-visible .fx-ri-tip, .fx-ri.show .fx-ri-tip { opacity: 1; visibility: visible; }
+.fx-ri:hover .fx-ri-tip, .fx-ri:focus-visible:not(.hush) .fx-ri-tip, .fx-ri.show .fx-ri-tip { opacity: 1; visibility: visible; }
 .fx-fnode .fx-when { flex: none; display: inline-flex; align-items: center; gap: 3px; margin-left: auto; padding-left: 4px; font-size: 11px; color: var(--color-fg-muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
 .fx-fnode .fx-when + b { margin-left: 0; }
 .fx-orders { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
@@ -505,6 +505,7 @@ const relIcon = (k) => {
   b.type = 'button'; b.setAttribute('aria-label', label + ': ' + what); tip.setAttribute('aria-hidden', 'true');
   b.append(icon(name, 14), tip);
   b.onclick = (e) => { e.stopPropagation(); const on = !b.classList.contains('show'); hideTips(); b.classList.toggle('show', on); };
+  b.onblur = () => b.classList.remove('hush');
   return b;
 };
 const hideTips = () => { document.querySelectorAll('.fx-ri.show').forEach((x) => x.classList.remove('show')); };
@@ -884,7 +885,8 @@ const closeSheet = () => {
   const back = FX.back; FX.stack = []; FX.back = null; modal(); dash.draw('sheet');
   if (back && back.isConnected) back.focus({preventScroll: true});
 };
-addEventListener('keydown', (e) => { if (e.key === 'Escape' && document.querySelector('.fx-ri.show')) hideTips(); else if (e.key === 'Escape' && FX.stack.length) closeSheet(); else if (e.key === 'Escape' && CV.big) expand(false); });
+addEventListener('keydown', (e) => { const tipped = document.activeElement?.closest?.('.fx-ri:focus-visible:not(.hush)');
+  if (e.key === 'Escape' && (document.querySelector('.fx-ri.show') || tipped)) { hideTips(); tipped?.classList.add('hush'); } else if (e.key === 'Escape' && FX.stack.length) closeSheet(); else if (e.key === 'Escape' && CV.big) expand(false); });
 /* on claude.ai the page scrolls inside an element of the runtime's, and "fixed" doesn't hold there: what fills the view is
    placed over that scroller's visible area (inside its scrollbar). The area, in screen pixels: */
 const seen = (node) => {
@@ -924,7 +926,7 @@ const section = (kind, title, tone) => {
 /* one fact with its icon in front */
 const fact = (name, ...kids) => { const p = el('p', 'fx-fact'), t = el('span'); t.append(...kids); p.append(icon(name, 14), t); return p; };
 const TONE_ICON = {ok: 'check', bad: 'octagon', warn: 'alert', none: 'alert'};
-const took = (s) => s < 60 ? Math.round(s) + 's' : s < 3600 ? Math.round(s / 60) + ' min' : Math.floor(s / 3600) + 'h ' + Math.round(s % 3600 / 60) + 'min';
+const took = (s) => { const m = Math.round(s / 60); return Math.round(s) < 60 ? Math.round(s) + 's' : m < 60 ? m + ' min' : Math.floor(m / 60) + 'h' + (m % 60 ? ' ' + m % 60 + ' min' : ''); };
 const money = (n) => '$' + n.toLocaleString('en', {minimumFractionDigits: 2, maximumFractionDigits: 2});
 /* run health: whether it ran and what its check said, when it runs next, and what it cost */
 const loopHealth = (r) => {
@@ -1230,6 +1232,8 @@ const loopWho = (r) => {
     const ul = el('ul', 'fx-rels');
     links.forEach((ks, k) => { const mine = ks.filter((x) => kinds.includes(x)); if (mine.length) ul.append(row(mine, k === YOU ? el('b', '', 'You') : who(k) || el('span', '', label(k)))); });
     if (title === 'Answers to' && r.moves) ul.append(row(['moves'], el('span', '', r.moves)));
+    /* the icon column is as wide as the row with the most icons, so the names line up */
+    ul.style.setProperty('--n', Math.max(1, ...[...ul.children].map((li) => li.firstChild.childElementCount)));
     if (ul.childElementCount) box.append(el('p', 'fx-sub', title), ul);
   });
   const via = (p) => p.slice(1, -1).map(label), route = g.route(id), ladder = g.ladder(id), up = ladder[ladder.length - 1] === 'you' ? via(ladder) : null;
