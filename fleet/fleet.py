@@ -600,7 +600,7 @@ FAN_IN = 5  # more loops than this naming you in Read by is a fan-in warning, wh
 def links(registry, services, glass, bad=(), health=False):
     """Each registry loop's Read by, Supervisor and Escalates to, and each break-glass entry's reason. A name is a loop's
     or service's name or its job, with or without the routine:/task: prefix, or you; any other name is kept as written, a
-    checker the registry doesn't have. Supervisor, optional, is the one loop that writes this loop's Orders (or you): a
+    reader the registry doesn't have. Supervisor, optional, is the one loop that writes this loop's Orders (or you): a
     parent that is no loop, or a chain that comes back to the row, is its supervisor_issue. Escalates to, optional, is
     where the loop sends what needs a person; blank means its project's manager, else the chief of staff, else you (always you for the chief). Once a loop
     has Role chief (master is read as chief), only it and the Break-glass table may reach you; escalation_issue says what breaks that. A cycle is
@@ -661,8 +661,8 @@ def links(registry, services, glass, bad=(), health=False):
                   else sup[loop]] + ([] if health else [
                   loop in readers[loop] and "Read by names itself",
                   not rs and "nobody reads it",
-                  *(f"checker {c} is not a loop, a service or you" for c in rs if c not in known | {"you"}),
-                  rs and loop not in reach and "its checkers never reach you",
+                  *(f"reader {c} is not a loop, a service or you" for c in rs if c not in known | {"you"}),
+                  rs and loop not in reach and "its readers never reach you",
                   l["supervisor"] in out and "you" in rs and f"Read by names you, but {l['supervisor']} supervises it"])
         l["supervisor_issue"] = "; ".join(i for i in issues if i) or None
         project, to = projects[loop], l["escalates_to"]

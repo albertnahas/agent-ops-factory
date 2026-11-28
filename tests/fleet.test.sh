@@ -96,14 +96,14 @@ expect "a change's trace is one link a line, every cell a scalar" "jq -e '(.rows
 expect "read by resolves jobs and you, once each" "jq -e '.rows[] | select(.loop == \"reader\") | .read_by == \"good, you, flaky, reader\"' $L >/dev/null"
 expect "a service's job names the service"   "jq -e '.rows[] | select(.loop == \"watched\") | .read_by == \"Build\"' $L >/dev/null"
 sup() { jq -r --arg l "$1" '.rows[] | select(.loop == $l) | "\(.supervisor) | \(.supervisor_issue)"' "$L"; }
-expect "a supervisor is a loop or you; a checker is a loop, a service or you" "[ \"\$(sup broken)\" = 'good | checker heartbeat is not a loop, a service or you' ] && [ \"\$(sup good)\" = 'you | null' ]"
+expect "a supervisor is a loop or you; a reader is a loop, a service or you" "[ \"\$(sup broken)\" = 'good | reader heartbeat is not a loop, a service or you' ] && [ \"\$(sup good)\" = 'you | null' ]"
 expect "a supervisor's job names its loop"     "[ \"\$(sup reader | cut -d' ' -f1)\" = watched ]"
 expect "no supervisor is fine; no reader is flagged" "[ \"\$(sup lonely)\" = 'null | nobody reads it' ]"
 expect "a missing supervisor is flagged"       "[ \"\$(sup fresh)\" = 'ghost | supervisor ghost is not a loop in the registry' ]"
 expect "a supervision cycle is drawn once, on its first loop" "sup flaky | grep -q 'comes back to it: flaky → flaky' && sup reader | grep -q 'reader → watched → reader' && sup watched | grep -q 'in the cycle through reader'"
 expect "a registered row with no job is paused" "[ \"\$(status jobless)\" = paused ]"
 expect "the registry-only check names the same issues" "! python3 fleet/fleet.py --check > $AGENT_OPS_DIR/issues && diff <(jq -r '[.rows[] | select(.supervisor_issue) | \"\\(.loop): \\(.supervisor_issue)\"] | join(\"; \")' $L) $AGENT_OPS_DIR/issues"
-expect "no checker is an empty cell"           "jq -e '.rows[] | select(.loop == \"lonely\") | .read_by == \"\"' $L >/dev/null"
+expect "no reader is an empty cell"           "jq -e '.rows[] | select(.loop == \"lonely\") | .read_by == \"\"' $L >/dev/null"
 expect "cost comes from the ledger"            "jq -e '.rows[] | select(.loop == \"good\") | .cost == 2' $L >/dev/null"
 expect "a project is its own scope"           "[ \"\$(scope good)\" = Shop ]"
 expect "no project is General"                 "[ \"\$(scope flaky)\" = General ]"
@@ -334,13 +334,13 @@ expect "the registry's issues wait on you on the page" "jq -e '[.rows[] | select
 expect "--check names a duplicate, a broken row and each cycle once" "grep -q 'row DUP: a row above has this Loop' $O/said && grep -q 'cells under 9 headers' $O/said && [ \$(grep -o 'comes back to it' $O/said | wc -l) -eq 1 ]"
 expect "--check names each loop name it leaves out" "grep -q 'row you: a loop name is letters' $O/said && grep -q 'row Nobody: a loop name' $O/said && grep -q 'row a b: a loop name' $O/said"
 mk chain; { reg "$(row c1)"; for i in $(seq 2 2000); do echo "| c$i | P | cloud | routine:c$i | daily | | | c$((i - 1)) | c$((i - 1)) |"; done; } > "$O/REGISTRY.md"
-expect "--check walks a 2000-deep supervisor and checker chain in a blink" "perl -e 'alarm 3; exec @ARGV' env AGENT_OPS_DIR=$O FLEET_CONFIG=$O/fleet.json python3 fleet/fleet.py --check"
+expect "--check walks a 2000-deep supervisor and reader chain in a blink" "perl -e 'alarm 3; exec @ARGV' env AGENT_OPS_DIR=$O FLEET_CONFIG=$O/fleet.json python3 fleet/fleet.py --check"
 # Design answers: who reads a loop, a charter's pause, interval grace, and what claude.ai and launchd say.
 mk readers; { reg "$(row boss)" "| w | P | cloud | routine:w | daily | | | boss, you | boss |" "| self | P | cloud | routine:self | daily | | | self | |" \
   "| r1 | P | cloud | routine:r1 | daily | | | r2 | |" "| r2 | P | cloud | routine:r2 | daily | | | r1 | |" "| ext | P | cloud | routine:ext | daily | | | vendor | |" \
   "| via | P | cloud | routine:via | daily | | | Build | |"
   for i in 1 2 3 4 5; do row "f$i"; done; printf '\n## Services\n\n| Service | Job | What it is |\n|---|---|---|\n| Build | com.b | builds |\n'; } > "$O/REGISTRY.md"
-expect "Read by: a self-check, a cycle and a stranger are flagged; a service ends a chain" "build && [ \"\$(get self .supervisor_issue)\" = 'Read by names itself; nobody reads it' ] && [ \"\$(get r1 .supervisor_issue)\" = 'its checkers never reach you' ] && [ \"\$(get ext .supervisor_issue)\" = 'checker vendor is not a loop, a service or you' ] && [ \"\$(get via .supervisor_issue)\" = null ]"
+expect "Read by: a self-check, a cycle and a stranger are flagged; a service ends a chain" "build && [ \"\$(get self .supervisor_issue)\" = 'Read by names itself; nobody reads it' ] && [ \"\$(get r1 .supervisor_issue)\" = 'its readers never reach you' ] && [ \"\$(get ext .supervisor_issue)\" = 'reader vendor is not a loop, a service or you' ] && [ \"\$(get via .supervisor_issue)\" = null ]"
 expect "a loop with a supervisor loop doesn't also name you" "[ \"\$(get w .supervisor_issue)\" = 'Read by names you, but boss supervises it' ] && [ \"\$(get f1 .supervisor_issue)\" = null ]"
 build --check
 expect "--check warns when more than 5 loops go straight to you" "grep -q '^warning: you: 7 loops name you in Read by, more than 5' $O/said"
