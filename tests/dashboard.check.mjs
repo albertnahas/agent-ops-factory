@@ -93,6 +93,15 @@ if (talk.names) {
   await page.setViewportSize(size); await frames();
   if (process.env.SHOTS) await page.screenshot({path: process.env.SHOTS + '/loop-drawer.png'});
   await close();
+  /* a relation icon's tip, focused from the keyboard: Escape hides the tip and keeps the drawer, a second Escape closes it */
+  await page.locator('#feeds .fx-name').first().click(); await frames();
+  if (await page.locator('.fx-sheet .fx-ri').count()) {
+    await page.locator('.fx-sheet .fx-ri').first().focus(); await page.keyboard.press('Tab'); await page.keyboard.press('Shift+Tab');
+    const tip = () => page.evaluate(() => [...document.querySelectorAll('.fx-sheet .fx-ri-tip')].some((t) => getComputedStyle(t).visibility === 'visible'));
+    talk.tip = {shown: await tip()}; await page.keyboard.press('Escape'); await frames();
+    Object.assign(talk.tip, {hidden: !await tip(), open: !!await page.locator('.fx-sheet').count()});
+  }
+  await close();
   talk.closed = await page.evaluate(() => !document.querySelector('.fx-sheet') && ![...document.body.querySelectorAll('[inert]')].length && !!document.activeElement?.closest('#feeds'));
   /* opened from the feed's last name in a short window, the page scrolled: the whole drawer is in view, the page no wider */
   await page.setViewportSize({...size, height: 300}); await page.locator('#feeds .fx-name').last().click(); await frames();

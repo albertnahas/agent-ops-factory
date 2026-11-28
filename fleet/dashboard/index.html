@@ -505,7 +505,7 @@ const relIcon = (k) => {
   b.type = 'button'; b.setAttribute('aria-label', label + ': ' + what); tip.setAttribute('aria-hidden', 'true');
   b.append(icon(name, 14), tip);
   b.onclick = (e) => { e.stopPropagation(); const on = !b.classList.contains('show'); hideTips(); b.classList.toggle('show', on); };
-  b.onblur = () => b.classList.remove('hush');
+  b.onfocus = () => b.classList.remove('hush');
   return b;
 };
 const hideTips = () => { document.querySelectorAll('.fx-ri.show').forEach((x) => x.classList.remove('show')); };
@@ -964,7 +964,7 @@ const loopGoal = (r) => {
   if (text) { const p = el('p', 'fx-good'); p.append(el('b', '', read ? 'Good: ' : 'Floor: '), document.createTextNode(text)); box.append(p); }
   return box;
 };
-const loopMore = (r) => (more) => { [loopHealth(r), loopChanges(r), defsRow(r), loopActs(r)].forEach((x) => x && more.append(x)); };
+const loopMore = (r) => (more) => { const reg = registered(r); [loopHealth(r), reg && loopGoal(r), reg && loopWho(r), loopChanges(r), defsRow(r), loopActs(r)].forEach((x) => x && more.append(x)); };
 const loopRow = (r, key, grouped) => {
   const right = el('span', 'r');
   right.append(hist(r.history), el('span', '', r.last_run ? rel(r.last_run) : r.result || r.status === 'no record' ? 'unknown' : 'never'));
