@@ -8,7 +8,7 @@
 
 Then ask "are my loops healthy?". It finds your launchd jobs and crontab lines (and your Claude Code cloud routines, if you let it read them) and opens one local page: what failed, what went quiet, what hasn't run yet. No registry, no account, nothing to wire up, and it doesn't need agent-ops-kit. The scan itself has no model in it, so rebuilding the page costs nothing. Without a run ledger it can only tell you whether a job ran and how it exited, not whether it did its job, and the page says so.
 
-How it differs: OpenRoutine, AgentBeat and Pykero have you move your loops into them or wire each one up. This reads what you already have scheduled, on your machine and in the cloud.
+How it differs: OpenRoutine and Paperclip have you move your loops into them or wire each one up. This reads what you already have scheduled, on your machine and in the cloud.
 
 Everything below is the bigger thing those loops came from.
 
