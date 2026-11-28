@@ -7,8 +7,8 @@ Every scheduled loop you run, one row each. `fleet/fleet.py` reads the two table
 - **Schedule** is for people. A cron in backticks overrides the job's own trigger, for runners that skip some fires. In an override, a day of month and a weekday must both match (`0 8 1-7 * 1` is the first Monday); crontab itself fires on either.
 - **Checked by** is who reads its output after its check passes: other loops by name, `heartbeat`, or `you`, comma-separated. Each is a loop or service with a row here, or `you`; a loop with a Supervisor loop leaves `you` out, as its supervisor reads it. `docs/LOOP_CATALOG.md` says who usually does for each kind of loop.
 - **Supervisor** (optional) is the loop that writes this loop's Orders (`docs/orders/<name>.md`). One per loop at most, and one loop can supervise many. Leave it blank for none.
-- **Escalates to** (optional) is where the loop sends anything that needs a person: a loop, or `you`. Blank means its project's manager, else the master, else you. Fill it only to override that.
-- **Role** (optional) is `master` for the one loop that may message you, or `manager` for the loop that takes its project's escalations (one per project). Once a loop is the master, `fleet.py --check` fails on any other loop that escalates to you, unless it's in the Break-glass table.
+- **Escalates to** (optional) is where the loop sends anything that needs a person: a loop, or `you`. Blank means its project's manager, else the chief of staff, else you. Fill it only to override that.
+- **Role** (optional) is `chief` for your chief of staff, the one loop that may message you (`master` is read as `chief`), or `manager` for the loop that takes its project's escalations (one per project). Once a loop is the chief of staff, `fleet.py --check` fails on any other loop that escalates to you, unless it's in the Break-glass table.
 - **Improver** (optional) is `on` to let the fleet's improver (`improver/IMPROVER.md`) change how this loop works; blank means it never does. `fleet.py --check` fails on any other value.
 - **Moves** (optional) is the input from its project's brief that the loop exists to move, by the name the brief gives it. Blank is fine: a loop that keeps things running (support, incidents, the heartbeat) moves none. An input no loop moves is an Order for the project's supervisor, not a new loop.
 - **Charter** is a backticked path to the loop's charter, which the dashboard links to, with the Orders and latest report the charter names (`fleet/README.md`, "What defines a loop"). Words alone link nothing.
@@ -21,7 +21,7 @@ Every scheduled loop you run, one row each. `fleet/fleet.py` reads the two table
 | myapp-daily-ops | MyApp | cloud | routine:myapp-daily-ops | daily 06:00 | `myapp/docs/AGENT_LOOP.md` | report PR for today (`checks/myapp-daily-ops.py`) | you |  |  |  | on |
 | myapp-smoke | MyApp | mac | com.me.myapp-smoke | daily 05:30 | `myapp/e2e/` | the tests | heartbeat, myapp-daily-ops | myapp-daily-ops |  |  |  |
 | heartbeat |  | mac | com.me.heartbeat | daily 09:30 | `bin/heartbeat.py` | its own liveness line | you |  |  |  |  |
-| master |  | mac | com.me.master | daily 08:00 | `MASTER.md` | queue is valid (`checks/master.py`) | you |  |  | master |  |
+| chief |  | mac | com.me.chief | daily 08:00 | `CHIEF.md` | queue is valid (`checks/chief.py`) | you |  |  | chief |  |
 
 ## Services
 
@@ -34,7 +34,7 @@ Daemons, dashboards and model-free jobs: they run with no model, so they have no
 
 ## Break-glass
 
-Loops and services that may message you directly, skipping the master, and why. Keep it to money at risk, production down and security. Each row is a standing exception, so give it a reason you'd defend.
+Loops and services that may message you directly, skipping the chief of staff, and why. Keep it to money at risk, production down and security. Each row is a standing exception, so give it a reason you'd defend.
 
 | Who | Why |
 |---|---|

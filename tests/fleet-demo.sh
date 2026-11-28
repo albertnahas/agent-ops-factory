@@ -16,7 +16,7 @@ job() { case $(runtime "$1") in app) echo "task:$1";; mac) echo "com.demo.$1";; 
 # exist, and the rest have none.
 supervisor() { case $1 in *-daily-ops) ;; shop-*) echo shop-daily-ops;; blog-writer|blog-editor|blog-seo) echo blog-daily-ops;;
   blog-links) echo blog-chief;; app-crash-triage|app-reviews|app-store-watch|app-release-notes) echo app-daily-ops;; esac; }
-role() { case $1 in master) echo master;; shop-daily-ops|app-daily-ops) echo manager;; esac; }
+role() { case $1 in chief) echo chief;; shop-daily-ops|app-daily-ops) echo manager;; esac; }
 escalates() { case $1 in blog-links) echo you;; esac; }
 day() { date -v-"$1"d +%FT0"$2":00:00 2>/dev/null || date -d "$1 days ago" +%FT0"$2":00:00; }
 # Two charters, each naming its Orders and its dated report, so a loop's detail links to what defines it.
@@ -56,7 +56,7 @@ loops=(
   "app-release-notes|Mobile app||-|0"
   "app-beta|Mobile app|you|ppp|5"
   "heartbeat|Ops|uptime-pager|pppppppppp|0"
-  "master|Ops|you|pppppppppp|0"
+  "chief|Ops|you|pppppppppp|0"
   "vault-sync|Ops|heartbeat|pppppppppp|0"
   "fleet-sync|Ops|you|ppppp|0"
   "news-radar|Personal|you|pppppp|0"

@@ -25,7 +25,7 @@ Use the `plan-loops` skill to propose and build the project's loops. Daily ops c
 
 ## 4. The control room
 
-As soon as there's more than one loop, use the `fleet` skill to set up the registry and the dashboard. If the user keeps a master queue, point `waiting.queue` in `fleet.json` at it.
+As soon as there's more than one loop, use the `fleet` skill to set up the registry and the dashboard. If the user keeps a queue, point `waiting.queue` in `fleet.json` at it.
 
 ## 5. The rules
 
