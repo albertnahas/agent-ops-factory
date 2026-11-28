@@ -92,9 +92,9 @@ Three budgets, and the second runs out first.
 Anything else goes in a report or on the dashboard's waiting list, where you read it when you choose. When the fleet goes over budget, merge alerts or raise thresholds. Don't add a loop that pings you.
 
 **One door.** Three links join loops, and only one of them interrupts you:
-- **Checks** (Read by): who reads a loop's output, when they choose to.
-- **Supervises** (Supervisor): who writes its Orders.
-- **Escalates** (Escalates to): where it sends anything that needs a person.
+- **Read by**: who reads a loop's output, when they choose to.
+- **Steered by** (the Supervisor column): who writes its Orders, the file that says what it works on now.
+- **Escalates to**: where it sends anything that needs a person.
 
 Give one loop Role `chief`, usually the run that works your queue, your chief of staff. From then on it's the only loop that messages you. Every other loop escalates to it, or to its project's manager, which escalates to the chief of staff. The chief of staff batches what reaches it, answers what it can, and sends you what's left in one message. A blank Escalates to follows that route, so most rows stay empty.
 
