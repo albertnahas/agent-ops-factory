@@ -54,6 +54,7 @@ EOF
   for v in fail fail fail pass; do echo "{\"loop\":\"flaky\",\"date\":\"$(day 1)\",\"check\":\"$v\"}"; done
   echo "{\"loop\":\"Poster\",\"date\":\"$(day 1)\",\"check\":\"fail\",\"detail\":\"post not on the API\"}"
   echo "{\"loop\":\"stray\",\"date\":\"$(day 1)\",\"subtype\":\"success\"}"
+  echo "{\"loop\":\"adhoc\",\"date\":\"$(day 1)\",\"subtype\":\"success\",\"cost\":0.5}"
   printf 'not json\n{}\n'
 } > "$AGENT_OPS_DIR/runs.jsonl"
 {
@@ -82,6 +83,7 @@ expect "a failed check is failing"             "[ \"\$(status broken)\" = failin
 expect "3 of the last 7 failed is flaky"       "[ \"\$(status flaky)\" = chronic ]"
 expect "never run is not run yet"              "[ \"\$(status fresh)\" = 'no runs yet' ]"
 expect "a ledger name with no row is unregistered" "[ \"\$(status stray)\" = unregistered ]"
+expect "an adhoc run is a one-off, not a loop" "[ \"\$(status adhoc)\" = one-off ] && jq -e '.rows[] | select(.loop == \"adhoc\") | .project == \"One-off\" and .cost == 0.5' \"$L\" >/dev/null"
 expect "a routine service is read from the snapshot: there, off, gone" "[ \"\$(status Watchman)\" = service ] && [ \"\$(status Sleeper)\" = paused ] && [ \"\$(status Gone)\" = missing ] && jq -e '.rows[] | select(.loop == \"Gone\") | .runtime == \"cloud\" and (.detail | test(\"no routine named gone in the claude.ai snapshot\"))' $L >/dev/null"
 expect "a service that logs a failed check is failing, with its pass rate" "[ \"\$(status Poster)\" = failing ] && jq -e '.rows[] | select(.loop == \"Poster\") | .checks == \"0 of 1\" and .detail == \"post not on the API\"' $L >/dev/null"
 expect "checked by is a comma list"            "jq -e '.rows[] | select(.loop == \"broken\") | .checked_by == \"good, heartbeat\"' $L >/dev/null"
@@ -115,7 +117,7 @@ expect "punctuation doesn't count"             "[ \"\$(of social-algorithms)\" =
 expect "a repo of a general project is General" "[ \"\$(of ops)\" = Ops/General ]"
 expect "a repo of no project is General"       "[ \"\$(of ops-queue)\" = /General ]"
 expect "the dashboard carries the data"        "grep -q 'report missing' $AGENT_OPS_DIR/fleet/dashboard.html && grep -q 'dash-one-writer' $AGENT_OPS_DIR/fleet/dashboard.html"
-expect "with no chief of staff, every loop escalates to you, unflagged" "jq -e '[.rows[] | select(.project != \"Unregistered\" and .project != \"Service\")] | all(.escalates_to == \"you\" and .escalates_default and .escalation_issue == null)' $L >/dev/null"
+expect "with no chief of staff, every loop escalates to you, unflagged" "jq -e '[.rows[] | select(.project != \"Unregistered\" and .project != \"Service\" and .project != \"One-off\")] | all(.escalates_to == \"you\" and .escalates_default and .escalation_issue == null)' $L >/dev/null"
 
 # Escalation: one chief of staff is the door to you; managers take their project's escalations; break-glass may skip the line.
 cat > "$AGENT_OPS_DIR/REGISTRY.md" <<EOF
