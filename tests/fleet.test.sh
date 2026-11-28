@@ -288,7 +288,7 @@ $(routine '"b"' false '"2026-11-23T06:00:00Z"'),$(routine '"c"' true null '"SUCC
 {\"name\":5,\"enabled\":true,\"cron\":[\"0 6 * * *\"],\"last_finished_at\":\"2026-11-21T06:00:00Z\"},\"junk\"],\"tasks\":{\"x\":1}}" > "$O/fleet/cloud.json"
 expect "a snapshot in any shape builds, Z times too" "build && scalar && [ \"\$(get a .status)\" != stale ]"
 expect "a routine's status is read in any case" "[ \"\$(get c .result)\" = pass ]"
-expect "a paused loop has no next run"         "[ \"\$(get b '\"\(.status) \(.next_due)\"')\" = 'paused null' ]"
+expect "a paused loop with a cron has no next run, nor any after it" "[ \"\$(get b '\"\(.status) \(.next_due) \(.next_runs)\"')\" = 'paused null null' ]"
 expect "a numeric routine name is a string, a list cron no cell" "[ \"\$(get 5 '.schedule')\" = 'on event' ]"
 echo '{}' > "$O/fleet/cloud.json"
 expect "an empty snapshot is stale data"       "build && [ \"\$(get a .status)\" = stale ]"

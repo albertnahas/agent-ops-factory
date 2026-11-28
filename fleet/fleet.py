@@ -815,7 +815,7 @@ def build():
                          else "ran" if health
                          else "no check")
         if service and row["status"] in ("healthy", "no check", "ran", "no runs yet", "no record"): row["status"] = "service"
-        if row["status"] in ("paused", "missing"): row["next_due"] = None  # it won't run
+        if row["status"] in ("paused", "missing"): row["next_due"] = row["next_runs"] = None  # it won't run
         if row["status"] == "missing": row["detail"] = (f"nothing on this machine runs a job named '{job}'" if kind == "local" else
                                                         f"no {kind} named {ref} in the claude.ai snapshot: deleted or renamed there?")
         rows.append(row)
