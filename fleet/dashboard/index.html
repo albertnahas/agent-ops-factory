@@ -507,7 +507,7 @@ const relIcon = (k) => {
   b.type = 'button'; b.setAttribute('aria-label', label + ': ' + what); tip.setAttribute('aria-hidden', 'true');
   b.append(icon(name, 14), tip);
   b.onclick = (e) => { e.stopPropagation(); const on = !b.classList.contains('show'); hideTips(); b.classList.toggle('show', on); };
-  b.onfocus = b.onpointerleave = () => b.classList.remove('hush');
+  b.onfocus = b.onpointerenter = () => b.classList.remove('hush');
   return b;
 };
 const hideTips = () => { document.querySelectorAll('.fx-ri.show').forEach((x) => x.classList.remove('show')); };

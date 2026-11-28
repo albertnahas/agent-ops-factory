@@ -17,7 +17,8 @@ page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
 const frames = () => page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)))
   .then(() => Promise.all(document.getAnimations().filter((a) => a.effect.getTiming().iterations !== Infinity).map((a) => a.finished.catch(() => {})))));
 const timed = async (f) => { const t = Date.now(); await f(); await frames(); return Date.now() - t; };
-const close = async () => { await page.keyboard.press('Escape'); await frames(); };
+/* the pointer moves off first: Escape hides a tip the pointer rests on before it closes the drawer */
+const close = async () => { await page.mouse.move(0, 0); await page.keyboard.press('Escape'); await frames(); };
 const sheetText = () => page.evaluate(() => [...document.querySelectorAll('.fx-sheet p')].map((p) => p.textContent));
 /* every loop's drawer and its row expansion draw without throwing, whatever the builder left empty */
 const every = async () => page.evaluate(() => { const bad = [], rows = dash.data('loops').data;
@@ -106,6 +107,10 @@ if (talk.names) {
     const tip = () => page.evaluate(() => [...document.querySelectorAll('.fx-sheet .fx-ri-tip')].some((t) => getComputedStyle(t).visibility === 'visible'));
     talk.tip = {shown: await tip()}; await page.keyboard.press('Escape'); await frames();
     Object.assign(talk.tip, {hidden: !await tip(), open: !!await page.locator('.fx-sheet').count()});
+    /* a tip shown by the pointer resting on its icon: Escape hides it too, and the drawer stays */
+    await page.locator('.fx-sheet .fx-ri').first().hover(); await frames(); talk.tip.hover = await tip();
+    await page.keyboard.press('Escape'); await frames();
+    Object.assign(talk.tip, {hoverHidden: !await tip(), hoverOpen: !!await page.locator('.fx-sheet').count()});
   }
   await close();
   talk.closed = await page.evaluate(() => !document.querySelector('.fx-sheet') && ![...document.body.querySelectorAll('[inert]')].length && !!document.activeElement?.closest('#feeds'));

@@ -134,7 +134,7 @@ expect "Feeds: Escape closes the drawer, frees the page and returns to the name 
 expect "Feeds: a name deep in the feed opens the whole drawer in view, the page no wider" "q odd '.talk.deep.scrolled and .talk.deep.fits and .talk.deep.page <= 0'"
 expect "Feeds: the composer turns a message into a prompt to copy" "q odd '.talk.compose != null'"
 expect "every loop's drawer and row expansion draw, an unregistered one with no detail too" "q odd '.every == [] and .everyCount > 10'"
-expect "Feeds: Escape hides a keyboard-focused relation tip first, then closes the drawer, with no page error" "q odd '.talk.tip.shown and .talk.tip.hidden and .talk.tip.open and .errors == []'"
+expect "Feeds: Escape hides a relation tip shown by keyboard focus or hover first, then closes the drawer, with no page error" "q odd '.talk.tip.shown and .talk.tip.hidden and .talk.tip.open and .talk.tip.hover and .talk.tip.hoverHidden and .talk.tip.hoverOpen and .errors == []'"
 expect "Feeds: a fleet that said nothing says so" "q clique '.talk.rows == 0'"
 expect "a long name keeps its loop count in view" "q odd '.loops.countsVisible'"
 expect "a route shows 25 loops, then See all opens the rest in place" "q big '.loops.firstCard == 25 and .loops.firstCardAll == 30'"
