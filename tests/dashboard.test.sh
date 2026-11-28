@@ -33,6 +33,7 @@ row = next(r for r in loops["rows"] if r["loop"] == "ops-a")
 loops["rows"] += [{**row, "loop": n, "project": p, "scope": p, "read_by": c} for n, p, c in
                   ((5, "Shop", "you"), (None, "Shop", "you"), ("you", "Shop", "ops-a"), ("nobody", "Shop", "you"), ("lonely", "Shop", ""),
                    ("لولאת-חנות-loop", "לולאת-חנות", "you"), ("zalgo-loop", "Zalgo-Z̷̢͓̈́a̸̧̛l̶g̷o̶", "you"), ("long-loop", "P" * 255, "you"))]
+loops["rows"].append({**row, "loop": "stray", "project": "Unregistered", "scope": "Unregistered", "status": "unregistered", "detail": None, "read_by": None})
 item = {"title": "Pick a price", "tag": "Decision", "source": "Queue", "kind": "Queue", "item": "Pick a price", "action": "decide",
         "where": "queue (decision)", "link": None, "since": None, "project": "", "scope": "General"}
 waiting["rows"] = [{**item, "title": f"due {d}", "due": d} for d in ("tomorrow", "2026-13-45", "99999-01-01", "", None, "2026-11-01", "2099-01-01")]
@@ -120,18 +121,20 @@ expect "New loop builds the skill's prompt, with a Copy button" "want $AGENT_OPS
 expect "Change this loop builds the edit prompt for that loop, founder route marked" "want $AGENT_OPS_DIR/clique.json edit && q clique '.form.edit.founder == 1 and .form.loop != \"\"'"
 expect "the open form and its prompt fit the phone" "q clique '.form.overflow == 0'"
 expect "with no question spec there's no builder" "q odd '.form.offered == 0'"
-expect "a loop's drawer says the improver may visit it" "q odd '.loops.read | endswith(\" · Improver: on\")'"
+expect "a loop's drawer says the improver may visit it" "q odd '.loops.read | test(\"The improver may change it\")'"
 expect "a Good with no bar shows as measured, with which way is better" "q odd '.loops.measured == \"Good: 5 · higher is better · as of 22 Nov · no Floor set\"'"
 expect "a loop's drawer shows its Good against its Floor and its attempts" "q odd '.loops.good == \"Good: 50 vs Floor at least 62% · below since 15 Nov · attempt 1 of 2 · as of 21 Nov\"'"
 expect "Evaluations, in the picked project, shows the fleet KPIs and lists the loops below the bar" "q odd '.evals.rows[\"Loops at or above their Floor\"] == \"0% of measured (0 of 1)\" and .evals.rows[\"Loops whose Good is measured\"] == \"33% (2 of 6)\" and .evals.rows[\"Improver hit rate\"] == \"1 of 2 read changes moved their Good\" and .evals.below == 1'"
 expect "with no data, every evaluation says not measured, none hidden" "q clique '.evals.rows[\"Loops at or above their Floor\"] == \"not measured\" and .evals.rows[\"Replay\"] == \"not measured\" and (.evals.rows[\"Improver hit rate\"] | startswith(\"not measured\")) and .evals.below == 0'"
 expect "nothing is wider than the phone"             "q odd '.ms.overflow == 0'"
 expect "Feeds: each dated line once, no unknown sender" "q odd '.talk.rows == 3 and (.talk.unknown | not)'"
-expect "Feeds: a name opens the loop's drawer, its Orders now then the Conversation, focus on Close, as wide as the phone" "q odd '.talk.sheet == \"shop1\" and .talk.sections == [\"Orders now\", \"Conversation\"] and .talk.bubbles > 0 and .talk.focus == \"Close\" and .talk.overflow <= 0 and .talk.inView'"
+expect "Feeds: a name opens the loop's drawer: its health, goal, who it works with, Orders now, then the Conversation, focus on Close, as wide as the phone" "q odd '.talk.sheet == \"shop1\" and .talk.sections == [\"Health\", \"Goal\", \"Works with\", \"Orders now\", \"Conversation\"] and .talk.bubbles > 0 and .talk.focus == \"Close\" and .talk.overflow <= 0 and .talk.inView'"
 expect "Feeds: the drawer is modal: the page behind it is inert, Tab stays inside, a redraw keeps focus and scroll" "q odd '.talk.inert and .talk.trapped and .talk.redraw.focus and .talk.redraw.top > 0'"
 expect "Feeds: Escape closes the drawer, frees the page and returns to the name clicked" "q odd '.talk.closed'"
 expect "Feeds: a name deep in the feed opens the whole drawer in view, the page no wider" "q odd '.talk.deep.scrolled and .talk.deep.fits and .talk.deep.page <= 0'"
 expect "Feeds: the composer turns a message into a prompt to copy" "q odd '.talk.compose != null'"
+expect "every loop's drawer and row expansion draw, an unregistered one with no detail too" "q odd '.every == [] and .everyCount > 10'"
+expect "Feeds: Escape hides a relation tip shown by keyboard focus or hover first, then closes the drawer, with no page error" "q odd '.talk.tip.shown and .talk.tip.hidden and .talk.tip.open and .talk.tip.hover and .talk.tip.hoverHidden and .talk.tip.hoverOpen and .errors == []'"
 expect "Feeds: a fleet that said nothing says so" "q clique '.talk.rows == 0'"
 expect "a long name keeps its loop count in view" "q odd '.loops.countsVisible'"
 expect "a route shows 25 loops, then See all opens the rest in place" "q big '.loops.firstCard == 25 and .loops.firstCardAll == 30'"

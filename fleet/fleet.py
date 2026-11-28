@@ -51,10 +51,14 @@ def when(s):
     try: t = dt.datetime.fromisoformat(s); return (t.astimezone().replace(tzinfo=None) if t.tzinfo else t).replace(microsecond=0)
     except (ValueError, OverflowError): return None  # not a time, or a "never" like 9999-12-31Z
 
+def finite(v):
+    """A finite number, else None."""
+    try: return v if isinstance(v, (int, float)) and not isinstance(v, bool) and math.isfinite(v) else None
+    except OverflowError: return None  # an int too big for a float
+
 def money(v):
     """A cost as a finite number, else 0."""
-    try: return v if isinstance(v, (int, float)) and not isinstance(v, bool) and math.isfinite(v) else 0
-    except OverflowError: return 0  # an int too big for a float
+    return finite(v) or 0
 
 def check_of(loop):
     """checks/<loop>.py when the name is a plain file name and the file is there (a name too long for one is no file)."""
@@ -149,6 +153,11 @@ def fires(spec, start, direction, days=70):
                           (s["Day"] is None or d.day in s["Day"]) and (s["Weekday"] is None or d.isoweekday() % 7 in s["Weekday"]))
                      for h in (s["Hour"] or range(24)) for m in (s["Minute"] or range(60))}, reverse=direction < 0)
         yield from (t for t in ts if (t > start if direction > 0 else t <= start))
+
+def clip(text, n=200):
+    """text as one line, cut at the last whole word within n characters, with an ellipsis when it was cut."""
+    text = " ".join(text.split())
+    return text if len(text) <= n else text[:n].rsplit(" ", 1)[0].rstrip(",;:.") + "…"
 
 def nth(gen, n):
     for i, x in enumerate(gen):
@@ -463,7 +472,7 @@ def ledger(now):
         win_checks = [r for r in checks if r["date"] >= since]
         win_claude = [r for r in claude if r["date"] >= since]
         if checks:
-            last_ok, detail = checks[-1]["check"] == "pass", " ".join(checks[-1]["detail"].split())
+            last_ok, detail = checks[-1]["check"] == "pass", checks[-1]["detail"]
             passes, total = sum(r["check"] == "pass" for r in win_checks), len(win_checks)
         else:
             last_ok = not failed(claude[-1])
@@ -474,7 +483,8 @@ def ledger(now):
         history = "".join("p" if r["check"] == "pass" else "f" for r in checks[-10:]) if checks else \
                   "".join("f" if failed(r) else "p" for r in claude[-10:])
         out[loop] = {
-            "last": max(r["date"] for r in rs), "last_ok": last_ok, "detail": detail[:200],
+            "last": max(r["date"] for r in rs), "last_ok": last_ok, "detail": clip(detail),
+            "secs": finite(claude[-1].get("secs")) if claude else None,
             "passes": passes, "total": total, "chronic": last7.count("fail") >= 3,
             "fails7": f"{last7.count('fail')} of last {len(last7)}",
             "cost": round(sum(r["cost"] for r in win_claude), 2),
@@ -742,8 +752,16 @@ def build():
                 row["detail"] = f"routine run {item['last_status']}"
         row.update({"charter_paused": False} if service else definitions(reg, kind, ref, item, roots), **job_links(j))
         if override: spec = cron_spec(override.group(1), both=True)
-        if spec and not (row["next_due"] and kind != "local"):
-            row["next_due"] = iso(nth(fires(spec, now, 1), 0))
+        if spec:  # the next run and the four fires after it, in local time (a routine's or task's cron is in UTC), so a page
+            # built hours ago still knows the next run once one has passed. claude.ai's own next run, when it has one, comes first
+            utc = kind != "local" and not override
+            local = (lambda t: t.replace(tzinfo=dt.timezone.utc).astimezone().replace(tzinfo=None)) if utc else (lambda t: t)
+            start = now.astimezone(dt.timezone.utc).replace(tzinfo=None) if utc else now
+            known = bool(row["next_due"]) and kind != "local"
+            after = dt.datetime.fromisoformat(row["next_due"]) if known else now
+            ahead = [t for t, _ in zip((t for t in map(local, fires(spec, start, 1)) if t > after), range(5))]
+            if not known: row["next_due"], ahead = (iso(ahead[0]), ahead[1:]) if ahead else (None, ahead)
+            row["next_runs"] = " ".join(iso(t) for t in ahead[:4])
         if not spec and not row["next_due"]:
             row["next_due"] = "on event"
         row["cadence"] = (every(j["interval"]) if j and j["interval"] else cadence(spec) if spec
@@ -751,14 +769,14 @@ def build():
         check = check_of(loop)
         if loop in led:
             l = led[loop]
-            row.update(last_run=l["last"][:16], result="pass" if l["last_ok"] else "fail", detail=l["detail"],
+            row.update(last_run=l["last"][:16], result="pass" if l["last_ok"] else "fail", detail=l["detail"], took=l["secs"],
                        pass_rate=round(l["passes"] / l["total"], 3) if l["total"] else None,
                        checks=f"{l['passes']} of {l['total']}", cost=l["cost"], history=l["history"])
             if l["chronic"]: row["detail"] = f"{l['fails7']} checks failed. " + row["detail"]
         elif check:  # loops that don't log (cloud routines): the builder runs their plain check
             c = subprocess.run([sys.executable, str(check)], capture_output=True, text=True, errors="replace")
             row["result"] = "pass" if c.returncode == 0 else "fail"
-            row["detail"] = " ".join((c.stdout or c.stderr).split())[:200]
+            row["detail"] = clip(c.stdout or c.stderr)
         elif j and j.get("exit") is not None:  # nothing logged: launchd's last exit and its log file's time
             row.update(result="pass" if j["exit"] == 0 else "fail", last_run=iso(j["log_at"]),
                        detail=f"last run exited {j['exit']}" + ("; launchd restarted it" if j["running"] else "" if j["log_at"]
@@ -797,7 +815,7 @@ def build():
                          else "ran" if health
                          else "no check")
         if service and row["status"] in ("healthy", "no check", "ran", "no runs yet", "no record"): row["status"] = "service"
-        if row["status"] in ("paused", "missing"): row["next_due"] = None  # it won't run
+        if row["status"] in ("paused", "missing"): row["next_due"] = row["next_runs"] = None  # it won't run
         if row["status"] == "missing": row["detail"] = (f"nothing on this machine runs a job named '{job}'" if kind == "local" else
                                                         f"no {kind} named {ref} in the claude.ai snapshot: deleted or renamed there?")
         rows.append(row)
@@ -834,7 +852,7 @@ def build():
     said = talk(rows, now)
     heavy = weight(rows)
     keys = ["loop", "project", "scope", "runtime", "job", "schedule", "cadence", "status", "last_run", "result", "detail",
-            "next_due", "pass_rate", "checks", "cost", "history", "read_by", "supervisor", "supervisor_issue",
+            "next_due", "next_runs", "took", "pass_rate", "checks", "cost", "history", "read_by", "supervisor", "supervisor_issue",
             "role", "escalates_to", "escalates_default", "break_glass", "escalation_issue", "improver", "moves",
             "charter", "orders", "prompt", "runner", "report", "log", "floor", "target", *KPI.values()]
     rows = [{k: r.get(k) for k in keys} for r in rows]

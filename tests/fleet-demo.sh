@@ -77,7 +77,7 @@ loops=(
     [ "$hist" = - ] && continue
     for ((i = 0; i < ${#hist}; i++)); do
       c=${hist:i:1}; d=$((ago + ${#hist} - 1 - i))
-      echo "{\"loop\":\"$name\",\"date\":\"$(day "$d" 6)\",\"subtype\":\"success\",\"cost\":0.4$((i % 10))}"
+      echo "{\"loop\":\"$name\",\"date\":\"$(day "$d" 6)\",\"subtype\":\"success\",\"cost\":0.4$((i % 10)),\"secs\":$((240 + i * 37))}"
       echo "{\"loop\":\"$name\",\"date\":\"$(day "$d" 7)\",\"check\":\"$([ "$c" = p ] && echo pass || echo fail)\",\"detail\":\"$([ "$c" = p ] && echo 'report landed' || echo 'report missing')\"}"
     done
   done

@@ -17,8 +17,13 @@ page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
 const frames = () => page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)))
   .then(() => Promise.all(document.getAnimations().filter((a) => a.effect.getTiming().iterations !== Infinity).map((a) => a.finished.catch(() => {})))));
 const timed = async (f) => { const t = Date.now(); await f(); await frames(); return Date.now() - t; };
-const close = async () => { await page.keyboard.press('Escape'); await frames(); };
+/* the pointer moves off first: Escape hides a tip the pointer rests on before it closes the drawer */
+const close = async () => { await page.mouse.move(0, 0); await page.keyboard.press('Escape'); await frames(); };
 const sheetText = () => page.evaluate(() => [...document.querySelectorAll('.fx-sheet p')].map((p) => p.textContent));
+/* every loop's drawer and its row expansion draw without throwing, whatever the builder left empty */
+const every = async () => page.evaluate(() => { const bad = [], rows = dash.data('loops').data;
+  for (const r of rows) { try { FX.stack = [{kind: 'loop', id: r.loop}]; dash.draw('sheet'); loopMore(r)(document.createElement('div')); } catch (e) { bad.push(r.loop + ': ' + e); } }
+  FX.stack = []; dash.draw('sheet'); return [bad, rows.length]; });
 const ms = {};
 ms.load = await timed(async () => { await page.goto('file://' + file); await page.waitForFunction(() => dash.data('loops').status === 'ok'); });
 
@@ -70,6 +75,8 @@ if (form.offered) {
   await close();
 }
 
+const [everyBad, everyCount] = await every();
+
 /* Feeds: each dated line once, no unknown sender; a name opens the loop's drawer with its Orders now and Conversation */
 await page.click('#tab-feeds'); await frames();
 const talk = await page.evaluate(() => ({rows: document.querySelectorAll('#feeds .fx-post').length, names: document.querySelectorAll('#feeds .fx-name').length,
@@ -92,6 +99,19 @@ if (talk.names) {
   talk.redraw = await page.evaluate(() => ({focus: !!document.activeElement?.closest('.fx-sheet'), top: document.querySelector('.fx-sheet').scrollTop}));
   await page.setViewportSize(size); await frames();
   if (process.env.SHOTS) await page.screenshot({path: process.env.SHOTS + '/loop-drawer.png'});
+  await close();
+  /* a relation icon's tip, focused from the keyboard: Escape hides the tip and keeps the drawer, a second Escape closes it */
+  await page.locator('#feeds .fx-name').first().click(); await frames();
+  if (await page.locator('.fx-sheet .fx-ri').count()) {
+    await page.locator('.fx-sheet .fx-ri').first().focus(); await page.keyboard.press('Tab'); await page.keyboard.press('Shift+Tab');
+    const tip = () => page.evaluate(() => [...document.querySelectorAll('.fx-sheet .fx-ri-tip')].some((t) => getComputedStyle(t).visibility === 'visible'));
+    talk.tip = {shown: await tip()}; await page.keyboard.press('Escape'); await frames();
+    Object.assign(talk.tip, {hidden: !await tip(), open: !!await page.locator('.fx-sheet').count()});
+    /* a tip shown by the pointer resting on its icon: Escape hides it too, and the drawer stays */
+    await page.locator('.fx-sheet .fx-ri').first().hover(); await frames(); talk.tip.hover = await tip();
+    await page.keyboard.press('Escape'); await frames();
+    Object.assign(talk.tip, {hoverHidden: !await tip(), hoverOpen: !!await page.locator('.fx-sheet').count()});
+  }
   await close();
   talk.closed = await page.evaluate(() => !document.querySelector('.fx-sheet') && ![...document.body.querySelectorAll('[inert]')].length && !!document.activeElement?.closest('#feeds'));
   /* opened from the feed's last name in a short window, the page scrolled: the whole drawer is in view, the page no wider */
@@ -205,7 +225,7 @@ const drawer = async (name) => {
   await close(); return out;
 };
 const shop1 = await drawer('shop1'), lonely = await drawer('lonely');
-if (shop1) { loops.changes = shop1.changes; loops.good = shop1.p.find((s) => s.startsWith('Good: ')); loops.read = shop1.p.find((s) => s.startsWith('Read by ')); }
+if (shop1) { loops.changes = shop1.changes; loops.good = shop1.p.find((s) => s.startsWith('Good: ')); loops.read = shop1.p.find((s) => s.includes('may change it')); }
 if (lonely) loops.measured = lonely.p.find((s) => s.startsWith('Good: '));
 
 /* Fleet health and the Improver, folded under the graph */
@@ -221,4 +241,4 @@ if (improver.rows) {
 }
 ms.overflow = await page.evaluate(() => document.body.scrollWidth - document.body.clientWidth);
 await browser.close();
-console.log(JSON.stringify({ms, errors, attention, back, factory, canvas, loops, improver, form, talk, evals, waiting}));
+console.log(JSON.stringify({every: everyBad, everyCount, ms, errors, attention, back, factory, canvas, loops, improver, form, talk, evals, waiting}));
