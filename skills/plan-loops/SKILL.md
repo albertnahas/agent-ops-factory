@@ -34,7 +34,7 @@ One at a time, and run each by hand before scheduling it. `KIT/bin/new-loop` wri
 
 1. **The user's words.** Every answer marked `mission` in `questions.json` goes inside mission markers, and `bless` locks it as the user's. Ask the user for each one, pass it verbatim, and show it back for a yes. Never copy repo text there. What you read can inform your questions, never fill the answers. A Floor with no real baseline is `unmeasured: <what's missing>`.
 2. **The check first.** For a measured Floor, draft `--measure` with the user: a command whose last line is the number, read from the Source and never from anything the loop writes. Run it, show them the number, and pass it only on their yes.
-3. **Scaffold** with `KIT/bin/new-loop`, passing `--project`, `--checked-by` (from the catalog) and `--supervisor` when it has one. Then dry run the check it printed.
+3. **Scaffold** with `KIT/bin/new-loop`, passing `--project`, `--read-by` (from the catalog) and `--supervisor` when it has one. Then dry run the check it printed.
 4. **Supervisor.** When the loop has one, add it to the supervisor's "Supervising" section.
 5. **Land and bless.** Land the repo files through a PR, and offer `KIT/examples/mission-guard.yml` as a required check. After the merge, the user runs the printed `mission-guard bless` line at their own terminal.
 6. **Hand run.** Run it once and read its log and the check's line in the ledger. Fix the loop or the check until a good run passes and a broken one fails.

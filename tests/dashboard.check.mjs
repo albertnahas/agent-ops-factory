@@ -46,17 +46,20 @@ const fill = () => page.evaluate(() => {
   const set = (i, v) => { i.value = v; i.dispatchEvent(new Event('input')); };
   for (const q of document.querySelectorAll('.fx-sheet .fx-q')) {
     const radio = q.querySelector('input[type=radio]:not([value=""])'); if (radio) { radio.click(); continue; }
+    const sel = q.querySelector('select'); if (sel) { sel.value = sel.options[sel.options.length - 1].value; sel.dispatchEvent(new Event('change')); set(q.querySelector('input.fx-input'), 'v-' + q.dataset.q); continue; }
     const i = q.querySelector('.fx-input'); if (!i || i.readOnly || i.type === 'number') continue;
     set(i, i.placeholder === 'One per line' ? 'x\ny' : i.tagName === 'TEXTAREA' ? 'a\nb' : 'v-' + q.dataset.q);
   }
 });
 const built = async () => { await page.click('.fx-sheet .fx-form-body > .fx-btn'); await frames();
-  return page.evaluate(() => ({prompt: document.querySelector('.fx-sheet .fx-prompt')?.textContent ?? null, copy: !!document.querySelector('.fx-sheet .fx-built .fx-btn'),
+  return page.evaluate(() => ({prompt: document.querySelector('.fx-sheet .fx-built .fx-prompt')?.textContent ?? null, copy: !!document.querySelector('.fx-sheet .fx-built .fx-btn'),
     founder: document.querySelectorAll('.fx-sheet .fx-founder').length, missing: document.querySelectorAll('.fx-sheet [data-missing]').length})); };
 const fields = () => page.evaluate(() => [...document.querySelectorAll('.fx-sheet .fx-q')].map((q) => q.dataset.q));
 const form = {offered: await page.locator('[data-draw="new-loop"] .fx-btn').count()};
 if (form.offered) {
   await page.click('[data-draw="new-loop"] .fx-btn'); await frames();
+  form.skill = await page.evaluate(() => document.querySelector('.fx-sheet .fx-prompt')?.textContent ?? null);
+  form.projects = await page.evaluate(() => [...document.querySelectorAll('.fx-sheet [data-q="project"] option')].map((o) => o.textContent));
   form.fields = await fields(); form.empty = await built(); await fill(); form.new = await built();
   form.overflow = await page.evaluate(() => document.body.scrollWidth - document.body.clientWidth);
   await close();

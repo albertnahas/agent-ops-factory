@@ -595,17 +595,17 @@ def tables():
 
 opted_in = lambda reg: reg.get("Improver", "").lower() == "on"  # the improver may visit this loop
 
-FAN_IN = 5  # more loops than this naming you in Checked by is a fan-in warning, which --check prints but doesn't fail on
+FAN_IN = 5  # more loops than this naming you in Read by is a fan-in warning, which --check prints but doesn't fail on
 
 def links(registry, services, glass, bad=(), health=False):
-    """Each registry loop's Checked by, Supervisor and Escalates to, and each break-glass entry's reason. A name is a loop's
+    """Each registry loop's Read by, Supervisor and Escalates to, and each break-glass entry's reason. A name is a loop's
     or service's name or its job, with or without the routine:/task: prefix, or you; any other name is kept as written, a
     checker the registry doesn't have. Supervisor, optional, is the one loop that writes this loop's Orders (or you): a
     parent that is no loop, or a chain that comes back to the row, is its supervisor_issue. Escalates to, optional, is
     where the loop sends what needs a person; blank means its project's manager, else the chief of staff, else you (always you for the chief). Once a loop
     has Role chief (master is read as chief), only it and the Break-glass table may reach you; escalation_issue says what breaks that. A cycle is
     drawn once, from its first loop by name; the other loops on it, and those whose chain runs into it, name that loop.
-    Checked by is checked too (not in health mode, whose rows have none): no reader but itself, a reader that is no loop,
+    Read by is checked too (not in health mode, whose rows have none): no reader but itself, a reader that is no loop,
     service or you, readers that only lead round loops (a cycle, or one nobody reads), and you on a loop with a supervisor loop.
     Returns (loops, break-glass reasons by name, issues that belong to no one loop: the `bad` rows tables() left out
     and Break-glass rows that name nothing, and warnings: more than FAN_IN loops read straight by you)."""
@@ -623,8 +623,9 @@ def links(registry, services, glass, bad=(), health=False):
     def default(loop):
         up = [m for m in managers.get(projects[loop], [])[:1] + chiefs[:1] if m != loop and roles[loop] != "chief"]
         return up[0] if up else "you"
-    readers = {r["Loop"]: list(dict.fromkeys(resolve(c.strip()) for c in cell(r, "Checked by").split(",") if c.strip())) for r in registry}
-    out = {r["Loop"]: {"checked_by": ", ".join(readers[r["Loop"]]),
+    # Checked by: the column's old name
+    readers = {r["Loop"]: list(dict.fromkeys(resolve(c.strip()) for c in (cell(r, "Read by") or cell(r, "Checked by")).split(",") if c.strip())) for r in registry}
+    out = {r["Loop"]: {"read_by": ", ".join(readers[r["Loop"]]),
                        "supervisor": resolve(cell(r, "Supervisor")) if cell(r, "Supervisor") else None,
                        "role": roles[r["Loop"]], "break_glass": reasons.get(r["Loop"]),
                        "escalates_to": resolve(cell(r, "Escalates to")) if cell(r, "Escalates to") else default(r["Loop"]),
@@ -658,11 +659,11 @@ def links(registry, services, glass, bad=(), health=False):
         rs = [c for c in readers[loop] if c != loop]
         issues = [f"supervisor {l['supervisor']} is not a loop in the registry" if l["supervisor"] not in {**out, "you": 0, None: 0}
                   else sup[loop]] + ([] if health else [
-                  loop in readers[loop] and "Checked by names itself",
+                  loop in readers[loop] and "Read by names itself",
                   not rs and "nobody reads it",
                   *(f"checker {c} is not a loop, a service or you" for c in rs if c not in known | {"you"}),
                   rs and loop not in reach and "its checkers never reach you",
-                  l["supervisor"] in out and "you" in rs and f"Checked by names you, but {l['supervisor']} supervises it"])
+                  l["supervisor"] in out and "you" in rs and f"Read by names you, but {l['supervisor']} supervises it"])
         l["supervisor_issue"] = "; ".join(i for i in issues if i) or None
         project, to = projects[loop], l["escalates_to"]
         issues = [l["role"] not in (None, "chief", "manager") and f"role {l['role']} is neither chief nor manager",
@@ -675,7 +676,7 @@ def links(registry, services, glass, bad=(), health=False):
                   esc[loop]]
         l["escalation_issue"] = "; ".join(i for i in issues if i) or None
     fan = [] if health else [l for l, rs in readers.items() if "you" in rs]
-    warn = [f"you: {len(fan)} loops name you in Checked by, more than {FAN_IN}; let a supervisor loop read most of them"] * (len(fan) > FAN_IN)
+    warn = [f"you: {len(fan)} loops name you in Read by, more than {FAN_IN}; let a supervisor loop read most of them"] * (len(fan) > FAN_IN)
     loose = list(bad) + [f"{who}: break-glass names no loop or service in the registry" for who in reasons if who not in known] + \
             [f"{who}: its break-glass row needs a reason" for who, why in reasons.items() if who in known - set(out) and not why]
     return out, reasons, loose, warn
@@ -833,7 +834,7 @@ def build():
     said = talk(rows, now)
     heavy = weight(rows)
     keys = ["loop", "project", "scope", "runtime", "job", "schedule", "cadence", "status", "last_run", "result", "detail",
-            "next_due", "pass_rate", "checks", "cost", "history", "checked_by", "supervisor", "supervisor_issue",
+            "next_due", "pass_rate", "checks", "cost", "history", "read_by", "supervisor", "supervisor_issue",
             "role", "escalates_to", "escalates_default", "break_glass", "escalation_issue", "improver", "moves",
             "charter", "orders", "prompt", "runner", "report", "log", "floor", "target", *KPI.values()]
     rows = [{k: r.get(k) for k in keys} for r in rows]
@@ -936,7 +937,7 @@ def talk(rows, now):
         f = r.get("report_file")
         if f and DAY.search(f.name) and DAY.search(f.name).group(0) >= since:
             day, md = DAY.search(f.name).group(0), read(f)
-            add(kind="report", at=day, loop=loop, to=r.get("checked_by"), text=f"{day} report", link=r["report"], **{"from": loop})
+            add(kind="report", at=day, loop=loop, to=r.get("read_by"), text=f"{day} report", link=r["report"], **{"from": loop})
             for t in items_under(md, "escalat"):
                 add(kind="escalation", at=day, loop=loop, to=r.get("escalates_to") or "you", text=t, link=r["report"], **{"from": loop})
             for t in items_under(md, "orders? requests?"):

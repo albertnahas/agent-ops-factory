@@ -26,7 +26,7 @@ day() { date -v-"$1"d +%FT10:00:00 2>/dev/null || date -d "$1 days ago" +%FT10:0
 cat > "$AGENT_OPS_DIR/REGISTRY.md" <<EOF
 ## Registry
 
-| Loop | Project | Runtime | Job | Schedule | Charter | Outcome check | Checked by | Supervisor |
+| Loop | Project | Runtime | Job | Schedule | Charter | Outcome check | Read by | Supervisor |
 |---|---|---|---|---|---|---|---|---|
 | good | Shop | cloud | routine:good | daily | | | you | You |
 | broken | Shop | cloud | routine:broken | daily | | | good, heartbeat | good |
@@ -86,15 +86,15 @@ expect "a ledger name with no row is unregistered" "[ \"\$(status stray)\" = unr
 expect "an adhoc run is a one-off, not a loop" "[ \"\$(status adhoc)\" = one-off ] && jq -e '.rows[] | select(.loop == \"adhoc\") | .project == \"One-off\" and .cost == 0.5' \"$L\" >/dev/null"
 expect "a routine service is read from the snapshot: there, off, gone" "[ \"\$(status Watchman)\" = service ] && [ \"\$(status Sleeper)\" = paused ] && [ \"\$(status Gone)\" = missing ] && jq -e '.rows[] | select(.loop == \"Gone\") | .runtime == \"cloud\" and (.detail | test(\"no routine named gone in the claude.ai snapshot\"))' $L >/dev/null"
 expect "a service that logs a failed check is failing, with its pass rate" "[ \"\$(status Poster)\" = failing ] && jq -e '.rows[] | select(.loop == \"Poster\") | .checks == \"0 of 1\" and .detail == \"post not on the API\"' $L >/dev/null"
-expect "checked by is a comma list"            "jq -e '.rows[] | select(.loop == \"broken\") | .checked_by == \"good, heartbeat\"' $L >/dev/null"
+expect "read by is a comma list"            "jq -e '.rows[] | select(.loop == \"broken\") | .read_by == \"good, heartbeat\"' $L >/dev/null"
 expect "every cell is a scalar, as on claude.ai" "jq -se 'all(.[].rows[][]; type != \"array\" and type != \"object\")' $L $AGENT_OPS_DIR/fleet/waiting.json >/dev/null"
 expect "a loop's KPI is its latest kpi.jsonl line, as scalar cells" "jq -e '[.rows[] | select(.loop == \"broken\" or .loop == \"good\" or .loop == \"flaky\" or .loop == \"fresh\") | [.loop, .kpi, .kpi_value, .kpi_attempts, .kpi_of, .kpi_since, .kpi_better]] | sort == [[\"broken\", \"below\", 50, 1, 2, \"2026-11-22\", null], [\"flaky\", null, null, null, null, null, null], [\"fresh\", \"measured\", 5, null, null, null, \"higher\"], [\"good\", \"no KPI\", null, null, null, null, null]]' $L >/dev/null"
 expect "the replay eval's latest scores ride in the meta, beside the KPIs" "jq -e '[.meta[] | select(.label | startswith(\"Eval: \"))] == [{\"label\": \"Eval: Replay window\", \"value\": \"2026-11-08 to 2026-11-22 at 09:30\"}, {\"label\": \"Eval: Replay, dashboard\", \"value\": \"catches 67% of real incidents (8 of 12), floor 66% · 54% of its flags are false alarms · flags in 2.65 h (median)\"}, {\"label\": \"Eval: Messages to you\", \"value\": \"3.13 a day\"}]' $L >/dev/null"
 C=$AGENT_OPS_DIR/fleet/changes.json
 expect "the improver's history: one row a change, the last line for an id wins, newest first" "jq -e '[.rows[] | [.id, .outcome, .moved, .result]] == [[\"c2\", \"pending\", null, null], [\"c1\", \"kept\", true, \"pass rate 60% to 90%\"]]' $C >/dev/null"
 expect "a change's trace is one link a line, every cell a scalar" "jq -e '(.rows[] | select(.id == \"c1\") | .trace == \"https://x/run/1\\nruns.jsonl:12\") and all(.rows[][]; type != \"array\" and type != \"object\")' $C >/dev/null"
-expect "checked by resolves jobs and you, once each" "jq -e '.rows[] | select(.loop == \"reader\") | .checked_by == \"good, you, flaky, reader\"' $L >/dev/null"
-expect "a service's job names the service"   "jq -e '.rows[] | select(.loop == \"watched\") | .checked_by == \"Build\"' $L >/dev/null"
+expect "read by resolves jobs and you, once each" "jq -e '.rows[] | select(.loop == \"reader\") | .read_by == \"good, you, flaky, reader\"' $L >/dev/null"
+expect "a service's job names the service"   "jq -e '.rows[] | select(.loop == \"watched\") | .read_by == \"Build\"' $L >/dev/null"
 sup() { jq -r --arg l "$1" '.rows[] | select(.loop == $l) | "\(.supervisor) | \(.supervisor_issue)"' "$L"; }
 expect "a supervisor is a loop or you; a checker is a loop, a service or you" "[ \"\$(sup broken)\" = 'good | checker heartbeat is not a loop, a service or you' ] && [ \"\$(sup good)\" = 'you | null' ]"
 expect "a supervisor's job names its loop"     "[ \"\$(sup reader | cut -d' ' -f1)\" = watched ]"
@@ -103,7 +103,7 @@ expect "a missing supervisor is flagged"       "[ \"\$(sup fresh)\" = 'ghost | s
 expect "a supervision cycle is drawn once, on its first loop" "sup flaky | grep -q 'comes back to it: flaky → flaky' && sup reader | grep -q 'reader → watched → reader' && sup watched | grep -q 'in the cycle through reader'"
 expect "a registered row with no job is paused" "[ \"\$(status jobless)\" = paused ]"
 expect "the registry-only check names the same issues" "! python3 fleet/fleet.py --check > $AGENT_OPS_DIR/issues && diff <(jq -r '[.rows[] | select(.supervisor_issue) | \"\\(.loop): \\(.supervisor_issue)\"] | join(\"; \")' $L) $AGENT_OPS_DIR/issues"
-expect "no checker is an empty cell"           "jq -e '.rows[] | select(.loop == \"lonely\") | .checked_by == \"\"' $L >/dev/null"
+expect "no checker is an empty cell"           "jq -e '.rows[] | select(.loop == \"lonely\") | .read_by == \"\"' $L >/dev/null"
 expect "cost comes from the ledger"            "jq -e '.rows[] | select(.loop == \"good\") | .cost == 2' $L >/dev/null"
 expect "a project is its own scope"           "[ \"\$(scope good)\" = Shop ]"
 expect "no project is General"                 "[ \"\$(scope flaky)\" = General ]"
@@ -123,7 +123,7 @@ expect "with no chief of staff, every loop escalates to you, unflagged" "jq -e '
 cat > "$AGENT_OPS_DIR/REGISTRY.md" <<EOF
 ## Registry
 
-| Loop | Project | Runtime | Job | Schedule | Charter | Outcome check | Checked by | Supervisor | Escalates to | Role | Moves |
+| Loop | Project | Runtime | Job | Schedule | Charter | Outcome check | Read by | Supervisor | Escalates to | Role | Moves |
 |---|---|---|---|---|---|---|---|---|---|---|---|
 | door | Shop | cloud | routine:door | daily | | | you | | | Master |
 | boss | Shop | cloud | routine:boss | daily | | | you | | | manager |
@@ -165,7 +165,7 @@ expect "a target that is no loop is flagged"     "esc astray | grep -q 'escalate
 expect "one manager per project"                "esc boss | grep -q 'Shop has 2 managers' && esc boss2 | grep -q 'Shop has 2 managers'"
 expect "a role is chief or manager"             "esc odd | grep -q 'role captain'"
 expect "every cell is still a scalar"           "jq -e 'all(.rows[][]; type != \"array\" and type != \"object\")' $L >/dev/null"
-expect "the registry-only check names every escalation issue" "! python3 fleet/fleet.py --check > $AGENT_OPS_DIR/issues && diff <(jq -r '[.rows[] | select(.escalation_issue) | \"\\(.loop): \\(.escalation_issue)\"] + [\"phantom: break-glass names no loop or service in the registry\"] | join(\"; \"), \"warning: you: 10 loops name you in Checked by, more than 5; let a supervisor loop read most of them\"' $L) $AGENT_OPS_DIR/issues"
+expect "the registry-only check names every escalation issue" "! python3 fleet/fleet.py --check > $AGENT_OPS_DIR/issues && diff <(jq -r '[.rows[] | select(.escalation_issue) | \"\\(.loop): \\(.escalation_issue)\"] + [\"phantom: break-glass names no loop or service in the registry\"] | join(\"; \"), \"warning: you: 10 loops name you in Read by, more than 5; let a supervisor loop read most of them\"' $L) $AGENT_OPS_DIR/issues"
 
 # What defines a loop: its charter (from the registry's folder, or a checkout whose path ends with the cell's leading
 # folders), the Orders and dated report its charter names, a routine's page, a task's prompt, a job's script.
@@ -188,6 +188,7 @@ echo "{\"launch_agents\": \"$AGENT_OPS_DIR/none\", \"tasks\": \"$AGENT_OPS_DIR/t
 python3 fleet/fleet.py >/dev/null
 TMP=$(cd "$AGENT_OPS_DIR" && pwd -P)
 def() { jq -r --arg l "$1" --arg k "$2" '.rows[] | select(.loop == $l) | .[$k] // ""' "$L" | sed "s|^$TMP/||"; }
+expect "Checked by, the column's old name, still reads as Read by" "[ \"\$(def ops read_by)\" = you ]"
 expect "a charter is found from the registry's folder"  "[ \"\$(def ops charter)\" = docs/OPS.md ]"
 expect "its Orders are the first orders file it names"  "[ \"\$(def ops orders)\" = docs/orders/ops.md ]"
 expect "its report is the newest dated file its report section names" "[ \"\$(def ops report)\" = docs/reports/2026-11-21.md ]"
@@ -251,7 +252,7 @@ expect "a job's script is its last argument in your home" "[ \"\$(run /bin/bash 
 mk() { O=$AGENT_OPS_DIR/case-$1; mkdir -p "$O/fleet" "$O/la" "$O/checks"; echo "{\"launch_agents\": \"$O/la\", \"waiting\": {\"queue\": {\"path\": \"$O/QUEUE.md\", \"owner\": \"You\"}}}" > "$O/fleet.json"; }
 build() { AGENT_OPS_DIR=$O FLEET_CONFIG=$O/fleet.json python3 fleet/fleet.py "$@" > "$O/said" 2>&1; }
 get() { jq -r --arg l "$1" ".rows[] | select(.loop == \$l) | $2" "$O/fleet/loops.json"; }
-reg() { printf '## Registry\n\n| Loop | Project | Runtime | Job | Schedule | Charter | Outcome check | Checked by | Supervisor |\n|---|---|---|---|---|---|---|---|---|\n'; printf '%s\n' "$@"; }
+reg() { printf '## Registry\n\n| Loop | Project | Runtime | Job | Schedule | Charter | Outcome check | Read by | Supervisor |\n|---|---|---|---|---|---|---|---|---|\n'; printf '%s\n' "$@"; }
 row() { echo "| $1 | ${3:-P} | cloud | routine:$1 | daily | | | you | ${2:-} |"; }
 routine() { printf '{"name":%s,"enabled":%s,"cron":"0 6 * * *","next_run_at":%s,"last_status":%s,"last_finished_at":%s}' "$1" "${2:-true}" "${3:-null}" "${4:-null}" "${5:-null}"; }
 cloud() { echo "{\"at\":\"$(date +%FT%T%z)\",\"routines\":[$1],\"tasks\":${2:-[]}}" > "$O/fleet/cloud.json"; }
@@ -323,7 +324,7 @@ mk reg; L300=$(printf 'l%.0s' $(seq 300)); echo "open('$O/ran', 'w')" > "$O/pwn.
   for l in t2:t1 t1:ta ta:tb tb:tc tc:tb; do row "${l%%:*}" "${l#*:}"; done; } > "$O/REGISTRY.md"
 expect "a long name is a loop; an odd or U+2028 name, you or nobody is left out" "build && [ -n \"\$(get \"$L300\" .loop)\" ] && [ -z \"\$(get \"\$(printf 'u\xe2\x80\xa8v')\" .loop)\$(get you .loop)\$(get Nobody .loop)\$(get 'a b' .loop)\" ]"
 expect "a loop name with ../ runs no check outside checks/" "[ ! -e $O/ran ]"
-expect "two rows with one name in any case are one loop, the first row's" "[ \$(get dup .loop | wc -l) -eq 1 ] && [ -z \"\$(get DUP .loop)\" ] && [ \"\$(get dup .checked_by)\" = you ]"
+expect "two rows with one name in any case are one loop, the first row's" "[ \$(get dup .loop | wc -l) -eq 1 ] && [ -z \"\$(get DUP .loop)\" ] && [ \"\$(get dup .read_by)\" = you ]"
 expect "a row with a stray | is left out; \\| is a pipe in a cell" "[ -z \"\$(get x .loop)\" ] && [ \"\$(get pipe .project)\" = 'A | B' ]"
 expect "an empty cell past the last header is fine" "[ -n \"\$(get g .loop)\" ]"
 expect "spellings of a project share the first; a project called General is General" "[ \"\$(get sp .scope)\" = Social-Algorithms ] && [ \"\$(get g .scope)\" = General ]"
@@ -339,12 +340,12 @@ mk readers; { reg "$(row boss)" "| w | P | cloud | routine:w | daily | | | boss,
   "| r1 | P | cloud | routine:r1 | daily | | | r2 | |" "| r2 | P | cloud | routine:r2 | daily | | | r1 | |" "| ext | P | cloud | routine:ext | daily | | | vendor | |" \
   "| via | P | cloud | routine:via | daily | | | Build | |"
   for i in 1 2 3 4 5; do row "f$i"; done; printf '\n## Services\n\n| Service | Job | What it is |\n|---|---|---|\n| Build | com.b | builds |\n'; } > "$O/REGISTRY.md"
-expect "Checked by: a self-check, a cycle and a stranger are flagged; a service ends a chain" "build && [ \"\$(get self .supervisor_issue)\" = 'Checked by names itself; nobody reads it' ] && [ \"\$(get r1 .supervisor_issue)\" = 'its checkers never reach you' ] && [ \"\$(get ext .supervisor_issue)\" = 'checker vendor is not a loop, a service or you' ] && [ \"\$(get via .supervisor_issue)\" = null ]"
-expect "a loop with a supervisor loop doesn't also name you" "[ \"\$(get w .supervisor_issue)\" = 'Checked by names you, but boss supervises it' ] && [ \"\$(get f1 .supervisor_issue)\" = null ]"
+expect "Read by: a self-check, a cycle and a stranger are flagged; a service ends a chain" "build && [ \"\$(get self .supervisor_issue)\" = 'Read by names itself; nobody reads it' ] && [ \"\$(get r1 .supervisor_issue)\" = 'its checkers never reach you' ] && [ \"\$(get ext .supervisor_issue)\" = 'checker vendor is not a loop, a service or you' ] && [ \"\$(get via .supervisor_issue)\" = null ]"
+expect "a loop with a supervisor loop doesn't also name you" "[ \"\$(get w .supervisor_issue)\" = 'Read by names you, but boss supervises it' ] && [ \"\$(get f1 .supervisor_issue)\" = null ]"
 build --check
-expect "--check warns when more than 5 loops go straight to you" "grep -q '^warning: you: 7 loops name you in Checked by, more than 5' $O/said"
+expect "--check warns when more than 5 loops go straight to you" "grep -q '^warning: you: 7 loops name you in Read by, more than 5' $O/said"
 mk fan; { reg; for i in 1 2 3 4 5 6; do row "f$i"; done; } > "$O/REGISTRY.md"
-expect "the fan-in warning alone prints and exits 0" "build --check && [ \"\$(cat $O/said)\" = 'warning: you: 6 loops name you in Checked by, more than 5; let a supervisor loop read most of them' ]"
+expect "the fan-in warning alone prints and exits 0" "build --check && [ \"\$(cat $O/said)\" = 'warning: you: 6 loops name you in Read by, more than 5; let a supervisor loop read most of them' ]"
 
 mk pause; mkdir "$O/ch"; printf '# P\n\nstatus: paused\n' > "$O/ch/p.md"; printf '# A\n\nstatus: active\n' > "$O/ch/a.md"
 reg '| p | P | cloud | routine:p | daily | `ch/p.md` | | you | |' '| a | P | cloud | routine:a | daily | `ch/a.md` | | you | |' > "$O/REGISTRY.md"

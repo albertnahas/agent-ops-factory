@@ -28,7 +28,7 @@ echo "{\"launch_agents\": \"$D/none\", \"tasks\": \"$D/none\"}" > "$D/fleet.json
 cat > "$D/REGISTRY.md" <<'EOF'
 ## Registry
 
-| Loop | Project | Runtime | Job | Schedule | Charter | Outcome check | Checked by | Improver |
+| Loop | Project | Runtime | Job | Schedule | Charter | Outcome check | Read by | Improver |
 |---|---|---|---|---|---|---|---|---|
 | up | Shop | cloud | routine:up | daily | | | you | on |
 | down | Shop | cloud | routine:down | daily | | | you | on |

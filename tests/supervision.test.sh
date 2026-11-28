@@ -11,7 +11,7 @@ expect() { if eval "$2"; then echo "ok    $1"; else echo "FAIL  $1"; fail=1; fi;
 cat > "$D/REGISTRY.md" <<'R'
 ## Registry
 
-| Loop | Project | Runtime | Job | Schedule | Charter | Outcome check | Checked by | Supervisor |
+| Loop | Project | Runtime | Job | Schedule | Charter | Outcome check | Read by | Supervisor |
 |---|---|---|---|---|---|---|---|---|
 | boss | Shop | cloud | routine:boss | daily | | | you | |
 | posts | Shop | mac | com.t.posts | daily | | | boss | boss |

@@ -177,7 +177,7 @@
 .fx-group > span + span { flex: none; }
 .fx-group small { font-weight: 400; text-transform: none; letter-spacing: 0; color: var(--color-fg-muted); margin-left: 8px; }
 
-/* factory: loops, then the loops that check them, then you; lines are Checked by, drawn from the chips' places */
+/* factory: loops, then the loops that check them, then you; lines are Read by, drawn from the chips' places */
 #factory-card { --sec: var(--fx-c0, var(--color-fg-muted)); overflow: clip; }
 .fx-fbody { padding: 12px; display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; }
 .fx-flayers, .fx-fcols { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr) 54px; column-gap: 18px; }
@@ -264,7 +264,7 @@
 .fx-disc summary small { margin-left: auto; color: var(--color-fg-muted); font-weight: 400; font-size: var(--cds-font-size-caption); text-align: right; }
 .fx-disc summary:focus-visible { outline: 2px solid var(--color-fg); outline-offset: -2px; }
 .fx-disc details > :not(summary) { border-top: 1px solid var(--color-border-line); }
-@media (max-width: 639px) { .fx-seg, .fx-flayers { display: none; } .fx-stage { padding: 0; } }
+@media (max-width: 639px) { .fx-seg, .fx-flayers, .fx-lhelp { display: none; } .fx-stage { padding: 0; } }
 .fx-ltog { all: unset; box-sizing: border-box; flex: 0 0 auto; justify-content: center; white-space: nowrap; display: inline-flex; align-items: center; gap: 5px; padding: 5px 8px; border-radius: 999px; border: 1px solid var(--color-border-line); cursor: pointer; font-size: var(--cds-font-size-caption); font-weight: var(--cds-font-weight-medium); color: var(--color-fg-muted); }
 .fx-ltog[aria-pressed="true"] { color: var(--color-fg); background: color-mix(in srgb, var(--color-fg) 8%, var(--fx-card)); border-color: color-mix(in srgb, var(--color-fg) 35%, transparent); }
 .fx-ltog[data-problems][aria-pressed="true"] { color: var(--color-bad); border-color: color-mix(in srgb, var(--color-bad) 50%, transparent); background: color-mix(in srgb, var(--color-bad) 8%, var(--fx-card)); }
@@ -318,15 +318,15 @@ textarea.fx-input { resize: vertical; }
     </div>
   </header>
   <div class="fx-about" id="about" hidden>
-    <p>Loops check each other's output, supervisors set their Orders, and anything that needs a person climbs to the chief of staff before it reaches you. Point at a loop to trace its chain; tap it for everything about it.</p>
+    <p>Three kinds of line join the loops. <b>Read by</b>: who reads a loop's output after it runs and catches what it missed. <b>Steered by</b>: the supervisor that writes a loop's Orders, the file that says what it works on now (its tests, priorities and read dates). <b>Escalates to</b>: where a loop sends what needs a person, climbing to the chief of staff, the only one that messages you. Point at a loop to trace its chain; tap it for everything about it.</p>
     <div class="fx-legend">
       <span><span class="fx-dot" data-tone="ok"></span>Healthy</span>
       <span><span class="fx-dot" data-tone="warn"></span>Needs a look</span>
       <span><span class="fx-dot" data-tone="bad"></span>Failing or silent</span>
       <span><span class="fx-dot" data-tone="none"></span>Not run yet or paused</span>
-      <span><i></i>Checks</span>
-      <span data-sups hidden><i class="sup"></i>Supervises</span>
-      <span><i class="esc"></i>Escalates</span>
+      <span><i></i>Read by</span>
+      <span data-sups hidden><i class="sup"></i>Steered by</span>
+      <span><i class="esc"></i>Escalates to</span>
       <span id="legend-glass" hidden><i class="glass"></i>Break-glass</span>
       <span><i class="gap"></i>Nobody reads it</span>
     </div>
@@ -344,18 +344,19 @@ textarea.fx-input { resize: vertical; }
     <div class="fx-fbar">
       <p class="fx-fdoor" data-draw="factory-door" data-source="loops"></p>
       <div class="fx-seg" role="group" aria-label="Lines">
-        <button type="button" class="fx-ltog" data-layer="esc">Escalates</button>
-        <button type="button" class="fx-ltog" data-layer="check">Checks</button>
-        <button type="button" class="fx-ltog" data-layer="sup" data-sups hidden>Orders</button>
+        <button type="button" class="fx-ltog" data-layer="esc">Escalates to</button>
+        <button type="button" class="fx-ltog" data-layer="check">Read by</button>
+        <button type="button" class="fx-ltog" data-layer="sup" data-sups hidden>Steered by</button>
       </div>
       <button type="button" class="fx-ltog fx-solo" data-problems>Problems</button>
       <span data-draw="new-loop" data-source="questions"></span>
     </div>
+    <p class="fx-muted fx-lhelp" id="layer-help"></p>
     <p class="fx-muted" id="factory-note" hidden><span data-draw="fleet-size" data-source="loops">—</span> loops are too many to draw at once. Pick a project:</p>
     <div class="fx-card fx-plain" id="factory-card">
       <div class="fx-canvas" id="factory-canvas" tabindex="0" aria-label="Factory graph: scroll to move around, pinch or hold Ctrl and scroll to zoom">
         <div class="fx-stage">
-          <div class="fx-flayers" aria-hidden="true"><span>Loops</span><span>Checked by</span><span>To you</span></div>
+          <div class="fx-flayers" aria-hidden="true"><span>Loops</span><span>Read by</span><span>To you</span></div>
           <div class="fx-factory" id="factory-graph" data-draw="factory" data-source="loops"></div>
         </div>
         <div class="fx-cv-tools" role="toolbar" aria-label="Zoom">
@@ -397,7 +398,7 @@ const GAPS = ['no check', 'no runs yet', 'no record'];
 const scoped = (rows, {project} = dash.params()) => rows.filter((r) => !project || r.scope === project);
 /* the graph's two ends aren't names, so a loop called you or nobody stays a loop; a cell that says you means you */
 const YOU = '\0you', NOBODY = '\0nobody', person = (c) => c === 'you' ? YOU : c;
-const checkers = (r) => r.checked_by ? r.checked_by.split(', ').map(person) : [];
+const checkers = (r) => r.read_by ? r.read_by.split(', ').map(person) : [];
 const LABEL = {failing: 'Failing', silent: 'Silent', unregistered: 'Unregistered', chronic: 'Flaky', stale: 'Stale data',
   'no check': 'Unchecked', 'no runs yet': 'Not run yet', 'no record': 'No run record', ran: 'Ran', healthy: 'Healthy', paused: 'Paused', missing: 'Missing', service: 'Running', 'one-off': 'One-off'};
 const TONE = {failing: 'bad', silent: 'bad', unregistered: 'warn', chronic: 'warn', stale: 'warn', 'no check': 'none', 'no runs yet': 'none',
@@ -508,7 +509,7 @@ const copyBtn = (cmd, label) => {
 const DEFS = [['charter', 'Charter'], ['orders', 'Orders'], ['prompt', (r) => /^https?:/.test(r.prompt) ? 'Routine' : 'Prompt'],
   ['runner', (r) => /\.plist$/.test(r.runner) ? 'Plist' : 'Run script'], ['report', 'Latest report'], ['log', 'Run log']];
 /* a loop with a registry row: what reads, steers and defines it is known, and the new-loop skill can change it */
-const registered = (r) => !health() && !NOT_LOOP.includes(r.project) && r.checked_by != null;
+const registered = (r) => !health() && !NOT_LOOP.includes(r.project) && r.read_by != null;
 const defsRow = (r) => {
   const defs = DEFS.filter(([k]) => r[k]);
   const none = registered(r) && !r.charter;
@@ -606,6 +607,7 @@ const ask = (form, r, from) => {
   FX.form = {form, row: r || null, values: r ? {loop: r.loop} : known ? {project} : {}, built: null, missing: []};
   openSheet({kind: 'form'}, from);
 };
+const projectsKnown = () => { const l = dash.data('loops'); return l.status === 'ok' ? [...new Set(l.data.map((x) => x.project).filter((p) => p && !NOT_LOOP.includes(p)))].sort() : []; };
 const field = (q, choices, onInput) => {
   const box = el('div', 'fx-q'), id = 'q-' + FX.form.form + '-' + q.id;
   box.dataset.q = q.id;
@@ -628,6 +630,17 @@ const field = (q, choices, onInput) => {
       lab.append(r, txt); set.append(lab);
     });
     box.append(set);
+  } else if (q.id === 'project' && projectsKnown().length) {
+    /* the projects the fleet has, or a new one typed in */
+    const sel = el('select', 'dash-select fx-input'), NEW = '\u0000new', known = projectsKnown();
+    sel.id = id;
+    [['', q.required ? 'Pick one' : 'None'], ...known.map((p) => [p, p]), [NEW, 'New project…']].forEach(([val, txt]) => { const o = el('option', '', txt); o.value = val; sel.append(o); });
+    const typed = el('input', 'fx-input'); typed.type = 'text'; typed.placeholder = 'Its name'; typed.setAttribute('aria-label', 'New project name');
+    const fresh = v !== '' && !known.includes(String(v));
+    sel.value = fresh ? NEW : String(v); typed.value = fresh ? v : ''; typed.hidden = !fresh;
+    sel.onchange = () => { typed.hidden = sel.value !== NEW; if (sel.value === NEW) { typed.focus(); onInput(q.id, typed.value); } else onInput(q.id, sel.value); };
+    typed.oninput = () => onInput(q.id, typed.value);
+    box.append(sel, typed);
   } else {
     const multi = q.kind === 'longtext' || q.repeat, input = el(multi ? 'textarea' : 'input', 'fx-input');
     input.id = id; input.value = v;
@@ -645,8 +658,11 @@ const field = (q, choices, onInput) => {
 /* the form, inside the drawer: answer, build, copy. The page runs nothing */
 const formBody = (box) => {
   const f = FX.form;
-  box.append(el('p', 'fx-muted', 'Answer here, copy the prompt, and paste it into Claude Code. It asks for anything missing and confirms before it changes a thing.'));
-  if (f.row) box.append(el('p', 'fx-muted', 'Now: ' + [f.row.runtime && 'runs on ' + f.row.runtime, f.row.schedule, f.row.supervisor && 'supervised by ' + f.row.supervisor].filter(Boolean).join(' · ')));
+  const skill = promptOf(f.form) + (f.row ? '\nloop: ' + f.row.loop : '');
+  box.append(el('h3', 'fx-sec', 'Let Claude write it'), el('p', 'fx-muted', 'Paste this into Claude Code. It reads the repo, asks you what it needs, and writes the whole loop, confirming before it changes a thing.'),
+    el('pre', 'fx-prompt', skill), copyBtn(skill, 'Copy for Claude Code'),
+    el('h3', 'fx-sec', 'Or answer up front'), el('p', 'fx-muted', 'Fill in what you know, build the prompt, and paste that instead. Claude asks only for what you left out.'));
+  if (f.row) box.append(el('p', 'fx-muted', 'Now: ' + [f.row.runtime && 'runs on ' + f.row.runtime, f.row.schedule, f.row.supervisor && 'steered by ' + f.row.supervisor].filter(Boolean).join(' · ')));
   const body = el('div', 'fx-form-body'), out = el('div', 'fx-built');
   const onInput = (id, v) => { f.values[id] = v; f.built = null; out.replaceChildren(); };
   const all = asked(f.form);
@@ -755,7 +771,7 @@ const loopTalk = (r, box) => {
   const mine = talkOf(r.loop), orders = mine.filter((e) => !e.at), said = mine.filter((e) => e.at).slice(0, 20).reverse();
   if (orders.length) {
     const ul = el('ul', 'fx-orders'); orders.forEach((e) => { const li = el('li'); li.append(el('p', '', e.text), el('small', '', [e.from && 'from ' + e.from, e.read_date && 'read ' + dayMonth(e.read_date)].filter(Boolean).join(' · '))); ul.append(li); });
-    box.append(el('h3', 'fx-sec', 'Orders now'), ul);
+    box.append(el('h3', 'fx-sec', 'Orders now'), el('p', 'fx-muted', 'What its supervisor has it working on: each test, priority or watch, and when it gets read.'), ul);
   }
   box.append(el('h3', 'fx-sec', 'Conversation'));
   if (said.length) { const ul = el('ul', 'fx-chat'); said.forEach((e) => ul.append(bubble(e, r.loop))); box.append(ul); }
@@ -822,7 +838,7 @@ const loopSummary = (r, more) => {
     r.cost != null ? '$' + r.cost.toLocaleString('en', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + ' in 30 days' : ledger() && /cloud|db|app/.test(r.runtime || '') ? 'cost not metered' : null].filter(Boolean).join(' · ')));
   if (r.status === 'no check') more.append(el('p', '', 'Nothing writes a pass or fail line for it, so a run that did nothing looks like one that worked.'));
   if (registered(r)) {
-    more.append(el('p', '', [r.checked_by && 'Read by ' + r.checked_by, r.supervisor && 'supervised by ' + r.supervisor,
+    more.append(el('p', '', [r.read_by && 'Read by ' + r.read_by, r.supervisor && 'steered by ' + r.supervisor,
       r.escalates_to && 'escalates to ' + r.escalates_to, r.role && 'role ' + r.role, r.improver && 'Improver: on'].filter(Boolean).join(' · ')));
     if (r.break_glass) { const p = el('p'); p.append(el('b', '', 'Break-glass: '), document.createTextNode(r.break_glass)); more.append(p); }
     const p = el('p'); p.append(el('b', '', 'Good: '), document.createTextNode([goodText(r), r.target && 'Target ' + r.target,
@@ -946,12 +962,12 @@ dash.draw('svc-count', (e) => {
   e.textContent = s.length + (bad ? ', ' + bad + ' failing' : '');
 });
 
-/* factory tab: three links. Checks: each loop points at every name in its Checked by, or at Nobody when it has none; loops
-   that read another's output are checkers, and a name that is no loop is a checker the registry doesn't have. Supervises:
+/* factory tab: three links. Read by: each loop points at every name in its Read by, or at Nobody when it has none; loops
+   that read another's output are checkers, and a name that is no loop is a checker the registry doesn't have. Steered by:
    a supervisor writes a loop's Orders. Escalates: where a loop sends what needs a person, ending at you through the
    chief of staff (the last column), or straight to you from the break-glass list. The page's scope picks the loops, and every
    loop their links reach comes too, so each chain stays whole. */
-const problem = (r) => ['failing', 'silent', 'chronic', 'no check'].includes(r.status) || !r.checked_by || !!(r.supervisor_issue || r.escalation_issue);
+const problem = (r) => ['failing', 'silent', 'chronic', 'no check'].includes(r.status) || !r.read_by || !!(r.supervisor_issue || r.escalation_issue);
 const factoryGraph = (rows, problems, params = dash.params()) => {
   const all = new Map(rows.filter((r) => !NOT_LOOP.includes(r.project)).map((r) => [r.loop, r]));
   const loops = scoped([...all.values()], params).filter((r) => !problems || problem(r)), keep = new Set(loops.map((r) => r.loop));
@@ -1028,7 +1044,13 @@ if (!FX.layer) {
   FX.layer = LAYERS.includes(v && v.layer) ? v.layer : 'esc'; FX.problems = !!(v && v.problems);
 }
 const saveView = () => { try { localStorage.setItem(VIEW, JSON.stringify({layer: FX.layer, problems: FX.problems})); } catch (e) { /* not remembered */ } };
+const LAYER_HELP = {
+  check: 'Read by: who reads each loop\'s output after it runs, and passes on what the loop missed.',
+  sup: 'Steered by: the supervisor that writes a loop\'s Orders, the file that says what it works on now: its tests, priorities and read dates.',
+  esc: 'Escalates to: where a loop sends what needs a person. It climbs to the chief of staff, the only one that messages you.',
+};
 const showLayer = () => {
+  document.querySelectorAll('#layer-help').forEach((e) => { e.textContent = LAYER_HELP[FX.layer]; });
   document.querySelectorAll('.fx-ltog[data-layer]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.layer === FX.layer)));
   document.querySelectorAll('#factory-graph').forEach((g) => LAYERS.forEach((k) => g.classList.toggle('hide-' + k, k !== FX.layer)));
 };
@@ -1068,7 +1090,7 @@ const nodeParas = (g, id) => {
   const reads = g.ins(id).map((e) => fname(g.nodes.get(e.from))), by = g.outs(id).map((e) => e.to === YOU ? 'you' : fname(g.nodes.get(e.to)));
   const label = (k) => k === 'you' ? 'you' : g.nodes.has(k) ? fname(g.nodes.get(k)) : k;
   if (n.kind === 'you') { say(g.doors.length + (g.doors.length === 1 ? ' path reaches' : ' paths reach') + ' you: ' + g.doors.map((k) => label(k) + (g.nodes.get(k).glass ? ' (break-glass: ' + g.nodes.get(k).glass + ')' : '')).join(', ') + '. You read ' + reads.length + ' loops\' output yourself.'); return out; }
-  if (n.kind === 'nobody') { say(reads.length + (reads.length === 1 ? ' loop runs' : ' loops run') + ' with no one reading their output: ' + reads.join(', ') + '. Give each a Checked by in the registry.'); return out; }
+  if (n.kind === 'nobody') { say(reads.length + (reads.length === 1 ? ' loop runs' : ' loops run') + ' with no one reading their output: ' + reads.join(', ') + '. Give each a Read by in the registry.'); return out; }
   if (n.kind === 'ext') say(n.service ? 'A service, not a loop: the registry doesn\'t say who reads its output.' : 'Not in the registry, so who reads its output is unknown.');
   if (n.kind === 'ext' && n.glass) say('Break-glass: ' + n.glass + '. May message you directly.');
   if (reads.length) say('Reads ' + reads.join(', ') + '.');
