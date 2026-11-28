@@ -4,7 +4,7 @@ The loop types a product ends up needing, taken from the fleet that runs OpenWhe
 
 A loop is a trigger, one job written down as a charter (`docs/AGENT_LOOP.md`), an outcome check with no model in it, and a ledger line per run (`bin/claude-run`, `bin/ops-check`), all from [agent-ops-kit](https://github.com/albertnahas/agent-ops-kit). Anything missing one of those isn't a loop yet. Daemons, dashboards and model-free watchers are services: they go in the registry's Services table, not its loop table.
 
-**Checked by** is who reads a loop's output after its own check passes: another loop (daily ops grades the fix agent's PRs), a script (the heartbeat), or you. Every loop names one, because an output nobody checks is how a loop drifts. The fleet dashboard draws these links.
+**Read by** is who reads a loop's output after its own check passes: another loop (daily ops grades the fix agent's PRs), a script (the heartbeat), or you. Every loop names one, because an output nobody checks is how a loop drifts. The fleet dashboard draws these links.
 
 **Supervisor** is optional: a loop that checks how another loop is doing and writes its Orders. When a product has several loops, daily ops is the usual supervisor of the ones it already reads (growth, social, fix on demand). Strategy, support, incident and the per-person loops usually have none. See "Supervisors and Orders" in the [playbook](FACTORY_PLAYBOOK.md).
 
@@ -12,7 +12,7 @@ A loop is a trigger, one job written down as a charter (`docs/AGENT_LOOP.md`), a
 
 ## Per product
 
-| Loop | Needs it when | Trigger | Output | Outcome check | Checked by | Cost |
+| Loop | Needs it when | Trigger | Output | Outcome check | Read by | Cost |
 |---|---|---|---|---|---|---|
 | **Daily ops** | it has users or revenue | daily, early | a report PR with metrics, anomalies and fixes; sweeps and grades open PRs | the report PR exists for today with every section | you, reading the report; grades by a fresh-context grader | $1–5 a run |
 | **Smoke test** | it has a deploy that can break a journey | daily, before you wake | pass or fail per journey | the test runner's exit | heartbeat; daily ops reads failures | free (no model) |
@@ -25,7 +25,7 @@ A loop is a trigger, one job written down as a charter (`docs/AGENT_LOOP.md`), a
 
 ## Per person (the fleet itself)
 
-| Loop | Needs it when | Trigger | Output | Outcome check | Checked by | Cost |
+| Loop | Needs it when | Trigger | Output | Outcome check | Read by | Cost |
 |---|---|---|---|---|---|---|
 | **Heartbeat** | you run more than one loop | daily | alerts on failed, silent and costly loops; `COSTS.md` | its own liveness line | a cloud watch that alerts if the heartbeat goes quiet | free |
 | **Cloud watch** | the heartbeat runs on a laptop | daily, in the cloud | an alert if the heartbeat stopped | the routine's run status | you | cents |

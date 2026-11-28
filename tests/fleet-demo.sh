@@ -33,7 +33,7 @@ printf '\n## Mission\n\n<!-- mission -->\nShoppers get their orders.\n\n- **Floo
 printf '\nTarget: at least 40 orders a week\n' >> "$AGENT_OPS_DIR/charters/orders/ops.md"
 
 loops=(
-  # loop|project|checked by|outcomes, oldest first (p pass, f fail, - none)|days since last run
+  # loop|project|read by|outcomes, oldest first (p pass, f fail, - none)|days since last run
   "shop-daily-ops|Shop|you|pppppppppp|0"
   "shop-support|Shop|shop-daily-ops, you|ppppppppp|0"
   "shop-support-fix|Shop|shop-daily-ops|ppfpp|1"
@@ -66,7 +66,7 @@ loops=(
   "life-review|Personal|you|-|0"
 )
 {
-  printf '## Registry\n\n| Loop | Project | Runtime | Job | Schedule | Charter | Outcome check | Checked by | Supervisor | Escalates to | Role |\n|---|---|---|---|---|---|---|---|---|---|---|\n'
+  printf '## Registry\n\n| Loop | Project | Runtime | Job | Schedule | Charter | Outcome check | Read by | Supervisor | Escalates to | Role |\n|---|---|---|---|---|---|---|---|---|---|---|\n'
   for l in "${loops[@]}"; do IFS='|' read -r name project by _ _ <<< "$l"; echo "| $name | $project | $(runtime "$name") | $(job "$name") | daily | $(charter "$name") | | $by | $(supervisor "$name") | $(escalates "$name") | $(role "$name") |"; done
   printf '\n## Services\n\n| Service | Job | What it is |\n|---|---|---|\n| Fleet build | com.demo.fleet-build | rebuilds the dashboard |\n| payments-watch | com.demo.payments-watch | disputes and refunds |\n'
   printf '\n## Break-glass\n\n| Who | Why |\n|---|---|\n| shop-e2e-smoke | production down |\n| payments-watch | money at risk |\n'

@@ -13,9 +13,9 @@ trap '[ -n "${KEEP:-}" ] || rm -rf "$AGENT_OPS_DIR"' EXIT
 fail=0
 expect() { if eval "$2"; then echo "ok    $1"; else echo "FAIL  $1"; fail=1; fi; }
 echo "{\"launch_agents\": \"$AGENT_OPS_DIR/none\"}" > "$AGENT_OPS_DIR/fleet.json"
-# fixture <name> < rows (loop|project|checked by): builds the dashboard from a registry of those rows, saved as <name>.html
+# fixture <name> < rows (loop|project|read by): builds the dashboard from a registry of those rows, saved as <name>.html
 fixture() {
-  { printf '## Registry\n\n| Loop | Project | Runtime | Job | Schedule | Charter | Outcome check | Checked by |\n|---|---|---|---|---|---|---|---|\n'
+  { printf '## Registry\n\n| Loop | Project | Runtime | Job | Schedule | Charter | Outcome check | Read by |\n|---|---|---|---|---|---|---|---|\n'
     while IFS='|' read -r l p c; do echo "| $l | $p | cloud | routine:$l | daily | | | $c |"; done; } > "$AGENT_OPS_DIR/REGISTRY.md"
   python3 fleet/fleet.py >/dev/null && cp "$AGENT_OPS_DIR/fleet/dashboard.html" "$AGENT_OPS_DIR/$1.html"
 }
@@ -30,7 +30,7 @@ python3 - "$AGENT_OPS_DIR" <<'EOF'
 import json, sys; sys.path.insert(0, "fleet"); from fleet import html, C
 loops, waiting = (json.loads((C["out"] / f"{n}.json").read_text()) for n in ("loops", "waiting"))
 row = next(r for r in loops["rows"] if r["loop"] == "ops-a")
-loops["rows"] += [{**row, "loop": n, "project": p, "scope": p, "checked_by": c} for n, p, c in
+loops["rows"] += [{**row, "loop": n, "project": p, "scope": p, "read_by": c} for n, p, c in
                   ((5, "Shop", "you"), (None, "Shop", "you"), ("you", "Shop", "ops-a"), ("nobody", "Shop", "you"), ("lonely", "Shop", ""),
                    ("لولאת-חנות-loop", "לולאת-חנות", "you"), ("zalgo-loop", "Zalgo-Z̷̢͓̈́a̸̧̛l̶g̷o̶", "you"), ("long-loop", "P" * 255, "you"))]
 item = {"title": "Pick a price", "tag": "Decision", "source": "Queue", "kind": "Queue", "item": "Pick a price", "action": "decide",
@@ -60,7 +60,7 @@ python3 - <<'EOF'
 import json, sys; sys.path.insert(0, "fleet"); from fleet import html, C
 loops = json.loads((C["out"] / "loops.json").read_text())
 row = next(r for r in loops["rows"] if r["loop"] == "ops-a")
-rows = [{**row, "loop": f"{p.lower()}{i:02d}", "project": p, "scope": p, "checked_by": "you", "status": "failing" if p == "Shop" and i < 22 else "healthy"}
+rows = [{**row, "loop": f"{p.lower()}{i:02d}", "project": p, "scope": p, "read_by": "you", "status": "failing" if p == "Shop" and i < 22 else "healthy"}
         for p, n in (("Shop", 30), ("Blog", 40)) for i in range(n)]
 html(rows, [], loops["meta"], "Loop fleet")
 EOF
@@ -113,6 +113,8 @@ sys.exit(0 if ok else 1)
 P
 }
 expect "the form asks the spec's questions, in its order" "want $AGENT_OPS_DIR/clique.json fields"
+expect "the form offers the skill command to copy, so Claude writes the whole loop" "q clique '.form.skill == \"/demo:new-loop\"'"
+expect "the project is picked from the fleet's projects, or typed as a new one" "q clique '(.form.projects | first) == \"None\" and (.form.projects | last) == \"New project…\" and (.form.projects | index(\"Shop\")) != null'"
 expect "an empty form asks for each required answer first" "q clique \".form.empty.prompt == null and .form.empty.missing == $(jq '[.new[] | select(.required)] | length' tests/kit/skills/new-loop/questions.json)\""
 expect "New loop builds the skill's prompt, with a Copy button" "want $AGENT_OPS_DIR/clique.json new && q clique '.form.new.copy'"
 expect "Change this loop builds the edit prompt for that loop, founder route marked" "want $AGENT_OPS_DIR/clique.json edit && q clique '.form.edit.founder == 1 and .form.loop != \"\"'"
