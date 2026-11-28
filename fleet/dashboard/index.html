@@ -318,7 +318,7 @@ textarea.fx-input { resize: vertical; }
     </div>
   </header>
   <div class="fx-about" id="about" hidden>
-    <p>Loops check each other's output, supervisors set their Orders, and anything that needs a person climbs to the master before it reaches you. Point at a loop to trace its chain; tap it for everything about it.</p>
+    <p>Loops check each other's output, supervisors set their Orders, and anything that needs a person climbs to the chief of staff before it reaches you. Point at a loop to trace its chain; tap it for everything about it.</p>
     <div class="fx-legend">
       <span><span class="fx-dot" data-tone="ok"></span>Healthy</span>
       <span><span class="fx-dot" data-tone="warn"></span>Needs a look</span>
@@ -949,7 +949,7 @@ dash.draw('svc-count', (e) => {
 /* factory tab: three links. Checks: each loop points at every name in its Checked by, or at Nobody when it has none; loops
    that read another's output are checkers, and a name that is no loop is a checker the registry doesn't have. Supervises:
    a supervisor writes a loop's Orders. Escalates: where a loop sends what needs a person, ending at you through the
-   master (the last column), or straight to you from the break-glass list. The page's scope picks the loops, and every
+   chief of staff (the last column), or straight to you from the break-glass list. The page's scope picks the loops, and every
    loop their links reach comes too, so each chain stays whole. */
 const problem = (r) => ['failing', 'silent', 'chronic', 'no check'].includes(r.status) || !r.checked_by || !!(r.supervisor_issue || r.escalation_issue);
 const factoryGraph = (rows, problems, params = dash.params()) => {
@@ -977,8 +977,8 @@ const factoryGraph = (rows, problems, params = dash.params()) => {
   /* each node's links, both ways, found once: every lookup below is by node, so a draw stays linear in loops and links */
   const by = (list, end) => groupBy(list, (e) => e[end]), from = by(edges, 'from'), to = by(edges, 'to');
   const outs = (id) => from.get(id) || [], ins = (id) => to.get(id) || [];
-  const master = (n) => n.kind === 'loop' && n.row.role === 'master';
-  nodes.forEach((n) => { n.col = ['you', 'nobody'].includes(n.kind) || master(n) ? 'ends' : n.kind === 'ext' || ins(n.id).length ? 'checkers' : 'workers'; });
+  const chief = (n) => n.kind === 'loop' && n.row.role === 'chief';
+  nodes.forEach((n) => { n.col = ['you', 'nobody'].includes(n.kind) || chief(n) ? 'ends' : n.kind === 'ext' || ins(n.id).length ? 'checkers' : 'workers'; });
   const ends = [...nodes.values()].filter((n) => n.col === 'ends').sort((a, b) => ['loop', 'you', 'nobody'].indexOf(a.kind) - ['loop', 'you', 'nobody'].indexOf(b.kind));
   /* how many checkers deep a node's output goes, each node once; a node met again on the way counts 0, so a loop of checkers ends */
   const depth = new Map(), deep = (id) => { if (!depth.has(id)) { depth.set(id, 0); depth.set(id, Math.max(0, ...outs(id).map((e) => 1 + deep(e.to)))); } return depth.get(id); };
@@ -1012,11 +1012,11 @@ const factoryGraph = (rows, problems, params = dash.params()) => {
   };
   /* a loop's escalation route, as its rows say: id → its Escalates to → … until you, a name that is no loop, or a repeat */
   const ladder = (id) => { const p = [id]; for (let n = all.get(id)?.escalates_to; n && !p.includes(n); n = n !== 'you' && all.get(n)?.escalates_to) p.push(n); return p; };
-  /* the doors to you: every node with an escalation straight to you. The target is the master plus the break-glass list */
+  /* the doors to you: every node with an escalation straight to you. The target is the chief of staff plus the break-glass list */
   const doors = [...new Set(escs.filter((e) => e.to === YOU).map((e) => e.from))], glass = [...nodes.values()].filter((n) => n.glass);
   /* supervision: a loop's supervisor writes its Orders; you, implied, isn't drawn */
   const sups = loops.filter((r) => r.supervisor && r.supervisor !== r.loop && nodes.get(person(r.supervisor))?.kind === 'loop').map((r, i) => ({from: r.supervisor, to: r.loop, i}));
-  return {nodes, edges, escs, outs, ins, order, groups, chain, route, ladder, doors, glass, loops, sups, hasMaster: loops.some((r) => r.role === 'master')};
+  return {nodes, edges, escs, outs, ins, order, groups, chain, route, ladder, doors, glass, loops, sups, hasChief: loops.some((r) => r.role === 'chief')};
 };
 const fname = (n) => n.kind === 'loop' ? nameOf(n.row) : n.kind === 'you' ? 'You' : n.kind === 'nobody' ? 'Nobody' : n.id;
 const fcurve = (x1, y1, x2, y2) => { const m = (x1 + x2) / 2; return `M${x1},${y1}C${m},${y1} ${m},${y2} ${x2},${y2}`; };
@@ -1049,16 +1049,16 @@ dash.draw('factory-count', (e) => {
   e.textContent = n + (n === 1 ? ' loop' : ' loops') + (!n ? '' : !gaps && !lost ? ' · every one is read' : (gaps ? ' · ' + gaps + ' nobody reads' : '') + (lost ? ' · ' + lost + ' never reach you' : ''));
   e.hidden = health();
 });
-/* the headline: how many paths can interrupt you, against one master plus the break-glass list */
+/* the headline: how many paths can interrupt you, against one chief of staff plus the break-glass list */
 dash.draw('factory-door', (e) => {
   const l = dash.data('loops'); e.replaceChildren();
   if (l.status !== 'ok') return;
   const g = factoryGraph(l.data), n = g.doors.length, target = 1 + g.glass.length;
   if (!g.nodes.size) return;
-  const tone = n <= target && g.hasMaster ? 'ok' : 'warn';
+  const tone = n <= target && g.hasChief ? 'ok' : 'warn';
   e.dataset.tone = tone;
-  e.title = 'Target ' + target + ': the master' + (g.glass.length ? ' and ' + g.glass.length + ' break-glass' : '') + '.'
-    + (g.hasMaster ? (n > target ? ' ' + (n - target) + ' more ' + (n - target === 1 ? 'goes' : 'go') + ' around the master.' : ' Everything else goes through them.') : ' No loop has Role master yet, so every loop can reach you.');
+  e.title = 'Target ' + target + ': the chief of staff' + (g.glass.length ? ' and ' + g.glass.length + ' break-glass' : '') + '.'
+    + (g.hasChief ? (n > target ? ' ' + (n - target) + ' more ' + (n - target === 1 ? 'goes' : 'go') + ' around the chief of staff.' : ' Everything else goes through them.') : ' No loop has Role chief yet, so every loop can reach you.');
   e.append(dot(tone), el('b', '', String(n)), el('span', '', (n === 1 ? ' path reaches' : ' paths reach') + ' you'));
 });
 /* what a node in the graph means: its path to you and what steers it; the drawer shows it */
@@ -1165,7 +1165,7 @@ dash.draw('factory', (box) => {
     const role = n.kind === 'loop' && n.row.role, issue = n.kind === 'loop' && [n.row.supervisor_issue, n.row.escalation_issue].filter(Boolean).join('; ');
     if (gap) b.classList.add('gap');
     if (issue) b.classList.add('issue');
-    if (role === 'master') b.classList.add('door', 'fx-fend');
+    if (role === 'chief') b.classList.add('door', 'fx-fend');
     if (role === 'manager') b.classList.add('mgr');
     if (n.glass) b.classList.add('glass');
     const rt = n.kind === 'loop' && runtimeOf(n.row);

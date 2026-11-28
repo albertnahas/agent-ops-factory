@@ -602,8 +602,8 @@ def links(registry, services, glass, bad=(), health=False):
     or service's name or its job, with or without the routine:/task: prefix, or you; any other name is kept as written, a
     checker the registry doesn't have. Supervisor, optional, is the one loop that writes this loop's Orders (or you): a
     parent that is no loop, or a chain that comes back to the row, is its supervisor_issue. Escalates to, optional, is
-    where the loop sends what needs a person; blank means its project's manager, else the master, else you (always you for the master). Once a loop
-    has Role master, only it and the Break-glass table may reach you; escalation_issue says what breaks that. A cycle is
+    where the loop sends what needs a person; blank means its project's manager, else the chief of staff, else you (always you for the chief). Once a loop
+    has Role chief (master is read as chief), only it and the Break-glass table may reach you; escalation_issue says what breaks that. A cycle is
     drawn once, from its first loop by name; the other loops on it, and those whose chain runs into it, name that loop.
     Checked by is checked too (not in health mode, whose rows have none): no reader but itself, a reader that is no loop,
     service or you, readers that only lead round loops (a cycle, or one nobody reads), and you on a loop with a supervisor loop.
@@ -614,14 +614,14 @@ def links(registry, services, glass, bad=(), health=False):
     resolve = lambda c: "you" if c.lower() == "you" else alias.get(c, c)
     cell = lambda r, k: r.get(k, "").strip()
     reasons = {resolve(cell(g, "Who")): cell(g, "Why") for g in glass if cell(g, "Who")}
-    roles = {r["Loop"]: cell(r, "Role").lower() or None for r in registry}
+    roles = {r["Loop"]: {"master": "chief"}.get(v := cell(r, "Role").lower(), v) or None for r in registry}  # master: its old name
     projects = {r["Loop"]: r.get("Project", "") for r in registry}
-    masters = [l for l, k in roles.items() if k == "master"]
+    chiefs = [l for l, k in roles.items() if k == "chief"]
     managers = {}
     for loop, k in roles.items():
         if k == "manager": managers.setdefault(projects[loop], []).append(loop)
     def default(loop):
-        up = [m for m in managers.get(projects[loop], [])[:1] + masters[:1] if m != loop and roles[loop] != "master"]
+        up = [m for m in managers.get(projects[loop], [])[:1] + chiefs[:1] if m != loop and roles[loop] != "chief"]
         return up[0] if up else "you"
     readers = {r["Loop"]: list(dict.fromkeys(resolve(c.strip()) for c in cell(r, "Checked by").split(",") if c.strip())) for r in registry}
     out = {r["Loop"]: {"checked_by": ", ".join(readers[r["Loop"]]),
@@ -665,13 +665,13 @@ def links(registry, services, glass, bad=(), health=False):
                   l["supervisor"] in out and "you" in rs and f"Checked by names you, but {l['supervisor']} supervises it"])
         l["supervisor_issue"] = "; ".join(i for i in issues if i) or None
         project, to = projects[loop], l["escalates_to"]
-        issues = [l["role"] not in (None, "master", "manager") and f"role {l['role']} is neither master nor manager",
-                  l["role"] == "master" and len(masters) > 1 and f"{len(masters)} loops have Role master; the door to you is one loop",
+        issues = [l["role"] not in (None, "chief", "manager") and f"role {l['role']} is neither chief nor manager",
+                  l["role"] == "chief" and len(chiefs) > 1 and f"{len(chiefs)} loops have Role chief; the door to you is one loop",
                   l["role"] == "manager" and len(managers[project]) > 1 and f"{project or 'no project'} has {len(managers[project])} managers",
                   l["break_glass"] == "" and "its break-glass row needs a reason",
                   to not in {**out, "you": 0} and f"escalates to {to}, which is not a loop in the registry",
-                  to == "you" and masters and loop not in masters and l["break_glass"] is None
-                  and "escalates straight to you; only the master and break-glass loops may",
+                  to == "you" and chiefs and loop not in chiefs and l["break_glass"] is None
+                  and "escalates straight to you; only the chief of staff and break-glass loops may",
                   esc[loop]]
         l["escalation_issue"] = "; ".join(i for i in issues if i) or None
     fan = [] if health else [l for l, rs in readers.items() if "you" in rs]

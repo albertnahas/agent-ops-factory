@@ -115,9 +115,9 @@ expect "punctuation doesn't count"             "[ \"\$(of social-algorithms)\" =
 expect "a repo of a general project is General" "[ \"\$(of ops)\" = Ops/General ]"
 expect "a repo of no project is General"       "[ \"\$(of ops-queue)\" = /General ]"
 expect "the dashboard carries the data"        "grep -q 'report missing' $AGENT_OPS_DIR/fleet/dashboard.html && grep -q 'dash-one-writer' $AGENT_OPS_DIR/fleet/dashboard.html"
-expect "with no master, every loop escalates to you, unflagged" "jq -e '[.rows[] | select(.project != \"Unregistered\" and .project != \"Service\")] | all(.escalates_to == \"you\" and .escalates_default and .escalation_issue == null)' $L >/dev/null"
+expect "with no chief of staff, every loop escalates to you, unflagged" "jq -e '[.rows[] | select(.project != \"Unregistered\" and .project != \"Service\")] | all(.escalates_to == \"you\" and .escalates_default and .escalation_issue == null)' $L >/dev/null"
 
-# Escalation: one master is the door to you; managers take their project's escalations; break-glass may skip the line.
+# Escalation: one chief of staff is the door to you; managers take their project's escalations; break-glass may skip the line.
 cat > "$AGENT_OPS_DIR/REGISTRY.md" <<EOF
 ## Registry
 
@@ -133,7 +133,7 @@ cat > "$AGENT_OPS_DIR/REGISTRY.md" <<EOF
 | ping | Blog | cloud | routine:ping | daily | | | you | | pong | |
 | pong | Blog | cloud | routine:pong-job | daily | | | you | | routine:ping | |
 | astray | Blog | cloud | routine:astray | daily | | | you | | nowhere | |
-| odd | Blog | cloud | routine:odd | daily | | | you | | | chief |
+| odd | Blog | cloud | routine:odd | daily | | | you | | | captain |
 
 ## Services
 
@@ -153,15 +153,15 @@ python3 fleet/fleet.py >/dev/null
 expect "Moves carries the brief input a loop serves; blank is none" "jq -e '[.rows[] | select(.loop == \"worker\" or .loop == \"lone\") | .moves] == [\"new_senders\", null]' $L >/dev/null"
 esc() { jq -r --arg l "$1" '.rows[] | select(.loop == $l) | "\(.escalates_to) \(.escalates_default) | \(.escalation_issue)"' "$L"; }
 expect "a blank goes to the project's manager"  "[ \"\$(esc worker)\" = 'boss true | null' ]"
-expect "a blank with no manager goes to the master" "[ \"\$(esc lone)\" = 'door true | null' ] && [ \"\$(esc boss | cut -d' ' -f1)\" = door ]"
-expect "the master's blank is you, even beside a manager"    "[ \"\$(esc door)\" = 'you true | null' ]"
-expect "only the master and break-glass reach you" "esc rogue | grep -q 'straight to you' && [ \"\$(esc pager)\" = 'you false | null' ]"
+expect "a blank with no manager goes to the chief of staff" "[ \"\$(esc lone)\" = 'door true | null' ] && [ \"\$(esc boss | cut -d' ' -f1)\" = door ]"
+expect "the chief's blank is you, beside a manager; Role Master reads as chief" "[ \"\$(esc door)\" = 'you true | null' ]"
+expect "only the chief of staff and break-glass reach you" "esc rogue | grep -q 'straight to you' && [ \"\$(esc pager)\" = 'you false | null' ]"
 expect "a break-glass reason is on its row"      "jq -e '[.rows[] | select(.break_glass)] | map(\"\\(.loop)=\\(.break_glass)\") == [\"pager=production down\", \"stripe=money at risk, refunds\"]' $L >/dev/null"
 expect "a service nothing runs is missing, not paused" "jq -e '.rows[] | select(.loop == \"stripe\") | .status == \"missing\" and (.detail | test(\"com.me.stripe\"))' $L >/dev/null"
 expect "escalation cycles are flagged, by job too" "esc ping | grep -q 'comes back to it: ping → pong → ping'"
 expect "a target that is no loop is flagged"     "esc astray | grep -q 'escalates to nowhere, which is not a loop'"
 expect "one manager per project"                "esc boss | grep -q 'Shop has 2 managers' && esc boss2 | grep -q 'Shop has 2 managers'"
-expect "a role is master or manager"            "esc odd | grep -q 'role chief'"
+expect "a role is chief or manager"             "esc odd | grep -q 'role captain'"
 expect "every cell is still a scalar"           "jq -e 'all(.rows[][]; type != \"array\" and type != \"object\")' $L >/dev/null"
 expect "the registry-only check names every escalation issue" "! python3 fleet/fleet.py --check > $AGENT_OPS_DIR/issues && diff <(jq -r '[.rows[] | select(.escalation_issue) | \"\\(.loop): \\(.escalation_issue)\"] + [\"phantom: break-glass names no loop or service in the registry\"] | join(\"; \"), \"warning: you: 10 loops name you in Checked by, more than 5; let a supervisor loop read most of them\"' $L) $AGENT_OPS_DIR/issues"
 

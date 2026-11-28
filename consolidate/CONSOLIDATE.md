@@ -2,7 +2,7 @@
 
 Loops write every day, and some of what they write is read again on every run: a loop's charter, an agent's memory index. Left alone those only grow. Runs get slower and dearer, and a memory index past the length its tool loads is cut off without a word. Consolidation moves what is past its daily use into an archive file the original links to. It never deletes. A decision or an event that mattered is either still where the run reads it, or one link away.
 
-It isn't a loop of its own. `fleet/fleet.py` measures each file against its budget, with no model, and writes `<out>/weight.json`. Whatever loop does your spare work (a master or queue loop) gets the files that are over, and follows this page for each one, one PR or one folder at a time. Or run it by hand.
+It isn't a loop of its own. `fleet/fleet.py` measures each file against its budget, with no model, and writes `<out>/weight.json`. Whatever loop does your spare work (a chief of staff or queue loop) gets the files that are over, and follows this page for each one, one PR or one folder at a time. Or run it by hand.
 
 ## Budgets
 

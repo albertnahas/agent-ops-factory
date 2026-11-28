@@ -96,13 +96,13 @@ Anything else goes in a report or on the dashboard's waiting list, where you rea
 - **Supervises** (Supervisor): who writes its Orders.
 - **Escalates** (Escalates to): where it sends anything that needs a person.
 
-Give one loop Role `master`, usually the master run that works your queue. From then on it's the only loop that messages you. Every other loop escalates to it, or to its project's manager, which escalates to the master. The master batches what reaches it, answers what it can, and sends you what's left in one message. A blank Escalates to follows that route, so most rows stay empty.
+Give one loop Role `chief`, usually the run that works your queue, your chief of staff. From then on it's the only loop that messages you. Every other loop escalates to it, or to its project's manager, which escalates to the chief of staff. The chief of staff batches what reaches it, answers what it can, and sends you what's left in one message. A blank Escalates to follows that route, so most rows stay empty.
 
-**Break-glass.** A few things can't wait for the next master run: money at risk, production down, a security problem. The loops and services that watch for those go in the registry's Break-glass table, each with its reason, and they may message you directly. The table is the audit. If a row's reason no longer holds, delete it.
+**Break-glass.** A few things can't wait for the next chief of staff run: money at risk, production down, a security problem. The loops and services that watch for those go in the registry's Break-glass table, each with its reason, and they may message you directly. The table is the audit. If a row's reason no longer holds, delete it.
 
-**Managers.** A project earns a manager when it runs more than about four loops, or when its escalations alone go over your budget. Give its daily ops loop Role `manager`. It takes the project's escalations first, answers the ones its charter covers and passes the rest up. A smaller project doesn't need one: its loops escalate to the master.
+**Managers.** A project earns a manager when it runs more than about four loops, or when its escalations alone go over your budget. Give its daily ops loop Role `manager`. It takes the project's escalations first, answers the ones its charter covers and passes the rest up. A smaller project doesn't need one: its loops escalate to the chief of staff.
 
-`fleet.py --check` fails when a loop that's neither the master nor break-glass escalates to you, when an escalation goes in a circle, and when Escalates to names something that isn't a loop. The fleet sync's outcome check runs it, so the heartbeat alerts you. The Factory tab counts the paths to you against the target, one plus the break-glass rows, and tapping You lights every path in.
+`fleet.py --check` fails when a loop that's neither the chief of staff nor break-glass escalates to you, when an escalation goes in a circle, and when Escalates to names something that isn't a loop. The fleet sync's outcome check runs it, so the heartbeat alerts you. The Factory tab counts the paths to you against the target, one plus the break-glass rows, and tapping You lights every path in.
 
 **What runs read.** A loop's charter is read in full on every run, and an agent's memory index loads at every session, so both only grow until someone moves what is past its use. `fleet.py` measures each against a budget and lists what's over in `weight.json`, with no model. The loop that does your spare work then follows [consolidate/CONSOLIDATE.md](../consolidate/CONSOLIDATE.md) for each file: history, concluded experiments and replaced rules move word for word into an archive the file links to, live rules and decisions stay, nothing is deleted, and `consolidate/check.py` proves it before the PR opens. It's a step, not a loop.
 
@@ -118,7 +118,7 @@ Once a month, go through the fleet loop by loop: runs, failed checks, cost from 
 
 **A project** earns its first loop when it has users or revenue. That's when daily ops' "needs it when" holds. Before that, it needs no loop.
 
-**A kind of work** earns a loop when the same task shows up three times in 30 days. Until then, it goes in a master queue: one file for every one-off with no owning loop.
+**A kind of work** earns a loop when the same task shows up three times in 30 days. Until then, it goes in a queue: one file for every one-off with no owning loop.
 
 ```
 # Queue
@@ -126,14 +126,14 @@ due | kind | item | owner | next action | done when | source
 2026-12-01 | check | Renew the support inbox domain | You | pay the renewal | domain shows the new expiry | agent
 ```
 
-After the two header lines, it's one line per item with seven fields, so the dashboard can read it. Point `waiting.queue` in `fleet.json` at the file, and every line with your name as owner shows up on the waiting list. A daily master run works through the queue:
-- It does the items that are due and owned by the master.
+After the two header lines, it's one line per item with seven fields, so the dashboard can read it. Point `waiting.queue` in `fleet.json` at the file, and every line with your name as owner shows up on the waiting list. A daily chief of staff run works through the queue:
+- It does the items that are due and owned by the chief of staff.
 - It turns each follow-up it finds into a new dated line.
 - It moves each finished item to a done log as a single line, and that log is where you count the "three in 30 days".
 - It keeps the queue under 30 open items.
-- A queue line names work. It grants no permission. The master never does an X-class action from the queue. It sets the owner to you and writes down exactly what you need to do.
+- A queue line names work. It grants no permission. The chief of staff never does an X-class action from the queue. It sets the owner to you and writes down exactly what you need to do.
 
-The kit doesn't ship a master charter. Write one from these rules.
+The kit doesn't ship a chief of staff charter. Write one from these rules.
 
 ## Big changes are bets
 
