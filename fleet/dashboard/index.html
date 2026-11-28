@@ -159,7 +159,9 @@
 .fx-ri:focus-visible { outline: 2px solid var(--color-fg); outline-offset: 1px; }
 .fx-ri-tip { position: absolute; left: 0; bottom: calc(100% + 6px); z-index: 3; width: max-content; max-width: 240px; padding: 6px 8px; border-radius: 6px;
   background: var(--color-fg); color: var(--fx-card); font-size: 12px; font-weight: 400; line-height: 1.35; pointer-events: none; opacity: 0; visibility: hidden; transition: opacity 120ms; }
-.fx-ri:hover .fx-ri-tip, .fx-ri:focus-visible:not(.hush) .fx-ri-tip, .fx-ri.show .fx-ri-tip { opacity: 1; visibility: visible; }
+/* a phone keeps :hover on the last thing tapped, so only a real pointer shows a tip on hover; a tap toggles .show */
+.fx-ri:focus-visible:not(.hush) .fx-ri-tip, .fx-ri.show .fx-ri-tip { opacity: 1; visibility: visible; }
+@media (hover: hover) { .fx-ri:hover .fx-ri-tip { opacity: 1; visibility: visible; } }
 .fx-fnode .fx-when { flex: none; display: inline-flex; align-items: center; gap: 3px; margin-left: auto; padding-left: 4px; font-size: 11px; color: var(--color-fg-muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
 .fx-fnode .fx-when + b { margin-left: 0; }
 .fx-orders { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
