@@ -161,7 +161,7 @@
   background: var(--color-fg); color: var(--fx-card); font-size: 12px; font-weight: 400; line-height: 1.35; pointer-events: none; opacity: 0; visibility: hidden; transition: opacity 120ms; }
 /* a phone keeps :hover on the last thing tapped, so only a real pointer shows a tip on hover; a tap toggles .show */
 .fx-ri:focus-visible:not(.hush) .fx-ri-tip, .fx-ri.show .fx-ri-tip { opacity: 1; visibility: visible; }
-@media (hover: hover) { .fx-ri:hover .fx-ri-tip { opacity: 1; visibility: visible; } }
+@media (hover: hover) { .fx-ri:hover:not(.hush) .fx-ri-tip { opacity: 1; visibility: visible; } }
 .fx-fnode .fx-when { flex: none; display: inline-flex; align-items: center; gap: 3px; margin-left: auto; padding-left: 4px; font-size: 11px; color: var(--color-fg-muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
 .fx-fnode .fx-when + b { margin-left: 0; }
 .fx-orders { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
@@ -507,7 +507,7 @@ const relIcon = (k) => {
   b.type = 'button'; b.setAttribute('aria-label', label + ': ' + what); tip.setAttribute('aria-hidden', 'true');
   b.append(icon(name, 14), tip);
   b.onclick = (e) => { e.stopPropagation(); const on = !b.classList.contains('show'); hideTips(); b.classList.toggle('show', on); };
-  b.onfocus = () => b.classList.remove('hush');
+  b.onfocus = b.onpointerleave = () => b.classList.remove('hush');
   return b;
 };
 const hideTips = () => { document.querySelectorAll('.fx-ri.show').forEach((x) => x.classList.remove('show')); };
@@ -656,9 +656,7 @@ const cadenceMark = (r) => {
 /* a loop's second line: its project, how often it runs and when next */
 const whenLine = (r, project) => {
   const s = el('small'), next = nextText(r);
-  if (project) s.append(project + ' · ');
-  const c = cadenceMark(r); if (c) s.append(c);
-  if (next && next !== r.cadence) s.append((c ? ' · ' : '') + next);
+  [project, cadenceMark(r), next !== r.cadence && next].filter(Boolean).forEach((x, i) => s.append(...(i ? [' · ', x] : [x])));
   return s.childNodes.length ? s : null;
 };
 const titleCell = (main, sub, tag, mark) => {
@@ -887,7 +885,7 @@ const closeSheet = () => {
   const back = FX.back; FX.stack = []; FX.back = null; modal(); dash.draw('sheet');
   if (back && back.isConnected) back.focus({preventScroll: true});
 };
-addEventListener('keydown', (e) => { const tipped = document.activeElement?.closest?.('.fx-ri:focus-visible:not(.hush)');
+addEventListener('keydown', (e) => { const tipped = document.activeElement?.closest?.('.fx-ri:focus-visible:not(.hush)') || (matchMedia('(hover: hover)').matches && document.querySelector('.fx-ri:hover:not(.hush)'));
   if (e.key === 'Escape' && (document.querySelector('.fx-ri.show') || tipped)) { hideTips(); tipped?.classList.add('hush'); } else if (e.key === 'Escape' && FX.stack.length) closeSheet(); else if (e.key === 'Escape' && CV.big) expand(false); });
 /* on claude.ai the page scrolls inside an element of the runtime's, and "fixed" doesn't hold there: what fills the view is
    placed over that scroller's visible area (inside its scrollbar). The area, in screen pixels: */

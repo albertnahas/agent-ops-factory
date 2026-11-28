@@ -52,6 +52,7 @@ EOF
   echo "{\"loop\":\"good\",\"date\":\"$(day 1)\",\"check\":\"pass\",\"detail\":\"report landed\"}"
   echo "{\"loop\":\"broken\",\"date\":\"$(day 1)\",\"check\":\"fail\",\"detail\":\"report missing\"}"
   for v in fail fail fail pass; do echo "{\"loop\":\"flaky\",\"date\":\"$(day 1)\",\"check\":\"$v\"}"; done
+  echo "{\"loop\":\"flaky\",\"date\":\"$(day 1)\",\"subtype\":\"success\",\"secs\":NaN}"
   echo "{\"loop\":\"Poster\",\"date\":\"$(day 1)\",\"check\":\"fail\",\"detail\":\"post not on the API\"}"
   echo "{\"loop\":\"stray\",\"date\":\"$(day 1)\",\"subtype\":\"success\"}"
   echo "{\"loop\":\"adhoc\",\"date\":\"$(day 1)\",\"subtype\":\"success\",\"cost\":0.5}"
@@ -88,6 +89,7 @@ expect "a routine service is read from the snapshot: there, off, gone" "[ \"\$(s
 expect "a service that logs a failed check is failing, with its pass rate" "[ \"\$(status Poster)\" = failing ] && jq -e '.rows[] | select(.loop == \"Poster\") | .checks == \"0 of 1\" and .detail == \"post not on the API\"' $L >/dev/null"
 expect "a loop's last run carries how long it took" "[ \"\$(jq -r '.rows[] | select(.loop == \"good\") | .took' $L)\" = 90 ]"
 expect "with no next run from claude.ai, a routine's next run and the four after it are its UTC cron in local time" "[ \"\$(jq -r '.rows[] | select(.loop == \"good\") | \"\\(.next_due) \\(.next_runs)\"' $L)\" = \"\$(python3 -c 'import datetime as dt; n = dt.datetime.now(dt.timezone.utc); d = n.replace(hour=6, minute=0, second=0, microsecond=0); d += dt.timedelta(days=d <= n); print(\" \".join((d + dt.timedelta(days=i)).astimezone().strftime(\"%Y-%m-%dT%H:%M\") for i in range(5)))')\" ]"
+expect "a duration that isn't a finite number is left out, so loops.json stays strict JSON" "[ \"\$(jq -r '.rows[] | select(.loop == \"flaky\") | .took' $L)\" = null ] && python3 -c 'import json, sys; json.loads(open(sys.argv[1]).read(), parse_constant=lambda c: sys.exit(1))' $L"
 expect "a long check line is cut at a word, with an ellipsis" "[ \"\$(python3 -c 'import sys; sys.path.insert(0, \"fleet\"); from fleet import clip; print(clip(\"numbers in,  every PR graded\", 20))')\" = 'numbers in, every…' ]"
 expect "read by is a comma list"            "jq -e '.rows[] | select(.loop == \"broken\") | .read_by == \"good, heartbeat\"' $L >/dev/null"
 expect "every cell is a scalar, as on claude.ai" "jq -se 'all(.[].rows[][]; type != \"array\" and type != \"object\")' $L $AGENT_OPS_DIR/fleet/waiting.json >/dev/null"

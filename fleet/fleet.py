@@ -51,10 +51,14 @@ def when(s):
     try: t = dt.datetime.fromisoformat(s); return (t.astimezone().replace(tzinfo=None) if t.tzinfo else t).replace(microsecond=0)
     except (ValueError, OverflowError): return None  # not a time, or a "never" like 9999-12-31Z
 
+def finite(v):
+    """A finite number, else None."""
+    try: return v if isinstance(v, (int, float)) and not isinstance(v, bool) and math.isfinite(v) else None
+    except OverflowError: return None  # an int too big for a float
+
 def money(v):
     """A cost as a finite number, else 0."""
-    try: return v if isinstance(v, (int, float)) and not isinstance(v, bool) and math.isfinite(v) else 0
-    except OverflowError: return 0  # an int too big for a float
+    return finite(v) or 0
 
 def check_of(loop):
     """checks/<loop>.py when the name is a plain file name and the file is there (a name too long for one is no file)."""
@@ -480,7 +484,7 @@ def ledger(now):
                   "".join("f" if failed(r) else "p" for r in claude[-10:])
         out[loop] = {
             "last": max(r["date"] for r in rs), "last_ok": last_ok, "detail": clip(detail),
-            "secs": claude[-1].get("secs") if claude and isinstance(claude[-1].get("secs"), (int, float)) else None,
+            "secs": finite(claude[-1].get("secs")) if claude else None,
             "passes": passes, "total": total, "chronic": last7.count("fail") >= 3,
             "fails7": f"{last7.count('fail')} of last {len(last7)}",
             "cost": round(sum(r["cost"] for r in win_claude), 2),
