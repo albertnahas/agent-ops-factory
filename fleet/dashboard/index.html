@@ -932,7 +932,7 @@ dash.draw('svc-list', (ul) => {
   const svc = scoped(l.data).filter((r) => NOT_LOOP.includes(r.project));
   if (!svc.length) ul.append(el('li', 'fx-empty', 'No services or one-off jobs here.'));
   svc.forEach((r) => {
-    const right = el('span', 'r', r.status === 'one-off' ? rel(r.next_due) : LABEL[r.status]);
+    const right = el('span', 'r', r.status === 'one-off' ? rel(r.next_due || r.last_run) : LABEL[r.status]);
     ul.append(expandRow('s:' + r.loop, [dot(r.status === 'failing' ? 'bad' : TONE[r.status], LABEL[r.status]), titleCell(r.loop, r.job !== r.loop ? r.job : r.schedule), right], (more) => {
       more.append(el('p', '', [r.schedule, r.detail].filter(Boolean).join('. ')));
       const defs = defsRow(r); if (defs) more.append(defs);

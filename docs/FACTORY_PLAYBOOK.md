@@ -170,7 +170,7 @@ Founder decision: approve / reject / defer by 1 Dec.
 
 What breaks first as the fleet grows, in the order it hurts:
 
-1. **Names.** The ledger is only as good as its loop names. A runner without `OPS_LOOP` logs under its repo's folder name, so two loops in one repo get counted as one.
+1. **Names.** The ledger is only as good as its loop names. A runner without `OPS_LOOP` logs as `adhoc`, the name for runs by hand, so its runs show as one-offs and it never counts as a loop.
 2. **One laptop.** Everything local stops when the laptop sleeps or travels. The kit's [RUNTIMES.md](https://github.com/albertnahas/agent-ops-kit/blob/main/docs/RUNTIMES.md) says what moves to the cloud first.
 3. **Lists kept by hand.** The registry is the only list. Anything else that names loops, like an alert's allowlist or a script's prefix list, goes stale.
 4. **Attention.** More loops mean more messages. The attention budget is the real limit, not the number of loops.

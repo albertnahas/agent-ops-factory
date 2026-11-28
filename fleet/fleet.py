@@ -584,12 +584,12 @@ def discovered(jobs, routines, tasks, led, week):
 
 def tables():
     """The registry's Registry, Services and Break-glass rows, and what's wrong with the rows left out. A loop's name is
-    letters, digits, _ . and -, and not you or nobody, so it is a file name, a ledger key and a graph node as written."""
+    letters, digits, _ . and -, and not you, nobody or adhoc, so it is a file name, a ledger key and a graph node as written."""
     md = "\n".join(lines(C["registry"]))
     (registry, b1), (services, b2), (glass, b3) = (table(md, "Registry", "Loop"), table(md, "Services", "Service"),
                                                    table(md, "Break-glass"))
-    ok = lambda n: re.fullmatch(r"[A-Za-z0-9_.-]+", n) and n.lower() not in ("you", "nobody")
-    b1 += [f"Registry row {r['Loop'][:60]}: a loop name is letters, digits, _ . and -, and not you or nobody" for r in registry if not ok(r["Loop"])]
+    ok = lambda n: re.fullmatch(r"[A-Za-z0-9_.-]+", n) and n.lower() not in ("you", "nobody", "adhoc")
+    b1 += [f"Registry row {r['Loop'][:60]}: a loop name is letters, digits, _ . and -, and not you, nobody or adhoc" for r in registry if not ok(r["Loop"])]
     b1 += [f"Registry row {r['Loop'][:60]}: Improver is on or blank" for r in registry if r.get("Improver", "").lower() not in ("", "on")]
     return [r for r in registry if ok(r["Loop"])], services, glass, b1 + b2 + b3
 
@@ -822,7 +822,10 @@ def build():
     names = {r["loop"] for r in rows}
     week = (now - dt.timedelta(days=7)).isoformat()
     for loop, l in led.items():
-        if loop not in names and l["last"] >= week:
+        if loop == "adhoc" and l["last"] >= week:  # the kit's name for a run with no loop name: a run by hand, not a loop
+            rows.append({"loop": loop, "project": "One-off", "runtime": "?", "job": loop, "status": "one-off", "cadence": "one-off",
+                         "last_run": l["last"][:16], "cost": l["cost"], "schedule": "runs by hand, logged with no loop name"})
+        elif loop not in names and l["last"] >= week:
             rows.append({"loop": loop, "project": "Unregistered", "runtime": "?", "job": "", "status": "unregistered",
                          "last_run": l["last"][:16], "schedule": "logs to the ledger with no registry row"})
     of, kpi = scoping(registry), kpis()
