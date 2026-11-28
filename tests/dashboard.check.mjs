@@ -205,7 +205,7 @@ const drawer = async (name) => {
   await close(); return out;
 };
 const shop1 = await drawer('shop1'), lonely = await drawer('lonely');
-if (shop1) { loops.changes = shop1.changes; loops.good = shop1.p.find((s) => s.startsWith('Good: ')); loops.read = shop1.p.find((s) => s.startsWith('Read by ')); }
+if (shop1) { loops.changes = shop1.changes; loops.good = shop1.p.find((s) => s.startsWith('Good: ')); loops.read = shop1.p.find((s) => s.includes('may change it')); }
 if (lonely) loops.measured = lonely.p.find((s) => s.startsWith('Good: '));
 
 /* Fleet health and the Improver, folded under the graph */

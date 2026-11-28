@@ -129,8 +129,39 @@
 .fx-inset { border: 1px solid var(--color-border-line); border-radius: 10px; overflow: hidden; }
 .fx-inset .fx-more { padding-left: 35px; }
 .fx-more-link { display: inline-flex; align-items: center; gap: 4px; }
-.fx-path { display: grid; gap: 6px; padding: 10px 12px; border-radius: 10px; background: var(--fx-tint); }
-.fx-path p.warn, .fx-more p.warn { color: var(--color-warn); }
+.fx-more p.warn { color: var(--color-warn); }
+/* the drawer's sections: each kind of fact its own accent; health and the goal take their tone's, and a tint of it */
+.fx-box { display: grid; gap: 8px; padding: 12px 14px; border-radius: 10px; background: var(--fx-tint); border-left: 3px solid var(--fx-accent, var(--color-border-line)); color: var(--color-fg); }
+.fx-box .fx-sec { margin: 0; font-size: 11px; text-transform: uppercase; letter-spacing: .05em; }
+.fx-box[data-kind="who"] { --fx-accent: var(--fx-c1, var(--color-fg-muted)); }
+.fx-box[data-kind="orders"] { --fx-accent: var(--fx-c0, var(--color-fg-muted)); }
+.fx-box[data-tone="ok"] { --fx-accent: var(--color-ok); background: color-mix(in srgb, var(--color-ok) 8%, var(--fx-card)); }
+.fx-box[data-tone="warn"] { --fx-accent: var(--color-warn); background: color-mix(in srgb, var(--color-warn) 10%, var(--fx-card)); }
+.fx-box[data-tone="bad"] { --fx-accent: var(--color-bad); background: color-mix(in srgb, var(--color-bad) 9%, var(--fx-card)); }
+.fx-box p.warn { color: var(--color-fg); padding-left: 8px; border-left: 2px solid var(--color-warn); }
+.fx-head { display: flex; align-items: center; gap: 8px; font-size: var(--cds-font-size-body); }
+.fx-head svg { flex: none; color: var(--fx-accent, var(--color-fg-muted)); }
+.fx-head b { font-weight: 600; }
+.fx-fact { display: flex; align-items: flex-start; gap: 8px; }
+.fx-fact > svg { flex: none; margin-top: 2px; color: var(--color-fg-muted); }
+.fx-fact .fx-hist { display: inline-flex; vertical-align: -1px; margin-left: 4px; }
+.fx-said { margin-left: 22px !important; padding-left: 10px; border-left: 2px solid var(--color-border-line); }
+.fx-owner { display: flex; align-items: flex-start; gap: 8px; font-weight: var(--cds-font-weight-medium); }
+.fx-owner svg { flex: none; margin-top: 2px; color: var(--color-ok); }
+.fx-owner[data-who="you"] svg { color: var(--color-warn); }
+.fx-good { color: var(--color-fg-muted); }
+.fx-rels { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.fx-rels li { display: flex; align-items: center; gap: 10px; min-width: 0; overflow-wrap: anywhere; }
+.fx-ris { display: inline-flex; gap: 3px; flex: none; min-width: 90px; }
+.fx-sub { font-size: 11px; font-weight: 600; color: var(--color-fg-muted); margin-top: 2px !important; }
+.fx-ri { all: unset; position: relative; box-sizing: border-box; width: 28px; height: 28px; display: inline-grid; place-items: center; border-radius: 7px; cursor: pointer;
+  color: var(--color-fg); background: color-mix(in srgb, var(--color-fg) 8%, transparent); }
+.fx-ri:focus-visible { outline: 2px solid var(--color-fg); outline-offset: 1px; }
+.fx-ri-tip { position: absolute; left: 0; bottom: calc(100% + 6px); z-index: 3; width: max-content; max-width: 240px; padding: 6px 8px; border-radius: 6px;
+  background: var(--color-fg); color: var(--fx-card); font-size: 12px; font-weight: 400; line-height: 1.35; pointer-events: none; opacity: 0; visibility: hidden; transition: opacity 120ms; }
+.fx-ri:hover .fx-ri-tip, .fx-ri:focus-visible .fx-ri-tip, .fx-ri.show .fx-ri-tip { opacity: 1; visibility: visible; }
+.fx-fnode .fx-when { flex: none; display: inline-flex; align-items: center; gap: 3px; margin-left: auto; padding-left: 4px; font-size: 11px; color: var(--color-fg-muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.fx-fnode .fx-when + b { margin-left: 0; }
 .fx-orders { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
 .fx-orders li { padding: 8px 10px; border-left: 3px solid var(--fx-c0, var(--color-fg)); border-radius: 0 8px 8px 0; background: var(--fx-tint); }
 .fx-orders p { margin: 0; color: var(--color-fg); }
@@ -451,7 +482,33 @@ const ICONS = {
   calendar: '<path d="M8 2v4"/><path d="M16 2v4"/><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M3 10h18"/>',
   infinity: '<path d="M6 16c5 0 7-8 12-8a4 4 0 0 1 0 8c-5 0-7-8-12-8a4 4 0 1 0 0 8"/>',
   laptop: '<path d="M18 5a2 2 0 0 1 2 2v8.526a2 2 0 0 0 .212.897l1.068 2.127a1 1 0 0 1-.9 1.45H3.62a1 1 0 0 1-.9-1.45l1.068-2.127A2 2 0 0 0 4 15.526V7a2 2 0 0 1 2-2z"/><path d="M20.054 15.987H3.946"/>',
+  rotate: '<path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/>',
+  wallet: '<path d="M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1"/><path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4"/>',
+  gauge: '<path d="m12 14 4-4"/><path d="M3.34 19a10 10 0 1 1 17.32 0"/>',
+  user: '<path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>',
+  eye: '<path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"/><circle cx="12" cy="12" r="3"/>',
+  compass: '<circle cx="12" cy="12" r="10"/><path d="m16.24 7.76-1.804 5.411a2 2 0 0 1-1.265 1.265L7.76 16.24l1.804-5.411a2 2 0 0 1 1.265-1.265z"/>',
+  siren: '<path d="M7 18v-6a5 5 0 1 1 10 0v6"/><path d="M5 21a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-1a2 2 0 0 0-2-2H7a2 2 0 0 0-2 2z"/><path d="M21 12h1"/><path d="M18.5 4.5 18 5"/><path d="M2 12h1"/><path d="M12 2v1"/><path d="m4.929 4.929.707.707"/><path d="M12 12v6"/>',
+  target: '<circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/>',
 };
+/* how loops relate, one icon each, used the same way everywhere (the drawer, and the graph's line buttons): Read by checks a
+   loop's output, Steered by writes its Orders, Escalates to gets what needs a person. Each has its inverse, with the same icon */
+const REL = {
+  read: ['eye', 'Read by', 'reads its output and checks it worked'], reads: ['eye', 'Reads', 'it reads their output and checks it worked'],
+  steer: ['compass', 'Steered by', 'writes its Orders, what to work on next'], steers: ['compass', 'Steers', 'it writes their Orders'],
+  esc: ['siren', 'Escalates to', 'gets what needs a person'], escs: ['siren', 'Takes escalations from', 'it gets what they can\'t settle alone'],
+  moves: ['target', 'Moves', 'the input in its project\'s brief it should push'],
+};
+/* a relation's icon: its label shows on hover and focus, and a tap shows it on touch (no hover there). Escape hides it */
+const relIcon = (k) => {
+  const [name, label, what] = REL[k], b = el('button', 'fx-ri'), tip = el('span', 'fx-ri-tip', label + ': ' + what);
+  b.type = 'button'; b.setAttribute('aria-label', label + ': ' + what); tip.setAttribute('aria-hidden', 'true');
+  b.append(icon(name, 14), tip);
+  b.onclick = (e) => { e.stopPropagation(); const on = !b.classList.contains('show'); hideTips(); b.classList.toggle('show', on); };
+  return b;
+};
+const hideTips = () => { document.querySelectorAll('.fx-ri.show').forEach((x) => x.classList.remove('show')); };
+addEventListener('click', hideTips);
 const icon = (name, size, cls) => {
   const s = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
   [['viewBox', '0 0 24 24'], ['width', size || 16], ['height', size || 16], ['fill', 'none'], ['stroke', 'currentColor'], ['stroke-width', '2'],
@@ -460,6 +517,8 @@ const icon = (name, size, cls) => {
   s.innerHTML = ICONS[name];
   return s;
 };
+/* the graph's line buttons wear their relation's icon */
+document.querySelectorAll('.fx-ltog[data-layer]').forEach((b) => b.prepend(icon(REL[{esc: 'esc', check: 'read', sup: 'steer'}[b.dataset.layer]][0], 13)));
 const groupBy = (rows, key) => rows.reduce((m, r) => { const k = key(r); (m.get(k) || m.set(k, []).get(k)).push(r); return m; }, new Map());
 const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
 const dot = (tone, label) => { const d = el('span', 'fx-dot'); d.dataset.tone = tone; if (label) { d.setAttribute('role', 'img'); d.setAttribute('aria-label', label); } return d; };
@@ -476,10 +535,30 @@ const rel = (iso) => {
   const v = a < 60 ? a + 'm' : a < 1440 ? Math.round(a / 60) + 'h' : Math.round(a / 1440) + 'd';
   return a < 2 ? 'now' : m < 0 ? v + ' ago' : 'in ' + v;
 };
+/* the next run still ahead: the page is built a few times a day, so a next run that has passed since gives way to the fires
+   after it (next_runs). Null for a loop with no clock schedule, or one whose every known run has passed */
+const upcoming = (r) => [r.next_due, ...String(r.next_runs || '').split(' ')].filter((t) => /^\d{4}-/.test(t || '') && new Date(t) > new Date()).sort()[0] || null;
+const fullWhen = (iso) => new Date(iso).toLocaleString('en-GB', {weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit'});
 const nextText = (r) => {
   if (!r.next_due) return '';
-  if (!/^\d/.test(r.next_due)) return r.next_due.replace('every ', 'every ');
-  return new Date(r.next_due) < new Date() ? 'due now' : 'next ' + rel(r.next_due);
+  if (!/^\d/.test(r.next_due)) return r.next_due;
+  const t = upcoming(r); return t ? 'next ' + rel(t) : 'due now';
+};
+/* the next run in words, for the drawer and the card's tooltip */
+const whenText = (r) => {
+  const t = upcoming(r), sched = r.schedule && r.schedule !== r.next_due ? ' (' + r.schedule + ')' : '';
+  if (t) return 'Next run ' + rel(t) + ', ' + fullWhen(t) + sched;
+  if (!r.next_due) return r.status === 'paused' || r.status === 'missing' ? 'No next run: it is ' + LABEL[r.status].toLowerCase() : 'No schedule found' + sched;
+  if (!/^\d/.test(r.next_due)) return (CADENCE[r.next_due] ? CADENCE[r.next_due][1] : 'Runs ' + r.next_due) + sched;
+  return 'Due now' + sched;
+};
+/* the card's mark: when it runs next, or with no clock schedule, when it last ran */
+const whenMark = (r) => {
+  const t = upcoming(r), m = el('span', 'fx-when');
+  if (t) m.append(icon('clock', 11), rel(t));
+  else if (r.last_run) m.append(icon('rotate', 11), rel(r.last_run));
+  else return null;
+  return m;
 };
 const hist = (h) => {
   const box = el('span', 'fx-hist');
@@ -767,12 +846,16 @@ const bubble = (e, loop) => {
 const tellPrompt = (r, text) => 'Tell the loop "' + r.loop + '" this from me: "' + text.trim() + '". '
   + (r.charter ? 'Its charter is ' + r.charter + '. ' : '') + (r.orders ? 'Its Orders are ' + r.orders + '. ' : '')
   + 'Decide whether it is a standing order (its Orders) or a one-off for its next run, show me the change and wait for my yes.';
+/* its standing orders: what its supervisor (or you) has it working on, each with when it gets read */
+const loopOrders = (r) => {
+  const orders = talkOf(r.loop).filter((e) => !e.at), box = section('orders', 'Orders now');
+  if (!orders.length) { box.append(el('p', '', r.orders ? 'No standing orders right now.' : 'It has no Orders file, so only its charter steers it.')); return box; }
+  const ul = el('ul', 'fx-orders'); orders.forEach((e) => { const li = el('li'); li.append(el('p', '', e.text), el('small', '', [e.from && 'from ' + e.from, e.read_date && 'read ' + dayMonth(e.read_date)].filter(Boolean).join(' · '))); ul.append(li); });
+  box.append(ul);
+  return box;
+};
 const loopTalk = (r, box) => {
-  const mine = talkOf(r.loop), orders = mine.filter((e) => !e.at), said = mine.filter((e) => e.at).slice(0, 20).reverse();
-  if (orders.length) {
-    const ul = el('ul', 'fx-orders'); orders.forEach((e) => { const li = el('li'); li.append(el('p', '', e.text), el('small', '', [e.from && 'from ' + e.from, e.read_date && 'read ' + dayMonth(e.read_date)].filter(Boolean).join(' · '))); ul.append(li); });
-    box.append(el('h3', 'fx-sec', 'Orders now'), el('p', 'fx-muted', 'What its supervisor has it working on: each test, priority or watch, and when it gets read.'), ul);
-  }
+  const said = talkOf(r.loop).filter((e) => e.at).slice(0, 20).reverse();
   box.append(el('h3', 'fx-sec', 'Conversation'));
   if (said.length) { const ul = el('ul', 'fx-chat'); said.forEach((e) => ul.append(bubble(e, r.loop))); box.append(ul); }
   else box.append(el('p', 'fx-muted', 'Nothing said in this window.'));
@@ -801,7 +884,7 @@ const closeSheet = () => {
   const back = FX.back; FX.stack = []; FX.back = null; modal(); dash.draw('sheet');
   if (back && back.isConnected) back.focus({preventScroll: true});
 };
-addEventListener('keydown', (e) => { if (e.key === 'Escape' && FX.stack.length) closeSheet(); else if (e.key === 'Escape' && CV.big) expand(false); });
+addEventListener('keydown', (e) => { if (e.key === 'Escape' && document.querySelector('.fx-ri.show')) hideTips(); else if (e.key === 'Escape' && FX.stack.length) closeSheet(); else if (e.key === 'Escape' && CV.big) expand(false); });
 /* on claude.ai the page scrolls inside an element of the runtime's, and "fixed" doesn't hold there: what fills the view is
    placed over that scroller's visible area (inside its scrollbar). The area, in screen pixels: */
 const seen = (node) => {
@@ -832,21 +915,54 @@ const goodText = (r) => r.kpi === 'met' || r.kpi === 'below'
   : r.kpi === 'measured' ? [r.kpi_value, r.kpi_better && r.kpi_better + ' is better', r.kpi_as_of && 'as of ' + dayMonth(String(r.kpi_as_of)),
     r.floor ? 'Floor ' + r.floor : 'no Floor set'].filter(Boolean).join(' · ')
   : 'not measured · ' + (r.floor ? 'Floor ' + r.floor : 'no Floor set');
-const loopSummary = (r, more) => {
-  if (r.detail) { const p = el('p'); p.append(el('b', '', 'Last result: '), document.createTextNode(r.detail)); more.append(p); }
-  more.append(el('p', '', [LABEL[r.status], r.schedule, r.job && r.job !== r.loop && r.job, r.checks && r.checks + ' checks passed',
-    r.cost != null ? '$' + r.cost.toLocaleString('en', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + ' in 30 days' : ledger() && /cloud|db|app/.test(r.runtime || '') ? 'cost not metered' : null].filter(Boolean).join(' · ')));
-  if (r.status === 'no check') more.append(el('p', '', 'Nothing writes a pass or fail line for it, so a run that did nothing looks like one that worked.'));
-  if (registered(r)) {
-    more.append(el('p', '', [r.read_by && 'Read by ' + r.read_by, r.supervisor && 'steered by ' + r.supervisor,
-      r.escalates_to && 'escalates to ' + r.escalates_to, r.role && 'role ' + r.role, r.improver && 'Improver: on'].filter(Boolean).join(' · ')));
-    if (r.break_glass) { const p = el('p'); p.append(el('b', '', 'Break-glass: '), document.createTextNode(r.break_glass)); more.append(p); }
-    const p = el('p'); p.append(el('b', '', 'Good: '), document.createTextNode([goodText(r), r.target && 'Target ' + r.target,
-      r.pass_rate != null && 'health: ' + Math.round(100 * r.pass_rate) + '% of checks passed'].filter(Boolean).join(' · ')));
-    more.append(p);
-  }
+/* a section of the drawer: a titled box whose kind sets its colour, and whose tone (ok, warn, bad) tints it */
+const section = (kind, title, tone) => {
+  const s = el('section', 'fx-box'); s.dataset.kind = kind; if (tone) s.dataset.tone = tone;
+  if (title) s.append(el('h3', 'fx-sec', title));
+  return s;
 };
-const loopMore = (r) => (more) => { loopSummary(r, more); [loopChanges(r), defsRow(r), loopActs(r)].forEach((x) => x && more.append(x)); };
+/* one fact with its icon in front */
+const fact = (name, ...kids) => { const p = el('p', 'fx-fact'), t = el('span'); t.append(...kids); p.append(icon(name, 14), t); return p; };
+const TONE_ICON = {ok: 'check', bad: 'octagon', warn: 'alert', none: 'alert'};
+const took = (s) => s < 60 ? Math.round(s) + 's' : s < 3600 ? Math.round(s / 60) + ' min' : Math.floor(s / 3600) + 'h ' + Math.round(s % 3600 / 60) + 'min';
+const money = (n) => '$' + n.toLocaleString('en', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+/* run health: whether it ran and what its check said, when it runs next, and what it cost */
+const loopHealth = (r) => {
+  const tone = TONE[r.status], box = section('health', 'Health', tone);
+  const head = el('p', 'fx-head'), say = el('span'), why = URGENT.includes(r.status) && reason(r);
+  say.append(el('b', '', LABEL[r.status]), why ? ': ' + why : r.checks ? ': ' + r.checks + ' checks passed in 30 days' : '');
+  head.append(icon(TONE_ICON[tone] || 'alert', 16), say); box.append(head);
+  if (r.status === 'no check') box.append(el('p', '', 'Nothing writes a pass or fail line for it, so a run that did nothing looks like one that worked.'));
+  const last = fact('rotate', r.last_run ? 'Last run ' + fullWhen(r.last_run) + ' (' + rel(r.last_run) + ')' : r.result || r.status === 'no record' ? 'Last run unknown' : 'Never run',
+    ...[r.took != null && ' · took ' + took(r.took), r.result && ' · ' + (r.result === 'pass' ? 'passed' : 'failed')].filter(Boolean));
+  if (r.history) last.lastChild.append(' ', hist(r.history));
+  box.append(last);
+  const said = why && r.detail.startsWith(why) ? r.detail.slice(why.length).replace(/^[.;\s]+/, '') : r.detail;
+  if (said) box.append(el('p', 'fx-said', said));
+  box.append(fact('clock', whenText(r)));
+  const cost = r.cost != null ? money(r.cost) + ' in the last 30 days' : ledger() && /cloud|db|app/.test(r.runtime || '') ? 'Cost not metered: it runs outside this machine' : null;
+  if (cost) box.append(fact('wallet', cost));
+  return box;
+};
+/* the goal: its Good against the Floor its charter sets, and who has to act when it's off. The Floor sits in the charter's
+   Mission, which only you change; the improver reads the Good weekly for loops with Improver on, and gets 2 tries below the
+   Floor before it comes to you */
+const goalState = (r) => r.kpi === 'met' ? ['ok', 'Goal met', null]
+  : r.kpi === 'below' ? [r.kpi_escalated ? 'bad' : 'warn', 'Below its Floor', r.kpi_escalated ? ['you', 'Needs you: the improver\'s tries didn\'t lift it.']
+    : ['loop', 'The improver owns this. It gets ' + (r.kpi_of ?? 2) + ' tries, then it comes to you.']]
+  : r.kpi === 'measured' ? ['none', 'Goal measured, with no Floor to compare it to', ['you', 'Needs you: set a Floor in its charter\'s Mission.']]
+  : !r.floor ? ['warn', 'No goal set', ['you', 'Needs you: write a Floor in its charter\'s Mission. Only you change the Mission.']]
+  : r.improver ? ['warn', 'Goal not measured yet', ['loop', 'The improver owns this. It reads the goal each week from the check\'s Good line.']]
+  : ['warn', 'Goal not measured', ['you', 'Needs you: nothing reads this goal. Have its check print a Good line, and turn the improver on in its registry row.']];
+const loopGoal = (r) => {
+  const [tone, head, owner] = goalState(r), box = section('goal', 'Goal', tone), h = el('p', 'fx-head');
+  h.append(icon('gauge', 16), el('b', '', head)); box.append(h);
+  if (owner) { const p = el('p', 'fx-owner'); p.dataset.who = owner[0]; p.append(icon(owner[0] === 'you' ? 'user' : 'check', 14), el('span', '', owner[1])); box.append(p); }
+  const read = ['met', 'below', 'measured'].includes(r.kpi), text = [read ? goodText(r) : r.floor, r.target && 'Target ' + r.target].filter(Boolean).join(' · ');
+  if (text) { const p = el('p', 'fx-good'); p.append(el('b', '', read ? 'Good: ' : 'Floor: '), document.createTextNode(text)); box.append(p); }
+  return box;
+};
+const loopMore = (r) => (more) => { [loopHealth(r), loopChanges(r), defsRow(r), loopActs(r)].forEach((x) => x && more.append(x)); };
 const loopRow = (r, key, grouped) => {
   const right = el('span', 'r');
   right.append(hist(r.history), el('span', '', r.last_run ? rel(r.last_run) : r.result || r.status === 'no record' ? 'unknown' : 'never'));
@@ -1083,29 +1199,50 @@ dash.draw('factory-door', (e) => {
     + (g.hasChief ? (n > target ? ' ' + (n - target) + ' more ' + (n - target === 1 ? 'goes' : 'go') + ' around the chief of staff.' : ' Everything else goes through them.') : ' No loop has Role chief yet, so every loop can reach you.');
   e.append(dot(tone), el('b', '', String(n)), el('span', '', (n === 1 ? ' path reaches' : ' paths reach') + ' you'));
 });
-/* what a node in the graph means: its path to you and what steers it; the drawer shows it */
+/* what a node that isn't a loop means (you, nobody, a service or a stranger); its drawer shows it */
 const nodeParas = (g, id) => {
   const n = g.nodes.get(id), out = [], say = (t, cls) => out.push(el('p', cls || '', t));
   if (!n) return out;
-  const reads = g.ins(id).map((e) => fname(g.nodes.get(e.from))), by = g.outs(id).map((e) => e.to === YOU ? 'you' : fname(g.nodes.get(e.to)));
+  const reads = g.ins(id).map((e) => fname(g.nodes.get(e.from)));
   const label = (k) => k === 'you' ? 'you' : g.nodes.has(k) ? fname(g.nodes.get(k)) : k;
   if (n.kind === 'you') { say(g.doors.length + (g.doors.length === 1 ? ' path reaches' : ' paths reach') + ' you: ' + g.doors.map((k) => label(k) + (g.nodes.get(k).glass ? ' (break-glass: ' + g.nodes.get(k).glass + ')' : '')).join(', ') + '. You read ' + reads.length + ' loops\' output yourself.'); return out; }
   if (n.kind === 'nobody') { say(reads.length + (reads.length === 1 ? ' loop runs' : ' loops run') + ' with no one reading their output: ' + reads.join(', ') + '. Give each a Read by in the registry.'); return out; }
   if (n.kind === 'ext') say(n.service ? 'A service, not a loop: the registry doesn\'t say who reads its output.' : 'Not in the registry, so who reads its output is unknown.');
   if (n.kind === 'ext' && n.glass) say('Break-glass: ' + n.glass + '. May message you directly.');
   if (reads.length) say('Reads ' + reads.join(', ') + '.');
-  if (n.kind !== 'loop') return out;
-  const path = g.route(id);
-  say(g.outs(id).every((e) => e.to === NOBODY) ? 'Nobody reads its output.'
-    : path ? (path.length > 3 ? 'Reaches you through ' + path.slice(1, -1).map((k) => fname(g.nodes.get(k))).join(' → ') : by.includes('you') ? 'You read it yourself' : 'Reaches you through ' + by.join(', ')) + '.'
-    : 'Read by ' + by.join(', ') + ', but the chain never reaches you.', path ? '' : 'warn');
-  if (n.row.moves) say('Moves ' + n.row.moves + ', an input in its project\'s brief.');
-  if (n.row.escalates_to) say('Escalates to ' + g.ladder(id).slice(1).map(label).join(' → ') + (n.row.escalates_default ? ' (the default)' : '') + '.');
-  const sup = n.row.supervisor, kids = g.sups.filter((e) => e.from === id).map((e) => fname(g.nodes.get(e.to)));
-  if (sup) say('Orders from ' + label(sup) + '.');
-  if (kids.length) say('Writes Orders for ' + kids.join(', ') + '.');
-  [n.row.supervisor_issue, n.row.escalation_issue].filter(Boolean).forEach((i) => say(i[0].toUpperCase() + i.slice(1) + '.', 'warn'));
   return out;
+};
+/* who a loop works with, each name once with an icon for every way they're linked, then how its output and its escalations
+   get to you, beyond the names above */
+const loopWho = (r) => {
+  const g = factoryGraph(dash.data('loops').data, false, {project: ''}), id = r.loop, box = section('who', 'Works with');
+  const label = (k) => k === YOU || k === 'you' ? 'you' : g.nodes.has(k) ? fname(g.nodes.get(k)) : k;
+  const links = new Map(), add = (k, ids) => ids.forEach((x) => (links.get(x) || links.set(x, []).get(x)).push(k));
+  add('read', g.outs(id).map((e) => e.to).filter((t) => t !== NOBODY));
+  add('steer', r.supervisor && r.supervisor !== id ? [person(r.supervisor)] : []);
+  add('esc', r.escalates_to ? [person(r.escalates_to)] : []);
+  add('reads', g.ins(id).map((e) => e.from));
+  add('steers', g.sups.filter((e) => e.from === id).map((e) => e.to));
+  add('escs', g.escs.filter((e) => e.to === id).map((e) => e.from));
+  /* what it answers to, then what it looks after: the same icons, so the two lists keep the direction apart */
+  const row = (ks, name) => { const li = el('li'), marks = el('span', 'fx-ris'); marks.append(...ks.map(relIcon)); li.append(marks, name); return li; };
+  [['Answers to', ['read', 'steer', 'esc']], ['Looks after', ['reads', 'steers', 'escs']]].forEach(([title, kinds]) => {
+    const ul = el('ul', 'fx-rels');
+    links.forEach((ks, k) => { const mine = ks.filter((x) => kinds.includes(x)); if (mine.length) ul.append(row(mine, k === YOU ? el('b', '', 'You') : who(k) || el('span', '', label(k)))); });
+    if (title === 'Answers to' && r.moves) ul.append(row(['moves'], el('span', '', r.moves)));
+    if (ul.childElementCount) box.append(el('p', 'fx-sub', title), ul);
+  });
+  const via = (p) => p.slice(1, -1).map(label), route = g.route(id), ladder = g.ladder(id), up = ladder[ladder.length - 1] === 'you' ? via(ladder) : null;
+  const ways = (p) => p.join(', then ');
+  if (!g.outs(id).some((e) => e.to !== NOBODY)) box.append(el('p', 'warn', 'Nobody reads its output. Give it a Read by in the registry.'));
+  else if (!route) box.append(el('p', 'warn', 'Its output never reaches you: the loops that read it stop before you.'));
+  else if (route.length > 2) box.append(fact('user', 'Its output reaches you through ' + ways(via(route)) + '.'));
+  if (up && up.length && ways(up) !== ways(route ? via(route) : [])) box.append(fact('user', 'Its escalations reach you through ' + ways(up) + '.'));
+  const roles = [r.role && 'Role: ' + r.role, r.improver && 'The improver may change it'].filter(Boolean);
+  if (roles.length) box.append(el('p', '', roles.join(' · ')));
+  if (r.break_glass) { const p = el('p', 'warn'); p.append(el('b', '', 'Break-glass: '), r.break_glass); box.append(p); }
+  [r.supervisor_issue, r.escalation_issue].filter(Boolean).forEach((i) => box.append(el('p', 'warn', i[0].toUpperCase() + i.slice(1) + '.')));
+  return box;
 };
 /* a mouse resting on a loop card shows its numbers for a moment, without a click; touch opens the detail below instead */
 const tip = document.querySelector('.fx-tip');
@@ -1115,10 +1252,10 @@ const peek = (chip, r) => {
   if (!chip) return;
   tipWait = setTimeout(() => {
     if (!chip.isConnected) return;
-    const money = r.cost != null ? '$' + r.cost.toFixed(2) + ' in 30 days' : null, next = nextText(r);
+    const spent = r.cost != null ? money(r.cost) + ' in 30 days' : null;
     tip.replaceChildren(el('b', '', r.loop),
-      ...[[...new Set([r.cadence, r.schedule, next].filter(Boolean))],
-        [r.last_run ? 'last run ' + rel(r.last_run) + (r.result ? ', ' + r.result + 'ed' : '') : 'never run', r.checks && r.checks + ' checks passed', money],
+      ...[[upcoming(r) ? whenText(r) : 'No set next run, so the card shows its last run. ' + whenText(r)],
+        [r.last_run ? 'Last run ' + rel(r.last_run) + (r.took != null ? ', took ' + took(r.took) : '') + (r.result ? ', ' + r.result + 'ed' : '') : 'Never run', r.checks && r.checks + ' checks passed', spent],
         [r.kpi && 'North Star: ' + goodText(r)]]
         .map((xs) => xs.filter(Boolean).join(' · ')).filter(Boolean).map((t) => el('p', '', t)),
       ...(r.detail ? [el('p', 'fx-tipd', r.detail)] : []));
@@ -1195,8 +1332,9 @@ dash.draw('factory', (box) => {
     /* one line per chip: status and name; where and how often it runs show on hover and in its drawer */
     const cad = n.kind === 'loop' && n.row.cadence;
     b.append(el('span', '', fname(n)));
+    const when = n.kind === 'loop' && whenMark(n.row); if (when) b.append(when);
     if (read) b.append(el('b', '', String(read)));
-    b.setAttribute('aria-label', fname(n) + (n.kind === 'loop' ? ', ' + LABEL[n.row.status] + (rt ? ', ' + rt[1] : '') + (cad ? ', ' + cad : '') : n.kind === 'ext' ? (n.service ? ', a service' : ', not in the registry') : '')
+    b.setAttribute('aria-label', fname(n) + (n.kind === 'loop' ? ', ' + LABEL[n.row.status] + (rt ? ', ' + rt[1] : '') + (cad ? ', ' + cad : '') + (when ? (upcoming(n.row) ? ', next run ' : ', last run ') + when.textContent : '') : n.kind === 'ext' ? (n.service ? ', a service' : ', not in the registry') : '')
       + (role ? ', ' + role : '') + (n.glass ? ', break-glass: ' + n.glass : '') + (read ? ', reads ' + read : '') + (gap ? ', nobody reads it' : '') + (issue ? ', ' + issue : ''));
     chips.set(n.id, b);
     return b;
@@ -1501,9 +1639,8 @@ const SHEETS = {
   loop: ({id}) => {
     const r = anyRow(id); if (!r) return null;
     return {title: nameOf(r), tone: TONE[r.status], sub: [LABEL[r.status], r.project || 'General', r.loop !== nameOf(r) && r.loop].filter(Boolean).join(' · '), fill: (box) => {
-      loopSummary(r, box);
-      if (registered(r)) { const path = nodeParas(factoryGraph(dash.data('loops').data, false, {project: ''}), r.loop); if (path.length) { const d = el('div', 'fx-path'); d.append(...path); box.append(d); } }
-      [loopChanges(r), defsRow(r), loopActs(r)].forEach((x) => x && box.append(x));
+      const reg = registered(r);
+      [loopHealth(r), reg && loopGoal(r), reg && loopWho(r), reg && loopOrders(r), loopChanges(r), defsRow(r), loopActs(r)].forEach((x) => x && box.append(x));
       if (registered(r)) loopTalk(r, box);
     }};
   },

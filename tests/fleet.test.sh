@@ -48,7 +48,7 @@ cat > "$AGENT_OPS_DIR/REGISTRY.md" <<EOF
 | Poster | routine:poster | posts, then a check proves it |
 EOF
 {
-  echo "{\"loop\":\"good\",\"date\":\"$(day 1)\",\"subtype\":\"success\",\"cost\":2}"
+  echo "{\"loop\":\"good\",\"date\":\"$(day 1)\",\"subtype\":\"success\",\"cost\":2,\"secs\":90}"
   echo "{\"loop\":\"good\",\"date\":\"$(day 1)\",\"check\":\"pass\",\"detail\":\"report landed\"}"
   echo "{\"loop\":\"broken\",\"date\":\"$(day 1)\",\"check\":\"fail\",\"detail\":\"report missing\"}"
   for v in fail fail fail pass; do echo "{\"loop\":\"flaky\",\"date\":\"$(day 1)\",\"check\":\"$v\"}"; done
@@ -86,6 +86,9 @@ expect "a ledger name with no row is unregistered" "[ \"\$(status stray)\" = unr
 expect "an adhoc run is a one-off, not a loop" "[ \"\$(status adhoc)\" = one-off ] && jq -e '.rows[] | select(.loop == \"adhoc\") | .project == \"One-off\" and .cost == 0.5' \"$L\" >/dev/null"
 expect "a routine service is read from the snapshot: there, off, gone" "[ \"\$(status Watchman)\" = service ] && [ \"\$(status Sleeper)\" = paused ] && [ \"\$(status Gone)\" = missing ] && jq -e '.rows[] | select(.loop == \"Gone\") | .runtime == \"cloud\" and (.detail | test(\"no routine named gone in the claude.ai snapshot\"))' $L >/dev/null"
 expect "a service that logs a failed check is failing, with its pass rate" "[ \"\$(status Poster)\" = failing ] && jq -e '.rows[] | select(.loop == \"Poster\") | .checks == \"0 of 1\" and .detail == \"post not on the API\"' $L >/dev/null"
+expect "a loop's last run carries how long it took" "[ \"\$(jq -r '.rows[] | select(.loop == \"good\") | .took' $L)\" = 90 ]"
+expect "a routine's next fires are its UTC cron in local time, four of them" "[ \"\$(jq -r '.rows[] | select(.loop == \"good\") | .next_runs' $L)\" = \"\$(python3 -c 'import datetime as dt; n = dt.datetime.now(dt.timezone.utc); d = n.replace(hour=6, minute=0, second=0, microsecond=0); d += dt.timedelta(days=d <= n); print(\" \".join((d + dt.timedelta(days=i)).astimezone().strftime(\"%Y-%m-%dT%H:%M\") for i in range(4)))')\" ]"
+expect "a long check line is cut at a word, with an ellipsis" "[ \"\$(python3 -c 'import sys; sys.path.insert(0, \"fleet\"); from fleet import clip; print(clip(\"numbers in,  every PR graded\", 20))')\" = 'numbers in, every…' ]"
 expect "read by is a comma list"            "jq -e '.rows[] | select(.loop == \"broken\") | .read_by == \"good, heartbeat\"' $L >/dev/null"
 expect "every cell is a scalar, as on claude.ai" "jq -se 'all(.[].rows[][]; type != \"array\" and type != \"object\")' $L $AGENT_OPS_DIR/fleet/waiting.json >/dev/null"
 expect "a loop's KPI is its latest kpi.jsonl line, as scalar cells" "jq -e '[.rows[] | select(.loop == \"broken\" or .loop == \"good\" or .loop == \"flaky\" or .loop == \"fresh\") | [.loop, .kpi, .kpi_value, .kpi_attempts, .kpi_of, .kpi_since, .kpi_better]] | sort == [[\"broken\", \"below\", 50, 1, 2, \"2026-11-22\", null], [\"flaky\", null, null, null, null, null, null], [\"fresh\", \"measured\", 5, null, null, null, \"higher\"], [\"good\", \"no KPI\", null, null, null, null, null]]' $L >/dev/null"

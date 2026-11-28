@@ -150,6 +150,11 @@ def fires(spec, start, direction, days=70):
                      for h in (s["Hour"] or range(24)) for m in (s["Minute"] or range(60))}, reverse=direction < 0)
         yield from (t for t in ts if (t > start if direction > 0 else t <= start))
 
+def clip(text, n=200):
+    """text as one line, cut at the last whole word within n characters, with an ellipsis when it was cut."""
+    text = " ".join(text.split())
+    return text if len(text) <= n else text[:n].rsplit(" ", 1)[0].rstrip(",;:.") + "…"
+
 def nth(gen, n):
     for i, x in enumerate(gen):
         if i == n: return x
@@ -463,7 +468,7 @@ def ledger(now):
         win_checks = [r for r in checks if r["date"] >= since]
         win_claude = [r for r in claude if r["date"] >= since]
         if checks:
-            last_ok, detail = checks[-1]["check"] == "pass", " ".join(checks[-1]["detail"].split())
+            last_ok, detail = checks[-1]["check"] == "pass", checks[-1]["detail"]
             passes, total = sum(r["check"] == "pass" for r in win_checks), len(win_checks)
         else:
             last_ok = not failed(claude[-1])
@@ -474,7 +479,8 @@ def ledger(now):
         history = "".join("p" if r["check"] == "pass" else "f" for r in checks[-10:]) if checks else \
                   "".join("f" if failed(r) else "p" for r in claude[-10:])
         out[loop] = {
-            "last": max(r["date"] for r in rs), "last_ok": last_ok, "detail": detail[:200],
+            "last": max(r["date"] for r in rs), "last_ok": last_ok, "detail": clip(detail),
+            "secs": claude[-1].get("secs") if claude and isinstance(claude[-1].get("secs"), (int, float)) else None,
             "passes": passes, "total": total, "chronic": last7.count("fail") >= 3,
             "fails7": f"{last7.count('fail')} of last {len(last7)}",
             "cost": round(sum(r["cost"] for r in win_claude), 2),
@@ -744,6 +750,13 @@ def build():
         if override: spec = cron_spec(override.group(1), both=True)
         if spec and not (row["next_due"] and kind != "local"):
             row["next_due"] = iso(nth(fires(spec, now, 1), 0))
+        if spec:  # the fires after the next one too, so a page built hours ago still knows the next run once that one passed.
+            # A routine's or task's cron is in UTC, and claude.ai's own next run comes first
+            utc = kind != "local" and not override
+            local = (lambda t: t.replace(tzinfo=dt.timezone.utc).astimezone().replace(tzinfo=None)) if utc else (lambda t: t)
+            start = now.astimezone(dt.timezone.utc).replace(tzinfo=None) if utc else now
+            after = dt.datetime.fromisoformat(row["next_due"]) if row["next_due"] and kind != "local" else now
+            row["next_runs"] = " ".join(iso(t) for t, _ in zip((t for t in map(local, fires(spec, start, 1)) if t > after), range(4)))
         if not spec and not row["next_due"]:
             row["next_due"] = "on event"
         row["cadence"] = (every(j["interval"]) if j and j["interval"] else cadence(spec) if spec
@@ -751,14 +764,14 @@ def build():
         check = check_of(loop)
         if loop in led:
             l = led[loop]
-            row.update(last_run=l["last"][:16], result="pass" if l["last_ok"] else "fail", detail=l["detail"],
+            row.update(last_run=l["last"][:16], result="pass" if l["last_ok"] else "fail", detail=l["detail"], took=l["secs"],
                        pass_rate=round(l["passes"] / l["total"], 3) if l["total"] else None,
                        checks=f"{l['passes']} of {l['total']}", cost=l["cost"], history=l["history"])
             if l["chronic"]: row["detail"] = f"{l['fails7']} checks failed. " + row["detail"]
         elif check:  # loops that don't log (cloud routines): the builder runs their plain check
             c = subprocess.run([sys.executable, str(check)], capture_output=True, text=True, errors="replace")
             row["result"] = "pass" if c.returncode == 0 else "fail"
-            row["detail"] = " ".join((c.stdout or c.stderr).split())[:200]
+            row["detail"] = clip(c.stdout or c.stderr)
         elif j and j.get("exit") is not None:  # nothing logged: launchd's last exit and its log file's time
             row.update(result="pass" if j["exit"] == 0 else "fail", last_run=iso(j["log_at"]),
                        detail=f"last run exited {j['exit']}" + ("; launchd restarted it" if j["running"] else "" if j["log_at"]
@@ -834,7 +847,7 @@ def build():
     said = talk(rows, now)
     heavy = weight(rows)
     keys = ["loop", "project", "scope", "runtime", "job", "schedule", "cadence", "status", "last_run", "result", "detail",
-            "next_due", "pass_rate", "checks", "cost", "history", "read_by", "supervisor", "supervisor_issue",
+            "next_due", "next_runs", "took", "pass_rate", "checks", "cost", "history", "read_by", "supervisor", "supervisor_issue",
             "role", "escalates_to", "escalates_default", "break_glass", "escalation_issue", "improver", "moves",
             "charter", "orders", "prompt", "runner", "report", "log", "floor", "target", *KPI.values()]
     rows = [{k: r.get(k) for k in keys} for r in rows]
