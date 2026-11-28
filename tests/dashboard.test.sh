@@ -33,6 +33,7 @@ row = next(r for r in loops["rows"] if r["loop"] == "ops-a")
 loops["rows"] += [{**row, "loop": n, "project": p, "scope": p, "read_by": c} for n, p, c in
                   ((5, "Shop", "you"), (None, "Shop", "you"), ("you", "Shop", "ops-a"), ("nobody", "Shop", "you"), ("lonely", "Shop", ""),
                    ("لولאת-חנות-loop", "לולאת-חנות", "you"), ("zalgo-loop", "Zalgo-Z̷̢͓̈́a̸̧̛l̶g̷o̶", "you"), ("long-loop", "P" * 255, "you"))]
+loops["rows"].append({**row, "loop": "stray", "project": "Unregistered", "scope": "Unregistered", "status": "unregistered", "detail": None, "read_by": None})
 item = {"title": "Pick a price", "tag": "Decision", "source": "Queue", "kind": "Queue", "item": "Pick a price", "action": "decide",
         "where": "queue (decision)", "link": None, "since": None, "project": "", "scope": "General"}
 waiting["rows"] = [{**item, "title": f"due {d}", "due": d} for d in ("tomorrow", "2026-13-45", "99999-01-01", "", None, "2026-11-01", "2099-01-01")]
@@ -132,6 +133,7 @@ expect "Feeds: the drawer is modal: the page behind it is inert, Tab stays insid
 expect "Feeds: Escape closes the drawer, frees the page and returns to the name clicked" "q odd '.talk.closed'"
 expect "Feeds: a name deep in the feed opens the whole drawer in view, the page no wider" "q odd '.talk.deep.scrolled and .talk.deep.fits and .talk.deep.page <= 0'"
 expect "Feeds: the composer turns a message into a prompt to copy" "q odd '.talk.compose != null'"
+expect "every loop's drawer and row expansion draw, an unregistered one with no detail too" "q odd '.every == [] and .everyCount > 10'"
 expect "Feeds: Escape hides a keyboard-focused relation tip first, then closes the drawer, with no page error" "q odd '.talk.tip.shown and .talk.tip.hidden and .talk.tip.open and .errors == []'"
 expect "Feeds: a fleet that said nothing says so" "q clique '.talk.rows == 0'"
 expect "a long name keeps its loop count in view" "q odd '.loops.countsVisible'"

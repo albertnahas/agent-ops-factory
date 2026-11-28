@@ -157,7 +157,7 @@
 .fx-ri { all: unset; position: relative; box-sizing: border-box; width: 28px; height: 28px; display: inline-grid; place-items: center; border-radius: 7px; cursor: pointer;
   color: var(--color-fg); background: color-mix(in srgb, var(--color-fg) 8%, transparent); }
 .fx-ri:focus-visible { outline: 2px solid var(--color-fg); outline-offset: 1px; }
-.fx-ri-tip { position: absolute; left: 0; bottom: calc(100% + 6px); z-index: 3; width: max-content; max-width: 240px; padding: 6px 8px; border-radius: 6px;
+.fx-ri-tip { position: absolute; left: 0; top: calc(100% + 6px); z-index: 3; width: max-content; max-width: 240px; padding: 6px 8px; border-radius: 6px;
   background: var(--color-fg); color: var(--fx-card); font-size: 12px; font-weight: 400; line-height: 1.35; pointer-events: none; opacity: 0; visibility: hidden; transition: opacity 120ms; }
 /* a phone keeps :hover on the last thing tapped, so only a real pointer shows a tip on hover; a tap toggles .show */
 .fx-ri:focus-visible:not(.hush) .fx-ri-tip, .fx-ri.show .fx-ri-tip { opacity: 1; visibility: visible; }
@@ -941,7 +941,7 @@ const loopHealth = (r) => {
     ...[r.took != null && ' · took ' + took(r.took), r.result && ' · ' + (r.result === 'pass' ? 'passed' : 'failed')].filter(Boolean));
   if (r.history) last.lastChild.append(' ', hist(r.history));
   box.append(last);
-  const said = why && r.detail.startsWith(why) ? r.detail.slice(why.length).replace(/^[.;\s]+/, '') : r.detail;
+  const said = why && (r.detail || '').startsWith(why) ? r.detail.slice(why.length).replace(/^[.;\s]+/, '') : r.detail;
   if (said) box.append(el('p', 'fx-said', said));
   box.append(fact('clock', whenText(r)));
   const cost = r.cost != null ? money(r.cost) + ' in the last 30 days' : ledger() && /cloud|db|app/.test(r.runtime || '') ? 'Cost not metered: it runs outside this machine' : null;

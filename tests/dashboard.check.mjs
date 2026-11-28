@@ -19,6 +19,10 @@ const frames = () => page.evaluate(() => new Promise((r) => requestAnimationFram
 const timed = async (f) => { const t = Date.now(); await f(); await frames(); return Date.now() - t; };
 const close = async () => { await page.keyboard.press('Escape'); await frames(); };
 const sheetText = () => page.evaluate(() => [...document.querySelectorAll('.fx-sheet p')].map((p) => p.textContent));
+/* every loop's drawer and its row expansion draw without throwing, whatever the builder left empty */
+const every = async () => page.evaluate(() => { const bad = [], rows = dash.data('loops').data;
+  for (const r of rows) { try { FX.stack = [{kind: 'loop', id: r.loop}]; dash.draw('sheet'); loopMore(r)(document.createElement('div')); } catch (e) { bad.push(r.loop + ': ' + e); } }
+  FX.stack = []; dash.draw('sheet'); return [bad, rows.length]; });
 const ms = {};
 ms.load = await timed(async () => { await page.goto('file://' + file); await page.waitForFunction(() => dash.data('loops').status === 'ok'); });
 
@@ -69,6 +73,8 @@ if (form.offered) {
   form.editFields = await fields(); await fill(); form.edit = await built();
   await close();
 }
+
+const [everyBad, everyCount] = await every();
 
 /* Feeds: each dated line once, no unknown sender; a name opens the loop's drawer with its Orders now and Conversation */
 await page.click('#tab-feeds'); await frames();
@@ -230,4 +236,4 @@ if (improver.rows) {
 }
 ms.overflow = await page.evaluate(() => document.body.scrollWidth - document.body.clientWidth);
 await browser.close();
-console.log(JSON.stringify({ms, errors, attention, back, factory, canvas, loops, improver, form, talk, evals, waiting}));
+console.log(JSON.stringify({every: everyBad, everyCount, ms, errors, attention, back, factory, canvas, loops, improver, form, talk, evals, waiting}));
